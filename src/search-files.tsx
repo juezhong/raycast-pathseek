@@ -84,28 +84,28 @@ export function SearchFilesView({
   const emptyTitle = missingBinary
     ? "Missing Required Tool"
     : loadError
-    ? "Search Error"
-    : index === undefined
-      ? "Loading Index"
-      : !index
-        ? "No Index Yet"
-        : !query.trim()
-          ? "Type to Search"
-          : "No Matching Files";
+      ? "Search Error"
+      : index === undefined
+        ? "Loading Index"
+        : !index
+          ? "No Index Yet"
+          : !query.trim()
+            ? "Type to Search"
+            : "No Matching Files";
 
   const emptyDescription = missingBinary
     ? missingBinaryMessage(missingBinary)
     : loadError
       ? loadError
-    : !index
-      ? "No index yet. First install fd and fzf (brew install fd fzf), then choose folders in Build Index. Nothing is indexed automatically."
-      : !query.trim()
-        ? "Indexed " +
-          index.count.toLocaleString() +
-          " paths on " +
-          new Date(index.createdAt).toLocaleString() +
-          "."
-        : "Try a different pattern or rebuild the index to include new files.";
+      : !index
+        ? "No index yet. First install fd and fzf (brew install fd fzf), then choose folders in Build Index. Nothing is indexed automatically."
+        : !query.trim()
+          ? "Indexed " +
+            index.count.toLocaleString() +
+            " paths on " +
+            new Date(index.createdAt).toLocaleString() +
+            "."
+          : "Try a different pattern or rebuild the index to include new files.";
 
   return (
     <List
