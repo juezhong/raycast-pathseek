@@ -8,6 +8,7 @@ import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Transform } from "node:stream";
 import lockfile from "proper-lockfile";
+import { beginCommandTrace } from "./command-trace";
 import { ACTIVE_INDEX_FILENAME, cleanupLegacyIndexes, prepareIndex, publishIndex, readIndexHeader, type SavedIndexMetadata } from "./index-files";
 
 export type Preferences = {
@@ -111,8 +112,20 @@ export async function readIndex(): Promise<IndexMetadata | null> {
   return { ...metadata, dataOffset: 0 };
 }
 
-async function runFd(fdPath: string, args: string[], outputPath: string): Promise<number> {
+async function runFd(
+  fdPath: string,
+  args: string[],
+  outputPath: string,
+  reason: "manual-rebuild" | "15-day-refresh",
+): Promise<number> {
+  // Show effective flags without exposing directory names or exclude patterns.
+  const flags = args.filter((arg) => ["--absolute-path", "--print0", "--hidden", "--follow"].includes(arg));
+  const excludeCount = args.filter((arg) => arg === "--exclude").length;
+  const invocation = "fd " + flags.join(" ") +
+    (excludeCount ? " --exclude <redacted> (x" + excludeCount + ")" : "") + " . <root>";
+  const trace = await beginCommandTrace("fd", reason, invocation);
   const child = spawn(fdPath, args, { stdio: ["ignore", "pipe", "pipe"] });
+  let exitCode: number | null | undefined;
   const chunks: string[] = [];
   let count = 0;
   child.stderr.on("data", (data: Buffer) => {
@@ -129,6 +142,7 @@ async function runFd(fdPath: string, args: string[], outputPath: string): Promis
   const completed = new Promise<void>((resolve, reject) => {
     child.once("error", reject);
     child.once("close", (code) => {
+      exitCode = code;
       if (code === 0) resolve();
       else reject(new Error(`fd failed (exit ${code}): ${chunks.join("").trim()}`));
     });
@@ -136,9 +150,11 @@ async function runFd(fdPath: string, args: string[], outputPath: string): Promis
 
   try {
     await Promise.all([pipeline(child.stdout, meter, createWriteStream(outputPath, { flags: "a" })), completed]);
+    await trace?.finish("success", count, exitCode);
     return count;
   } catch (error) {
     child.kill();
+    await trace?.finish("failure", count, exitCode, error);
     throw error;
   }
 }
@@ -221,7 +237,7 @@ export async function rebuildIndex(options: { skipIfFresh?: boolean } = {}): Pro
     try {
       await writeFile(rawTemp, "", { flag: "wx" });
       for (const root of roots) {
-        total += await runFd(fd, [...args, ".", root], rawTemp);
+        total += await runFd(fd, [...args, ".", root], rawTemp, options.skipIfFresh ? "15-day-refresh" : "manual-rebuild");
       }
 
       const metadata: IndexMetadata = {
