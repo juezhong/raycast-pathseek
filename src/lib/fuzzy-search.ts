@@ -42,7 +42,11 @@ export async function fuzzySearch(
       child.kill();
       finish(error);
     });
-    child.stdin.on("error", (error: NodeJS.ErrnoException) => {\n      // 到达结果上限并结束 fzf 时，输入流可能出现预期的 EPIPE。\n      if (error.code !== "EPIPE" && !limited && !signal?.aborted) finish(error);\n    });\n    input.pipe(child.stdin);
+    child.stdin.on("error", (error: NodeJS.ErrnoException) => {
+      // 到达结果上限并结束 fzf 时，输入流可能出现预期的 EPIPE。
+      if (error.code !== "EPIPE" && !limited && !signal?.aborted) finish(error);
+    });
+    input.pipe(child.stdin);
 
     child.stdout.on("data", (data: Buffer) => {
       pending = Buffer.concat([pending, data]);
