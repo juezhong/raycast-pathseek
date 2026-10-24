@@ -10,7 +10,7 @@ import { Transform } from "node:stream";
 import lockfile from "proper-lockfile";
 import { beginCommandTrace } from "./command-trace";
 import { getConfiguredIndexRoots, normalizeIndexRoots } from "./index-roots";
-import { ACTIVE_INDEX_FILENAME, cleanupLegacyIndexes, prepareIndex, publishIndex, readIndexHeader, type SavedIndexMetadata } from "./index-files";
+import { ACTIVE_INDEX_FILENAME, cleanupLegacyIndexes, cleanupStaleBuildTemps, prepareIndex, publishIndex, readIndexHeader, type SavedIndexMetadata } from "./index-files";
 
 export type Preferences = {
   includeHidden: boolean;
@@ -175,6 +175,13 @@ export async function rebuildIndex(selectedRoots?: string[]): Promise<IndexMetad
   });
 
   try {
+    // Maintenance runs only after the explicit Build/Rebuild action acquires
+    // the write lock. Search Files and Index Status never touch these files.
+    try {
+      await cleanupStaleBuildTemps(indexDirectory);
+    } catch (error) {
+      console.warn("Stale build artifact cleanup deferred:", error);
+    }
     const prefs = getPreferences();
     const previous = await readIndex();
     const roots = selectedRoots
