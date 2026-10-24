@@ -124,8 +124,10 @@ npm run build
 
 采用 [MIT License](LICENSE)。上游来源与版权通知见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。当前开发图标临时使用 MIT 许可的 Fuzzy File Search 上游资源，提交 Raycast Store 前需要更换为 PathSeek 原创图标。
 
-## Open/Save 对话框辅助导航（P4.1 · 开发版）
+## Open/Save 对话框中快速选择文件或目录（开发版）
 
-新命令 **Search in Open/Save Dialog** 可把 PathSeek 搜索到的文件**所在目录**粘贴回原应用已有的「前往文件夹」文本框。工作流程：原应用的 Open/Save 窗口按 **⌘⇧G** → 呼出 Raycast 的 **Search in Open/Save Dialog** → 搜索并按 **Return** 粘贴父目录 → 在原来的对话框里手动按 **Return** 导航。若结果本身是文件夹，可在 ⌘K 菜单选择 **Paste Selected Path (For Folder Results)**。
+新命令 **Search in Open/Save Dialog** 只负责两件事：让你在原应用的 **Open** 文件选择框中快速定位并选择文件，或者在 **Open/Save** 对话框中快速进入目标文件夹。
 
-**这是辅助导航，而非完整自动跳转。** 插件不会自动按 ⌘⇧G、不会确认 Open/Save、不会打开额外 Finder，也不会自动建索引。详细步骤和支持边界见 [Open/Save 对话框说明](docs/open-save-dialog.md)。实机测试见 [Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7)。
+在原应用先按 **⌘⇧G** 打开「前往文件夹」，呼出 PathSeek 搜索文件/目录，按 **Return** 粘贴**完整路径**，回原应用按 Return 查看定位结果。对文件，标准 Open 对话框可能直接选中目标文件；具体行为待你的 Mac 实测。备用动作 **⌘K → Go to Containing Folder (Fallback)** 则只进入文件所在目录。
+
+不会自动弹出文件管理器、识别/控制活动窗口或确认 Open/Save。**不做更复杂的“自动导航”方案**。详见 [简明操作说明](docs/open-save-dialog.md) 与 [Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7)。
