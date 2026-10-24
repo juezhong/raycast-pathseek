@@ -38,7 +38,7 @@ function ChooseFolders({
         </ActionPanel>
       }
     >
-      <Form.Description text="Select one or more directories. PathSeek never scans until you explicitly choose to build an index. Change them later with Cmd+K in Rebuild Index." />
+      <Form.Description text="Select one or more directories. PathSeek never scans until you explicitly choose to build an index. Change them later with Cmd+K in Build Index." />
       <Form.FilePicker
         id="folders"
         title="Index Folders"
@@ -128,11 +128,11 @@ export default function RebuildIndex() {
 
   const markdown =
     mode === "loading"
-      ? "# Rebuild Index\n\nReading saved folders. No scan will start automatically."
+      ? "# Build Index\n\nReading saved folders. No scan will start automatically."
       : mode === "building"
         ? "# Building Index\n\nRunning fd on your selected folders. The previous index stays available until the new one is complete."
         : [
-            "# Rebuild Index",
+            "# Build Index",
             "",
             "**Indexing is manual only.** Opening this command, Search Files or Index Status never starts a scan.",
             "",
