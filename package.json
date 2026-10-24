@@ -1,0 +1,97 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "pathseek",
+  "title": "PathSeek – File Navigator",
+  "description": "Search a manually maintained file index and navigate to files quickly on macOS.",
+  "icon": "extension-icon.png",
+  "author": "juezhong",
+  "platforms": [
+    "macOS"
+  ],
+  "categories": [
+    "Productivity",
+    "System"
+  ],
+  "license": "MIT",
+  "preferences": [
+    {
+      "name": "searchRoots",
+      "title": "Search Roots",
+      "description": "Absolute directories to index, one per line. ~ expands to your home directory.",
+      "type": "textfield",
+      "default": "~",
+      "required": true
+    },
+    {
+      "name": "includeHidden",
+      "title": "Include Hidden Files",
+      "description": "Include hidden files and directories when rebuilding the index.",
+      "type": "checkbox",
+      "label": "Include hidden paths",
+      "default": false,
+      "required": false
+    },
+    {
+      "name": "followSymlinks",
+      "title": "Follow Symbolic Links",
+      "description": "Follow symlinked directories (can cause extensive traversal).",
+      "type": "checkbox",
+      "label": "Follow symlinked directories",
+      "default": false,
+      "required": false
+    },
+    {
+      "name": "excludePatterns",
+      "title": "Exclude Patterns",
+      "description": "Optional fd glob patterns to exclude, separated by commas.",
+      "type": "textfield",
+      "default": ".git,node_modules",
+      "required": false
+    },
+    {
+      "name": "fdBinary",
+      "title": "fd Executable",
+      "description": "Optional absolute path. Default: find fd in Homebrew, Cargo or PATH.",
+      "type": "textfield",
+      "required": false
+    },
+    {
+      "name": "fzfBinary",
+      "title": "fzf Executable",
+      "description": "Optional absolute path. Default: find fzf in Homebrew or PATH.",
+      "type": "textfield",
+      "required": false
+    }
+  ],
+  "commands": [
+    {
+      "name": "search-files",
+      "title": "Search Files",
+      "description": "Search files and folders using the saved index.",
+      "mode": "view"
+    },
+    {
+      "name": "rebuild-index",
+      "title": "Rebuild Index",
+      "description": "Manually regenerate the persistent file index with fd.",
+      "mode": "view"
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^1.102.3"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^2.0.4",
+    "@types/node": "^22.13.10",
+    "@types/react": "^19.0.10",
+    "eslint": "^9.22.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.2"
+  },
+  "scripts": {
+    "dev": "ray develop",
+    "build": "ray build",
+    "lint": "ray lint",
+    "publish": "npx @raycast/api@latest publish"
+  }
+}
