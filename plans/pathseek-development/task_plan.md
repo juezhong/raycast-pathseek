@@ -6,9 +6,9 @@
 - Plan Directory: plans/pathseek-development/
 - Write Mode: continuous_checkpoints
 - Status: active / code-review-quality-gate
-- Current Phase: Q1 — PR3 pre-merge quality review complete, awaiting merge authorization
-- Checkpoint ID: pathseek-20261024-pr3-premerge-10
-- Last Checkpoint: pathseek-20261024-pr3-premerge-10 (2026-10-24; verified across three files)
+- Current Phase: P4 — Original application Open/Save dialog navigation design
+- Checkpoint ID: pathseek-20261024-pr3-merged-11
+- Last Checkpoint: pathseek-20261024-pr3-merged-11 (2026-10-24; three-file check)
 - Last Updated: 2026-10-24
 - Storage: github_checkpointed
 
@@ -177,3 +177,16 @@ Issue #6 的 11/11 项用户可见 Mac 验收已完成，PR #3 最新 macOS CI �
 
 ## Active Next Step (pathseek-20261024-pr3-premerge-10)
 PR #3 核心代码已完成用户 Issue #6（11/11）验收及 macOS CI 的 npm ci、18/18 tests、TypeScript、源码 ESLint 与 Raycast build；合并前技术复审已出。下一步请维护者确认是否授权将 Draft PR #3 合并到 main；如确认，先转 Ready/核验 CI 并合并，再开始 P4 原应用 Open/Save 对话框导航的设计与最小原型。Store 账号/发布格式待正式上架前处理。
+
+## 2026-10-24 — PR #3 正式合并，开始 P4 规划（pathseek-20261024-pr3-merged-11）
+
+- [x] 用户明确授权合并 Draft PR #3，已转 Ready 并 Squash Merge 到 main，commit `09d7a864257c88d9869aac545e90aea11c6b2558`。
+- [x] 已核对 main 的最新索引源码、锁文件以及 closed/merged PR 状态；Issue #4 也已更新。
+- [x] 核心 P2/P3 的 11/11 Mac 使用验收 + 18/18 开发 CI 已完成。
+- [ ] **P4 第一阶段**：研究 macOS 当前 Open/Save panel 在第三方应用中的交互方式，评估 AX 权限、原生面板与非标准面板的支持范围；实现安全的原位路径导航，不自动确认。
+- [ ] P2 延后增强：异常强杀端到端测试、失效路径提示、类型筛选、旧索引/temp 诊断；详见 [Issue #4](https://github.com/juezhong/raycast-pathseek/issues/4)。
+- [ ] 正式 Raycast Store 发布身份/Prettier 和专属图标，在上架前完成。
+- [ ] 用户本地清理独立测试 worktree 时检查是否有未提交改动，不强制删除。
+
+## Active Next Step (pathseek-20261024-pr3-merged-11)
+PR #3 已合并进 main（squash commit 09d7a864257c88d9869aac545e90aea11c6b2558），用户可在原始仓库 git switch main && git pull --ff-only origin main，检查 git worktree list 后安全移除 ../raycast-pathseek-pr3。下一阶段启动 P4：设计 macOS 原应用 Open/Save 面板中的安全路径导航，不自动确认 Open/Save，先调研 Accessibility、标准面板与第三方面板兼容性；剩余 P2 在 Issue #4 持续跟踪。
