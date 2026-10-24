@@ -1,0 +1,45 @@
+# One-time repository cleanup requested by the maintainer.
+# This deletes ONLY the 3 verified merged PR branches. It never moves main or tags.
+name: Remove merged PathSeek branches (one time)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/remove-merged-branches-once.yml"
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Delete only merged and checked branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          branches=(
+            "fix/stable-index-file-atomic-swap:3"
+            "feat/p4-assisted-open-save-navigation:8"
+            "chore/streamline-readme-and-repo:12"
+          )
+          for spec in "${branches[@]}"; do
+            branch="${spec%:*}"
+            number="${spec##*:}"
+            merged="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$number" --jq .merged)"
+            if [[ "$merged" != "true" ]]; then
+              echo "Refusing to delete $branch: PR #$number is not merged"
+              exit 1
+            fi
+            if [[ -z "$(git ls-remote --heads origin "$branch")" ]]; then
+              echo "$branch already deleted"
+              continue
+            fi
+            git push origin --delete "$branch"
+          done
+          echo "All three merged development branches removed"
