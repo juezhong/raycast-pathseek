@@ -19,7 +19,7 @@ export async function fuzzySearch(
   const binary = await findBinary("fzf", getPreferences().fzfBinary);
   const input = await openIndexDataStream(indexFilePath(index));
   // Actual argv contains the search query; never write it to the trace.
-  const trace = await beginCommandTrace("fzf", "fuzzy-query", "fzf --read0 --print0 --filter <redacted>");
+  const trace = await beginCommandTrace("fzf", "fuzzy-query", "fzf --extended --read0 --print0 --filter <redacted>");
   let exitCode: number | null | undefined;
 
   try {
@@ -38,7 +38,7 @@ export async function fuzzySearch(
       else resolve(results);
     };
 
-    const child = spawn(binary, ["--read0", "--print0", "--filter", query], {
+    const child = spawn(binary, ["--extended", "--read0", "--print0", "--filter", query], {
       stdio: ["pipe", "pipe", "pipe"],
       signal,
     });
