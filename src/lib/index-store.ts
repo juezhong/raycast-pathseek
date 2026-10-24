@@ -2,12 +2,13 @@ import { environment, getPreferenceValues } from "@raycast/api";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { createWriteStream, constants } from "node:fs";
-import { access, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Transform } from "node:stream";
 import lockfile from "proper-lockfile";
+import { ACTIVE_INDEX_FILENAME, cleanupLegacyIndexes, publishIndex } from "./index-files";
 
 export type Preferences = {
   searchRoots: string;
@@ -17,8 +18,6 @@ export type Preferences = {
   fdBinary?: string;
   fzfBinary?: string;
 };
-
-export const ACTIVE_INDEX_FILENAME = "index.nul";
 
 export type IndexMetadata = {
   version: 1;
@@ -179,28 +178,6 @@ export async function refreshExpiredIndex(metadata: IndexMetadata): Promise<Inde
  * Delete older index generations only AFTER a new file has been published.
  * Runs within the exclusive cross-process rebuild lock.
  */
-/**
- * Legacy cleanup only. Current generations always use a stable index.nul
- * pathname: an atomic rename replaces its content without leaving readers
- * with stale generation-specific names. Legacy UUID files get a grace period
- * because a search command may still hold an old metadata snapshot.
- */
-async function cleanupLegacyGenerations(): Promise<void> {
-  const LEGACY_GRACE_MS = 24 * 60 * 60 * 1000;
-  const published = await readIndex();
-  if (!published || published.filename !== ACTIVE_INDEX_FILENAME) return;
-
-  const entries = await readdir(indexDirectory);
-  for (const filename of entries) {
-    if (!/^index-[a-f0-9-]+\.nul$/.test(filename)) continue;
-    const filepath = path.join(indexDirectory, filename);
-    const fileInfo = await stat(filepath).catch(() => null);
-    if (!fileInfo || Date.now() - fileInfo.mtimeMs < LEGACY_GRACE_MS) continue;
-    // This does not touch index.nul, nor unrecognized files.
-    await rm(filepath, { force: true });
-  }
-}
-
 export async function rebuildIndex(options: { skipIfFresh?: boolean } = {}): Promise<IndexMetadata> {
   await mkdir(indexDirectory, { recursive: true });
   // Heartbeat prevents simultaneous rebuilds. Abandoned locks expire.
@@ -247,10 +224,8 @@ export async function rebuildIndex(options: { skipIfFresh?: boolean } = {}): Pro
         total += await runFd(fd, [...args, ".", root], tempPath);
       }
 
-      // Atomic replacement: readers open a stable path and never chase a deleted UUID.
-      await rename(tempPath, finalPath);
-      const fileInfo = await stat(finalPath);
-      if (!fileInfo.isFile()) throw new Error("Index is not a regular file");
+      // Always replace a stable pathname, never publish/deallocate UUID files.
+      await publishIndex(tempPath, indexDirectory);
 
       const metadata: IndexMetadata = {
         version: 1,
@@ -264,7 +239,7 @@ export async function rebuildIndex(options: { skipIfFresh?: boolean } = {}): Pro
 
       // Cleanup is best-effort; publish success does not depend on cleanup.
       try {
-        await cleanupLegacyGenerations();
+        await cleanupLegacyIndexes(indexDirectory);
       } catch (error) {
         console.warn("Index cleanup deferred:", error);
       }
