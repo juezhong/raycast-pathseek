@@ -32,6 +32,8 @@ jobs:
           name: pathseek-npm-lockfile
           path: package-lock.json
           retention-days: 7
+      - name: Install fd for real-scan integration tests
+        run: command -v fd || brew install fd
       - name: Index format and atomic-publish tests
         run: npm test
       - name: TypeScript typecheck
