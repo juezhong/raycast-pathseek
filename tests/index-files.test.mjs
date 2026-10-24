@@ -29,7 +29,8 @@ async function stage(dir, label, content = "foo\0bar\0", roots = ["/test"]) {
   const raw = path.join(dir, label + ".paths.tmp");
   const staged = path.join(dir, label + ".nul.tmp");
   await writeFile(raw, content);
-  const metadata = await prepareIndex(raw, staged, meta(roots));
+  const count = [...content].filter((char) => char === "\0").length;
+  const metadata = await prepareIndex(raw, staged, meta(roots, count));
   return { raw, staged, metadata };
 }
 
