@@ -45,7 +45,7 @@ JSON 元数据包含：
 ## 3. 构建、发布与失败保护
 
 \`\`\`text
-Rebuild Index / 到期后的按需刷新
+用户主动在 Rebuild Index 中选择 Build / Rebuild
     ↓
 独占写入锁（仅防止多个扫描互相交错）
     ↓
@@ -80,13 +80,15 @@ rename(临时封装文件, index.nul)   ← 唯一的原子发布点
 
 因此，**首次升级后的短时间内看见两份索引是预期的迁移现象，不代表新版本每次重建都生成两个正式索引。**
 
-## 5. 15 天刷新策略
+## 5. 纯手动索引与首次使用
 
-- 首次明确执行 Rebuild Index 建立索引。
-- 自最近一次成功构建起满 15 天，下次打开 Search Files 时尝试刷新（无常驻调度服务）。
-- 普通输入搜索词不调用 \`fd\`；两种搜索模式都查询现有索引。
-- 现有 24 小时失败退避在 Code Review 中已标为需要改进（CR-04）；不能把它理解为严谨的后台任务保证。
-- 修改扫描根目录/排除规则后可以随时手动重建，不必等 15 天。
+- 安装 PathSeek 后，插件不会自动建立索引。首次打开 Search Files 和 Index Status 只显示未建立索引的引导，**不调用 fd**。
+- 首次打开 Rebuild Index 也不会自动扫描。通过 Raycast Form.FilePicker 选择一个或多个目录，主动点击 **Choose Folders and Build Index** 后才调用 fd。
+- 后续打开 Rebuild Index 仅展示上次构建及选定目录；通过 **⌘K → Change Indexed Folders** 修改范围并保存在 Raycast LocalStorage 中，保存目录**不触发扫描**。
+- 选定目录后须主动点击 **Rebuild Index Now** 才更新持久化索引。无论经过多少天都不会自动重建；原先设计过的 15 天按需自动刷新已被正式取消。
+- 对升级用户，如果 LocalStorage 还没有目录选择但已有 v1/v2 索引，可从现有索引元数据的 roots 读取扫描范围；旧索引继续可用，不会因升级自动重建。
+- 原有索引在新索引成功发布前保持可搜索；更换文件夹后新目录的文件只有手动重建成功后才会出现在搜索结果中。
+
 
 ## 6. 验证与测试
 
@@ -105,7 +107,7 @@ npm test
 - v1 UUID 旧索引无头部读取；
 - 迁移宽限期及清理不会删除 \`index.nul\`。
 
-完整 macOS Raycast GUI、fd 实际大规模扫描、15 天刷新行为仍要在相关 Issue 中验证。
+完整 macOS Raycast GUI、首次目录选择和 ⌘K 修改目录的交互、异常中断行为仍需要在 Issue 中验证。
 
 ## 7. 相关任务
 
