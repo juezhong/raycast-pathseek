@@ -32,14 +32,14 @@ jobs:
         run: command -v fd || brew install fd
       - name: Index format and atomic-publish tests
         run: npm test
+      - name: Raycast build (generates preference types)
+        run: npm run build
       - name: TypeScript typecheck
         run: npx tsc --noEmit
       - name: Source ESLint (independent of Store account validation)
         run: npm run lint:code
       - name: Prettier source format check
         run: npm run format:check
-      - name: Raycast build
-        run: npm run build
       # Raycast's full lint also validates the extension's Store author.
       # The owner will provide their Raycast username at publication time.
       # Keep the result visible without blocking the developer-only CI.
