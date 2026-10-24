@@ -70,7 +70,7 @@ The index may contain private file names and paths; do not upload it to public G
 
 ### Search modes
 
-Choose **Fuzzy (fzf)** or **Regex (full path)** in the Search Files dropdown. Regex examples: `\\.tsx?$` finds TypeScript extensions, and `src/.*/config` finds nested configuration paths. Regex matches **paths only, not file contents**.
+Choose **Fuzzy (fzf)** or **Regex (full path)** in the Search Files dropdown. Regex examples: `\.tsx?$` finds TypeScript extensions, and `src/.*/config` finds nested configuration paths. Regex matches **paths only, not file contents**.
 
 ## Documentation
 
