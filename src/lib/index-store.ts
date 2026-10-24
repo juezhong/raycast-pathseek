@@ -189,7 +189,7 @@ export async function rebuildIndex(): Promise<IndexMetadata> {
     // 清理失败不应让已成功发布的新索引失效。
     try {
       for (const filename of await readdir(indexDirectory)) {
-        if (!/^index-[a-f0-9-]+\\.nul$/.test(filename)) continue;
+        if (!/^index-[a-f0-9-]+\.nul$/.test(filename)) continue;
         if (filename === metadata.filename || filename === previousIndex?.filename) continue;
         await rm(path.join(indexDirectory, filename), { force: true });
       }
