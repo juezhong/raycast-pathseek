@@ -6,9 +6,9 @@
 - Plan Directory: plans/pathseek-development/
 - Write Mode: continuous_checkpoints
 - Status: active / code-review-quality-gate
-- Current Phase: Q1 — Code Review / Developer Observability / Mac acceptance
-- Checkpoint ID: pathseek-20261024-fzf-only-06
-- Last Checkpoint: pathseek-20261024-fzf-only-06 (2026-10-24; after three-file readback)
+- Current Phase: Q1 — Mac acceptance and fzf strict result-cap regression
+- Checkpoint ID: pathseek-20261024-mac-log-limit-07
+- Last Checkpoint: pathseek-20261024-mac-log-limit-07 (2026-10-24; verified after three-file readback)
 - Last Updated: 2026-10-24
 - Storage: github_checkpointed
 
@@ -120,3 +120,17 @@
 
 ## Latest Next Step (pathseek-20261024-fzf-only-06)
 请维护者继续在 Mac 上用 Draft PR #3 独立 worktree 验收单一 fzf 搜索（含 .pdf$、'report、!node_modules、OR）、fd/fzf 调用追踪和索引重建；根据 Issue #2 / #5 实测与剩余 Code Review 风险决定 PR #3 是否 Ready / 合并。
+
+## 2026-10-24 — 用户 Mac 验收与 fzf 结果截断修复（pathseek-20261024-mac-log-limit-07）
+
+- [x] 用户已在 macOS 15.1.1、Raycast 1.104.32 下验证 PR #3 基本功能；v2 index.nul 单文件索引正常，7975 条路径、716460 B、当前索引代数 1。
+- [x] fzf 搜索通常约 15–19 ms；当前追踪样本无额外 fd 调用，含预期 cancelled 记录。
+- [x] 发现 max=150 仍输出 151–159 的代码边界；已在 PR #3 新增有严格上限的 fzf NUL 累积器、`limit-reached` 状态与 4 个回归测试。
+- [x] GitHub Actions 对上述修复的开发期测试、tsc、源码 ESLint、Raycast build 均已完成成功。
+- [x] 更新 [Issue #2](https://github.com/juezhong/raycast-pathseek/issues/2)（10/20）、[Issue #5](https://github.com/juezhong/raycast-pathseek/issues/5)（8/14）的已验证项；未测试的极端场景保持未勾选。
+- [ ] 用户在 Mac 上复测本次 150 条上限改动，确保 `limit-reached, results=150` 且无 151–159。
+- [ ] 后续 Code Review 聚焦 CR-03/04（15 天刷新生命周期/重试退避）和剩余关键稳定性验证；PR #3 仍 Draft，未获合并授权。
+- [ ] Raycast Store 作者身份及全量发布校验按用户要求延后到正式发布前。
+
+## Active Next Step (pathseek-20261024-mac-log-limit-07)
+用户在 Mac 上更新 PR #3 独立 worktree，搜索一个能匹配超过 150 条路径的词，检查 Debug Info 最新记录为 limit-reached / results=150（不再有 151–159）；通过后对 Draft PR #3 进行最终 Code Review 与剩余 P1 风险评估，再征得用户明确同意后考虑合并 main。
