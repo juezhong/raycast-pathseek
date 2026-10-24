@@ -2,7 +2,7 @@
 
 > 本文描述 **Draft PR #3 中的新索引格式 v2**。合并之前的 \`main\` 仍使用旧的 \`index.json + index-UUID.nul\`。本 PR 必须经过 GitHub CI 和 macOS 实测才考虑合并。
 >
-> 相关源码：[index-files.ts](../src/lib/index-files.ts)、[index-store.ts](../src/lib/index-store.ts)、[fuzzy-search.ts](../src/lib/fuzzy-search.ts)、[regex-search.ts](../src/lib/regex-search.ts)。
+> 相关源码：[index-files.ts](../src/lib/index-files.ts)、[index-store.ts](../src/lib/index-store.ts)、[fuzzy-search.ts](../src/lib/fuzzy-search.ts)、[开发者调用追踪](developer-tracing.md)。
 
 ## 1. 索引实际存储在哪里？
 
