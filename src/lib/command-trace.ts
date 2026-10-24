@@ -18,7 +18,7 @@ export type CommandTraceRecord = {
   at: string;
   tool: CommandTraceTool;
   phase: "start" | "end";
-  reason: "manual-rebuild" | "15-day-refresh" | "fuzzy-query";
+  reason: "manual-rebuild" | "fuzzy-query";
   invocation: string;
   outcome?: CommandTraceOutcome;
   durationMs?: number;
