@@ -1,7 +1,7 @@
 # Findings — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-pr3-v2-03
+- Checkpoint ID: pathseek-20261024-ci-dev-04
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Evidence: [首轮 Code Review](../../docs/reviews/2026-10-24-initial-code-review.md) · [质量 Issue #4](https://github.com/juezhong/raycast-pathseek/issues/4) · [Draft PR #3](https://github.com/juezhong/raycast-pathseek/pull/3)
@@ -68,3 +68,11 @@
 
 ## Next Step
 确认正确的 Raycast 账户用户名（当前 package.json author=juezhong 被官方校验返回 404），据此修正 PR #3 的 manifest；随后修复 Prettier 格式并重新运行 macOS CI 的 lint/build。
+
+## 2026-10-24 — 开发检查与商店发布检查分离
+
+- 经仓库维护者确认：`package.json.author` 对应的 Raycast Store 用户名**在正式发布前再填写**；开发阶段保留现值，不猜测或借用第三方用户名。
+- [Draft PR #3](https://github.com/juezhong/raycast-pathseek/pull/3) 已添加 `lint:code`、`format`、`format:check` 脚本，把源码 ESLint 与完整 Raycast Store lint 分开。
+- macOS GitHub Actions 已确认 `npm install`、`npm test` 7/7、`npx tsc --noEmit`、`npm run lint:code`、`npm run build` **全部通过**。
+- 完整 `npm run lint` 在 CI 中标注为**非阻塞发布审查项**：仍会显示 `author` 404 和 Prettier 格式错误，故不得误报“Raycast Store lint 通过”。详细情况在 [PR 评论](https://github.com/juezhong/raycast-pathseek/pull/3#issuecomment-6382410366)。
+- 质量说明：新自描述 v2 单文件索引、旧版兼容逻辑通过代码构建与辅助函数单测，但尚未完成 macOS GUI 实测、实际 `fd` 长目录构建性能或 FSEvents/对话框交互测试。
