@@ -1,21 +1,28 @@
-import { Action, ActionPanel, Icon, List } from "@raycast/api";
-import { useEffect, useState } from "react";
+import { Action, ActionPanel, Icon, List, showToast, Toast } from "@raycast/api";
+import { useEffect, useRef, useState } from "react";
 import os from "node:os";
 import path from "node:path";
 import { fuzzySearch } from "./lib/fuzzy-search";
-import { readIndex, type IndexMetadata } from "./lib/index-store";
+import { regexSearch } from "./lib/regex-search";
+import { isIndexStale, readIndex, refreshExpiredIndex, type IndexMetadata } from "./lib/index-store";
+
+type SearchMode = "fuzzy" | "regex";
 
 export default function SearchFiles() {
   const [index, setIndex] = useState<IndexMetadata | null>();
   const [loadError, setLoadError] = useState<string>();
   const [query, setQuery] = useState("");
+  const [mode, setMode] = useState<SearchMode>("fuzzy");
   const [results, setResults] = useState<string[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const autoRefreshAttempted = useRef(false);
 
   useEffect(() => {
     let active = true;
     readIndex()
-      .then((data) => { if (active) setIndex(data); })
+      .then((data) => {
+        if (active) setIndex(data);
+      })
       .catch((error: unknown) => {
         if (active) {
           setLoadError(String(error));
@@ -25,17 +32,50 @@ export default function SearchFiles() {
     return () => { active = false; };
   }, []);
 
+  // Only consider refresh ONCE when Search Files is opened, not per keystroke.
+  // The existing index remains searchable while a new generation is built.
+  useEffect(() => {
+    if (!index || autoRefreshAttempted.current || !isIndexStale(index)) return;
+    autoRefreshAttempted.current = true;
+    let active = true;
+
+    refreshExpiredIndex(index)
+      .then((newIndex) => {
+        if (active && newIndex) {
+          setIndex(newIndex);
+          void showToast({ style: Toast.Style.Success, title: "15-day index refresh completed" });
+        }
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          console.warn("Automatic index refresh failed:", error);
+          void showToast({
+            style: Toast.Style.Failure,
+            title: "Automatic index refresh failed",
+            message: "The previous index is still available. Try Rebuild Index manually.",
+          });
+        }
+      });
+
+    return () => { active = false; };
+  }, [index]);
+
   useEffect(() => {
     const controller = new AbortController();
+
     if (!index || !query.trim()) {
       setResults([]);
       setIsSearching(false);
       return () => controller.abort();
     }
 
+    setResults([]);
+    setLoadError(undefined);
     setIsSearching(true);
+
     const timer = setTimeout(() => {
-      fuzzySearch(index, query, controller.signal)
+      const search = mode === "regex" ? regexSearch : fuzzySearch;
+      search(index, query, controller.signal)
         .then((paths) => {
           if (!controller.signal.aborted) setResults(paths);
         })
@@ -51,10 +91,10 @@ export default function SearchFiles() {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [index, query]);
+  }, [index, query, mode]);
 
   const emptyTitle = loadError
-    ? "Search Error"
+    ? (mode === "regex" ? "Invalid Regex or Search Error" : "Search Error")
     : index === undefined
       ? "Loading Index"
       : !index
@@ -68,14 +108,22 @@ export default function SearchFiles() {
     : !index
       ? "Run Rebuild Index in Raycast to create the first local index."
       : !query.trim()
-        ? `Indexed ${index.count.toLocaleString()} paths on ${new Date(index.createdAt).toLocaleString()}.`
-        : "Try a different filename or rebuild the index to include new files.";
+        ? "Indexed " + index.count.toLocaleString() + " paths on " + new Date(index.createdAt).toLocaleString() + "."
+        : "Try a different pattern or rebuild the index to include new files.";
 
   return (
     <List
       isLoading={index === undefined || isSearching}
       filtering={false}
-      searchBarPlaceholder="Search by filename or any part of its path…"
+      searchBarPlaceholder={
+        mode === "regex" ? "Regex on full path (e.g. \\.ts$ or src/.*/config)" : "Fuzzy search by filename or path"
+      }
+      searchBarAccessory={
+        <List.Dropdown tooltip="Search Mode" value={mode} onChange={(value) => setMode(value as SearchMode)}>
+          <List.Dropdown.Item title="Fuzzy (fzf)" value="fuzzy" />
+          <List.Dropdown.Item title="Regex (full path)" value="regex" />
+        </List.Dropdown>
+      }
       onSearchTextChange={setQuery}
     >
       <List.EmptyView title={emptyTitle} description={emptyDescription} icon={Icon.MagnifyingGlass} />
@@ -88,7 +136,7 @@ export default function SearchFiles() {
             key={filepath}
             title={path.basename(filepath)}
             subtitle={path.dirname(display)}
-            icon={Icon.Document}
+            icon={{ fileIcon: filepath }}
             quickLook={{ path: filepath, name: path.basename(filepath) }}
             actions={
               <ActionPanel>
