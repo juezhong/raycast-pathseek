@@ -24,7 +24,7 @@ npm run dev
 `npm run dev` 启动 Raycast 开发扩展，按 Raycast 搜索启动命令：
 
 1. **Index Status**：查看索引状态/复制目录，不触发扫描。
-2. **Rebuild Index**：手动触发 `fd` 扫描，第一次使用必须执行一次。
+2. **Rebuild Index**：首次打开后先使用目录选择器选择一个或多个目录，点击 Build 才开始扫描。后续打开仅显示状态；按 ⌘K 可以更换目录或显式 Rebuild，**不会因打开命令而自动运行 fd**。
 3. **Search Files**：使用 fzf 单一搜索框输入文件名、目录或路径片段；支持精确/后缀/排除等 fzf 自带语法，显示 Finder 原生图标。
 4. **Debug Info**：自动收集 macOS、Raycast、Node.js（扩展运行时）及当前索引文件的状态，复制不含用户绝对路径的诊断报告。
 
@@ -36,7 +36,7 @@ npm run dev
 
 | 参数 | 作用 | 示例 |
 | --- | --- | --- |
-| Search Roots | 分号或换行分隔多个绝对/用户目录 | `~/Projects;~/Downloads` |
+| 索引目录 | 在 Rebuild Index 里使用 Raycast 目录选择器选择，⌘K 可随时修改 | 第一次使用时选择 |
 | Include Hidden Files | 重建时包含隐藏文件和目录 | 默认关闭 |
 | Follow Symbolic Links | 重建时进入软链接目录 | 默认关闭 |
 | Exclude Patterns | `fd --exclude`，多个模式以英文逗号分隔 | `.git,node_modules` |
@@ -53,7 +53,7 @@ npm run dev
 
 ## 5. 提交测试反馈
 
-测试任务：[Issue #1 — macOS/Raycast 初版验收](https://github.com/juezhong/raycast-pathseek/issues/1)；新增功能：[Issue #2 — 15 天刷新 / fzf / Finder 图标](https://github.com/juezhong/raycast-pathseek/issues/2)。
+测试任务：[Issue #1 — macOS/Raycast 初版验收](https://github.com/juezhong/raycast-pathseek/issues/1)；新增功能：[Issue #2 — 纯手动索引 / fzf / Finder 图标](https://github.com/juezhong/raycast-pathseek/issues/2)。
 
 请逐项勾选已通过项目；未通过的直接评论：
 
@@ -114,7 +114,7 @@ npm run build
 
 ## 7. 当前限制和后续开发
 
-- **索引每满 15 天后按需更新**：下次打开 Search Files 才尝试执行 fd 重建（没有常驻服务）；手动 Rebuild Index 随时可用，自动失败 24 小时内不反复尝试。
+- **永不自动建立或更新索引**：只有 Rebuild Index 的明确用户操作才调用 fd；Search Files、Index Status 和目录变更都不扫描。索引不会按时间过期自动重建。
 - 普通键入查询不会运行 `fd`；`fzf` 从已有索引读取路径（有 CPU、内存与缓存/SSD 读取成本）。
 - 索引文件内含绝对路径，按普通本地文件处理，而非 Raycast 加密数据库。
 - P4 对话框导航、跨应用兼容、自动下载依赖与正式发布工作尚未完成。
