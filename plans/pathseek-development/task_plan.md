@@ -6,9 +6,9 @@
 - Plan Directory: plans/pathseek-development/
 - Write Mode: continuous_checkpoints
 - Status: active / code-review-quality-gate
-- Current Phase: P4 — Minimal file selection and folder jump (Draft PR #8; Mac GUI pending)
-- Checkpoint ID: pathseek-20261024-p4-minimal-13
-- Last Checkpoint: pathseek-20261024-p4-minimal-13 (2026-10-24; verified three-file readback)
+- Current Phase: P4 — Minimal Open/Save path transfer user-validated; PR #8 merge decision
+- Checkpoint ID: pathseek-20261024-p4-user-validated-14
+- Last Checkpoint: pathseek-20261024-p4-user-validated-14 (2026-10-24; verified after three-file readback)
 - Last Updated: 2026-10-24
 - Storage: github_checkpointed
 
@@ -217,3 +217,16 @@ PR #3 已合并进 main（squash commit 09d7a864257c88d9869aac545e90aea11c6b2558
 
 ## Active Next Step (pathseek-20261024-p4-minimal-13)
 维护者在 Mac 上只验证 Draft PR #8 的两项基础场景：标准 Open 对话框通过 ⌘⇧G 接收完整文件路径后能否定位/选中文件；Open/Save 对话框接收目录完整路径后能否进入目录。若完整文件路径无法直接选中，使用 Go to Containing Folder (Fallback) 手动选文件。助理根据反馈维护 Issue #7。自动活动窗口管理 P4.2 明确取消（Issue #9 closed/not_planned）。PR #8 保持 Draft，未获用户确认不合并。
+
+## 2026-10-24 — 核心 P4 路径粘贴体验已获用户验收（pathseek-20261024-p4-user-validated-14）
+
+- [x] 用户 Mac 实测：普通 PathSeek 索引/搜索、文件默认应用打开/所在目录打开均正常。
+- [x] 用户 Mac 实测：原 Open/Save 快速路径输入框通过 ⌘⇧G 打开后，PathSeek 搜索文件或目录均可正常返回原输入框并粘贴路径。
+- [x] 用户明确表示现有交互即所需体验；不做自动识别/管理窗口、Accessibility、后台进程等过度设计。
+- [x] 更新 [Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7) 4/7 用户确认项目、保留 3 项未明确描述的细节；PR #8 添加实际测试结论。
+- [x] PR #8 最新 macOS CI completed/success，源码构建与单测通过；Store 发布检查仍留正式发布前。
+- [ ] 等待用户明确决定是否把已验证的 [Draft PR #8](https://github.com/juezhong/raycast-pathseek/pull/8) 合并 main（不自动合并）。
+- [ ] 后续只有在用户提出**具体**小体验问题后，才增加相应优化；不另开大范围功能路线图。
+
+## Active Next Step (pathseek-20261024-p4-user-validated-14)
+用户确认 PR #8 的核心文件与目录搜索路径粘贴体验在 macOS 实机正常，已经达到其所需最小功能。暂不添加其他窗口自动化或未提出的优化需求；保留文件高亮选中/备用父目录等未逐项描述的细节为可选验证。向用户征求是否将 Draft PR #8 合并到 main；取得明确授权后确认 CI/mergeable 并合并。后续优化由用户提供具体体验反馈再按最小改动推进。
