@@ -1,7 +1,7 @@
 # Findings — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-p4-minimal-13
+- Checkpoint ID: pathseek-20261024-p4-user-validated-14
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Evidence: [首轮 Code Review](../../docs/reviews/2026-10-24-initial-code-review.md) · [质量 Issue #4](https://github.com/juezhong/raycast-pathseek/issues/4) · [Draft PR #3](https://github.com/juezhong/raycast-pathseek/pull/3)
@@ -203,3 +203,15 @@ PR #3 已合并进 main（squash commit 09d7a864257c88d9869aac545e90aea11c6b2558
 
 ## Active Next Step (pathseek-20261024-p4-minimal-13)
 维护者在 Mac 上只验证 Draft PR #8 的两项基础场景：标准 Open 对话框通过 ⌘⇧G 接收完整文件路径后能否定位/选中文件；Open/Save 对话框接收目录完整路径后能否进入目录。若完整文件路径无法直接选中，使用 Go to Containing Folder (Fallback) 手动选文件。助理根据反馈维护 Issue #7。自动活动窗口管理 P4.2 明确取消（Issue #9 closed/not_planned）。PR #8 保持 Draft，未获用户确认不合并。
+
+## 2026-10-24 — PR #8 最小功能获用户 Mac 验证并确认就是所需体验（pathseek-20261024-p4-user-validated-14）
+
+- 维护者在聊天实测确认：现有 PathSeek fzf 搜索、默认应用打开文件、打开所在目录正常。
+- 在原应用文件选择窗口按 ⌘⇧G 打开 Go to Folder，呼出 Raycast `Search in Open/Save Dialog`，搜索文件或目录均可找到；动作返回原 Go to Folder 输入框并成功粘贴结果路径。
+- 用户明确认可“目前这个功能是正常的，而我想要的正是这个功能”，不要求 Listary 自动激活/管理窗口、Accessibility helper、后台服务；未来若有具体体验痛点再小范围优化，不能自行增加额外需求。
+- 已将可直接验证的操作勾选到 [Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7)：**4 项通过、3 项保留未单独证实**（完整文件路径提交后高亮状态、进入目录后最终界面、父目录备用动作）。不把用户「文件/目录可搜索并粘贴」扩大解释为所有原生面板中精确文件高亮均已证明。
+- 已在 [Draft PR #8](https://github.com/juezhong/raycast-pathseek/pull/8#issuecomment-6383610084) 记录 Mac 实测范围与后续合并建议。最新 CI completed/success；PR 仍 Draft/未合并 main，未取得合并授权。
+- 当前 P4 只包含原窗口路径粘贴的基础体验；[Issue #9](https://github.com/juezhong/raycast-pathseek/issues/9) 的自动管理功能已 closed/not_planned。
+
+## Active Next Step (pathseek-20261024-p4-user-validated-14)
+用户确认 PR #8 的核心文件与目录搜索路径粘贴体验在 macOS 实机正常，已经达到其所需最小功能。暂不添加其他窗口自动化或未提出的优化需求；保留文件高亮选中/备用父目录等未逐项描述的细节为可选验证。向用户征求是否将 Draft PR #8 合并到 main；取得明确授权后确认 CI/mergeable 并合并。后续优化由用户提供具体体验反馈再按最小改动推进。
