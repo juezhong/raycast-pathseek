@@ -6,9 +6,9 @@
 - Plan Directory: plans/pathseek-development/
 - Write Mode: continuous_checkpoints
 - Status: active / code-review-quality-gate
-- Current Phase: Q1 — Mac acceptance and fzf strict result-cap regression
-- Checkpoint ID: pathseek-20261024-mac-log-limit-07
-- Last Checkpoint: pathseek-20261024-mac-log-limit-07 (2026-10-24; verified after three-file readback)
+- Current Phase: Q1 — Manual-only onboarding acceptance and remaining code review
+- Checkpoint ID: pathseek-20261024-manual-setup-08
+- Last Checkpoint: pathseek-20261024-manual-setup-08 (2026-10-24; three-file readback verified)
 - Last Updated: 2026-10-24
 - Storage: github_checkpointed
 
@@ -16,7 +16,7 @@
 开源 Raycast macOS 文件搜索工具 PathSeek，对齐 Windows Listary 的核心体验：插件自有持久化索引、文件名与完整路径快速搜索、Finder 文件操作、在原应用 Open/Save 文件对话框中导航。最终目标是 Raycast Store 发布。
 
 ## 需求与技术边界（当前版本）
-- **索引**：由 `fd` 构建，存入 Raycast `environment.supportPath`；默认不在每次搜索字符输入时重扫。首次显式 Rebuild，15 天后下一次进入 Search Files 按需刷新，允许手动重建。不得假称有常驻后台守护/保证按时刷新。
+- **索引**：由 `fd` 构建，存入 Raycast `environment.supportPath`；默认不在每次搜索字符输入时重扫。首次在 Rebuild Index 显式选择目录并点击 Build；之后只有用户主动 Rebuild 才调用 fd，**永不按时间自动刷新**。不得在安装、启动、搜索、查看状态或修改目录时自动索引。
 - **搜索**：统一由 `fzf` 的扩展搜索匹配路径（模糊、精确、前后缀、排除、OR），不再提供 JavaScript Regex 引擎。File/Directory 筛选仍待开发。
 - **结果**：Finder 原生文件图标，Open/Show in Finder/Open With/Copy Path/Quick Look；需要完善失效路径处理。
 - **索引正确性**：构建失败保留有效索引；新索引完整后原子提交；正式索引路径不会被并发清理误删；metadata/data 一致性与崩溃恢复是审查阻塞项。
@@ -29,7 +29,7 @@
 | --- | --- | --- |
 | P0：GitHub/计划/许可证 | **已完成** | 三文件初始检查点与仓库已存在 |
 | P1：Fuzzy File Search 审查与 Raycast 工程 | **基本实现，部分验证** | 用户 Issue #1 已勾选安装、命令、部分索引测试；未有完整 lint/build 证据 |
-| P2：持久化索引与15天更新 | **已实现，需整改** | main 存在 UUID 删除读竞态；Draft PR #3 固定路径方向正确，但 CR-01 metadata 一致性尚未修复 |
+| P2：持久化索引、纯手动建索引与目录引导 | **Draft PR #3 已实现，待 Mac UI 验收** | v2 单文件原子发布、首次选目录及 ⌘K 修改目录，CI 成功 |
 | P3：fzf-only / Finder Actions | **已提交至 Draft PR #3，待新版 Mac 验收** | Issue #2 已有部分旧版勾选；Regex 已取消，改为 fzf 内建扩展搜索 |
 | Q1：初轮 Code Review 质量收口 | **审查完成，整改待开始** | [审查报告](../../docs/reviews/2026-10-24-initial-code-review.md) · [Issue #4](https://github.com/juezhong/raycast-pathseek/issues/4) |
 | P4：原 Open/Save 对话框跳转 | **未开始** | 等待 Q1 的 P0/P1 风险处理 |
@@ -134,3 +134,19 @@
 
 ## Active Next Step (pathseek-20261024-mac-log-limit-07)
 用户在 Mac 上更新 PR #3 独立 worktree，搜索一个能匹配超过 150 条路径的词，检查 Debug Info 最新记录为 limit-reached / results=150（不再有 151–159）；通过后对 Draft PR #3 进行最终 Code Review 与剩余 P1 风险评估，再征得用户明确同意后考虑合并 main。
+
+## 2026-10-24 当前生效的产品决策（pathseek-20261024-manual-setup-08）
+
+- [x] fzf 150 条上限用户实测通过；不再要求重复该项。
+- [x] 用户决定只允许**手动建立/重建索引**；已在 Draft PR #3 删除 15 天自动刷新与任何 Search Files 启动重建。
+- [x] 首次使用 Rebuild Index 必须先明确选择一个/多个目录（不默认索引 Home）；只有明确提交 Build 才调用 fd。
+- [x] 后续 Rebuild Index ⌘K 提供 Change Indexed Folders、Rebuild Index Now；只保存新目录不会自动刷新已发布索引。
+- [x] Search Files / Index Status 缺索引状态显示引导动作；中英文 README 与技术文档已更新。
+- [x] 创建 [Issue #6](https://github.com/juezhong/raycast-pathseek/issues/6) 面向普通用户的简单测试清单，旧技术 Issue 交由助理/CI 管理。
+- [x] 最新 macOS GitHub Actions 测试、tsc、源码 ESLint、Raycast build 全部通过；静态测试新增 manual-only 防回归约束。
+- [ ] 用户在 Mac 对**本次新代码**测试首次无索引、目录选择、Cmd+K 修改根目录、无自动 fd；可以直接在聊天中口头反馈，由助理判断测试状态。
+- [ ] 复核原子索引崩溃保护/失效文件路径等剩余 Code Review 风险；再决定 PR #3 是否 Ready。合并 main 需要用户确认。
+- [ ] 正式 Raycast Store 作者账户与发布校验仍等到发布前处理。
+
+## Active Next Step (pathseek-20261024-manual-setup-08)
+用户在 Mac 更新 Draft PR #3 后，简短验证首次无索引提示、目录选择、打开 Rebuild 时不自动执行 fd、⌘K 更改目录及显式 Rebuild；由助理根据聊天反馈维护简单 Issue #6。之后集中代码审查剩余索引稳定性问题，用户授权后再讨论合并 PR #3。
