@@ -12,6 +12,7 @@
 - **Fast path-aware search** — `Search Files` uses `fzf` on the saved index and **does not run `fd`** during normal searches.
 - **Finder actions** — Open, Show in Finder, Open Containing Folder, Open With, Quick Look and Copy Absolute Path.
 - **Index Status** — See index metadata, open its actual support directory in Finder, and copy the full directory path.
+- **Debug Info** — Copy a privacy-safe diagnostics report with macOS, Raycast, Node.js and index-file consistency checks for GitHub Issues.
 - **Configurable scope** — Choose multiple roots, hidden files, symlink traversal, and excluded globs.
 - **Future** — Navigate a pre-existing macOS Open/Save file picker directly from Raycast results (Dialog Bridge, not yet available).
 
@@ -36,6 +37,7 @@ npm run dev
 1. **Index Status** — inspect the current index and find the exact on-disk storage location (without scanning).
 2. **Rebuild Index** — manually create the index. **Before the first run**, set `Search Roots` to a small directory (e.g. `~/Projects`) rather than indexing your entire home directory.
 3. **Search Files** — type a filename, folder name or part of a path; select a result and use its actions.
+4. **Debug Info** — if a test fails, copy the sanitized report into [Issue #1](https://github.com/juezhong/raycast-pathseek/issues/1).
 
 No automatic reindexing or directory watcher runs in the current version. Files created after the last build will not be searchable until you rebuild.
 
@@ -61,10 +63,10 @@ Run **Index Status → Open Index Directory in Finder** (or **Copy Index Directo
 <environment.supportPath>/
 ├── index.json            # Active index metadata: filename, timestamp, count, search roots
 ├── index-<UUID>.nul      # Active index; UTF-8 absolute paths separated by NUL bytes
-└── index-<UUID>.nul      # Previous generation, if available
+└── index-<UUID>.nul      # Older generations may remain until explicit cleanup is implemented
 ```
 
-The index may contain private file names and paths; do not upload it to public GitHub Issues. See [Index Storage & Maintenance (中文)](docs/index-storage.md) for the file format, update/rollback strategy and read-only inspection commands.
+The index may contain private file names and paths; do not upload it to public GitHub Issues. Automatic removal of old index generations is temporarily disabled to avoid a possible race between overlapping rebuilds; inspect actual disk usage in Index Status/Finder. See [Index Storage & Maintenance (中文)](docs/index-storage.md) for the file format, update/rollback strategy and read-only inspection commands.
 
 ## Documentation
 
