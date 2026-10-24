@@ -170,7 +170,7 @@ export async function refreshExpiredIndex(metadata: IndexMetadata): Promise<Inde
   await mkdir(indexDirectory, { recursive: true });
   await writeFile(autoRefreshStatePath, JSON.stringify({ lastAttempt: new Date().toISOString() }));
   // Also serializes against a manual rebuild in another Raycast process.
-  return rebuildIndex();
+  return rebuildIndex({ skipIfFresh: true });
 }
 
 /**
@@ -190,7 +190,7 @@ async function cleanupOldGenerations(current: IndexMetadata): Promise<void> {
   }
 }
 
-export async function rebuildIndex(): Promise<IndexMetadata> {
+export async function rebuildIndex(options: { skipIfFresh?: boolean } = {}): Promise<IndexMetadata> {
   await mkdir(indexDirectory, { recursive: true });
   // Heartbeat prevents simultaneous rebuilds. Abandoned locks expire.
   const release = await lockfile.lock(indexDirectory, {
@@ -201,6 +201,12 @@ export async function rebuildIndex(): Promise<IndexMetadata> {
   });
 
   try {
+    // Another window may have finished rebuilding while this process waited
+    // for the lock. Do not scan again when the current index is already fresh.
+    if (options.skipIfFresh) {
+      const current = await readIndex().catch(() => null);
+      if (current && !isIndexStale(current)) return current;
+    }
     const prefs = getPreferences();
     const roots = parseRoots(prefs.searchRoots);
     if (!roots.length) throw new Error("Set at least one search root in PathSeek preferences.");
