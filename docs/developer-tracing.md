@@ -43,6 +43,8 @@
 2026-10-24T09:01:00Z | fzf | fuzzy-query | fzf --extended --read0 --print0 --filter <redacted> | success, 26ms, results=19, exit=0
 ```
 
+达到最多 150 条匹配结果后，fzf 可能被主动发出终止信号，诊断应显示 **limit-reached, results=150, exit=null**。这属于正常截断，不是搜索失败。
+
 只有 start 而没有 end 的记录表示「发生过启动尝试」，**不能断定进程仍在运行**；它也可能已因 Raycast 退出而终止。
 
 ## 隐私、存储、性能
