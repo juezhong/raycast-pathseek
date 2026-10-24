@@ -172,3 +172,27 @@ export async function cleanupLegacyIndexes(
   }
   return removed;
 }
+
+
+/**
+ * Clean up abandoned build artifacts only while holding the exclusive rebuild
+ * lock. This helper must NEVER run on Search Files startup or ordinary query.
+ * The 24-hour safety margin avoids deleting a recently active build's data.
+ */
+export async function cleanupStaleBuildTemps(
+  indexDirectory: string,
+  now = Date.now(),
+  graceMs = LEGACY_GRACE_MS,
+): Promise<number> {
+  let removed = 0;
+  const tempPattern = /^index-[a-f0-9-]+\.(?:paths|nul)\.tmp$/;
+  for (const filename of await readdir(indexDirectory)) {
+    if (!tempPattern.test(filename)) continue;
+    const fullPath = path.join(indexDirectory, filename);
+    const info = await stat(fullPath).catch(() => null);
+    if (!info || !info.isFile() || now - info.mtimeMs < graceMs) continue;
+    await rm(fullPath, { force: true });
+    removed++;
+  }
+  return removed;
+}
