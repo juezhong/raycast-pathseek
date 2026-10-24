@@ -108,28 +108,30 @@ npm run lint
 npm run build
 ```
 
-目前还没有基于 macOS 本机安装结果提交并验证的 `package-lock.json`；正式发布前需要补齐依赖锁文件、原创图标、自动化检查及 Raycast Store 审核材料。
+已提交 `package-lock.json`，macOS CI 使用 `npm ci` 并通过测试、TypeScript、源码 ESLint 和 Raycast build；正式上架前仍需原创图标、Raycast Store 作者身份与完整发布格式检查。
 
 ## 当前开发进度
 
 | 阶段 | 状态 |
 | --- | --- |
 | P1：上游审查和插件工程初始化 | 源码已提交，macOS 构建待验证 |
-| P2：纯手动索引、首次选目录与安全发布 | 已提交 Draft PR，实机待验证 |
-| P3：统一 fzf 搜索与原生 Finder 图标 | 初始实现已提交，实机待验证 |
-| P4：原 Open/Save 对话框跳转 | 尚未实现 |
+| P2：纯手动索引、首次选目录与安全发布 | PR #3 已合并，Mac 实测通过 |
+| P3：统一 fzf 搜索与原生 Finder 图标 | PR #3 已合并，Mac 实测通过 |
+| P4：原 Open/Save 对话框快速路径传递 | PR #8 已合并，Mac 实测通过 |
 | P5：测试和 Raycast Store 发布 | 尚未开始 |
 
 ## 许可证
 
 采用 [MIT License](LICENSE)。上游来源与版权通知见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。当前开发图标临时使用 MIT 许可的 Fuzzy File Search 上游资源，提交 Raycast Store 前需要更换为 PathSeek 原创图标。
 
-## Open/Save 对话框中快速选择文件或目录（开发版）
+## Open/Save 对话框快速选择文件或目录（已通过 Mac 实测）
 
-新命令 **Search in Open/Save Dialog** 只负责两件事：让你在原应用的 **Open** 文件选择框中快速定位并选择文件，或者在 **Open/Save** 对话框中快速进入目标文件夹。
+**稳定版本：[v0.1.0](https://github.com/juezhong/raycast-pathseek/tree/v0.1.0)**（已打 Git Tag，非 Raycast Store 发布）。
 
-在原应用先按 **⌘⇧G** 打开「前往文件夹」，呼出 PathSeek 搜索文件/目录，按 **Return** 粘贴**完整路径**，回原应用按 Return 查看定位结果。对文件，标准 Open 对话框可能直接选中目标文件；具体行为待你的 Mac 实测。备用动作 **⌘K → Go to Containing Folder (Fallback)** 则只进入文件所在目录。
+在原应用打开文件选择窗口，**直接按已绑定的 ⌘⇧F** → PathSeek 搜索文件或文件夹 → **Return** 粘贴完整绝对路径。维护者实测确认：**无需先按 ⌘⇧G**，原窗口会正确高亮选中文件或进入目录；最终打开/保存仍由用户决定。这来自 Raycast `Action.Paste` 与当前原生文件选择窗口的组合，PathSeek 没有自动模拟按键、操纵 Finder 或管理窗口。
 
-不会自动弹出文件管理器、识别/控制活动窗口或确认 Open/Save。**不做更复杂的“自动导航”方案**。**更快的方法：** 在 Raycast Settings → Shortcuts 给 **Search in Open/Save Dialog** 单独设置全局热键（例如 `⌘⇧F`）。之后原 Open/Save 窗口先按 `⌘⇧G`，紧接着按 `⌘⇧F`，就能直接开始搜索，不用再从 Raycast 根搜索里找命令。Raycast 不支持插件在安装时自动声明全局快捷键；只需一次手动在 Settings → Shortcuts 录入 `⌘⇧F`。如果与其他应用的搜索快捷键冲突，可在 Raycast 中更改。不要把插件也绑定到系统原有的 `⌘⇧G`，否则可能抢占原生「前往文件夹」动作。无需自动窗口管理器。
+如果别的应用无法直接接受完整路径，可以在原文件选择窗口先按 **⌘⇧G** 打开「前往文件夹」，再按 **⌘⇧F** 搜索并粘贴；必要时使用 **⌘K → Go to Containing Folder (Fallback)** 先进入父目录。不同应用可能有兼容差异。
 
-详见 [简明操作说明](docs/open-save-dialog.md)、[Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7) 与 [Issue #10 快捷键体验优化](https://github.com/juezhong/raycast-pathseek/issues/10)。
+Raycast 不允许扩展在安装时自动注册全局热键；`⌘⇧F` 需要用户在 **Configure Command → Set Hotkey** 或 Raycast Settings → Shortcuts **设置一次**。此后无需再从 Raycast 根搜索中寻找插件。
+
+详细说明：[Open/Save 路径导航](docs/open-save-dialog.md) · [Mac 实测 Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7) · [快捷键 Issue #10](https://github.com/juezhong/raycast-pathseek/issues/10)。
