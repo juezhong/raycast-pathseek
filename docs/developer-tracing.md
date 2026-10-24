@@ -6,7 +6,7 @@
 
 在 Raycast → Extensions → PathSeek → Preferences 开启 **Developer: Trace fd/fzf Calls**。默认是 **Off**；关闭时不创建追踪文件，也不执行额外的磁盘读取或写入。修改后建议重新打开搜索命令。
 
-打开选项后，执行 **Rebuild Index** 或在 **Search Files** 的 Fuzzy 模式输入搜索词。随后打开 **Debug Info**，查看「fd/fzf 调用记录（开发者选项）」。已打开的 Debug Info 可以通过 Action → **Refresh Diagnostics** 手动刷新。Action → **Copy Sanitized Debug Info** 可复制完整脱敏报告。
+打开选项后，执行 **Rebuild Index** 或在 **Search Files** 输入搜索词。随后打开 **Debug Info**，查看「fd/fzf 调用记录（开发者选项）」。已打开的 Debug Info 可以通过 Action → **Refresh Diagnostics** 手动刷新。Action → **Copy Sanitized Debug Info** 可复制完整脱敏报告。
 
 ## 何时调用
 
@@ -14,10 +14,10 @@
 | --- | --- | --- | --- |
 | fd | 显式 Rebuild Index | manual-rebuild | Node.js child_process.spawn，参数含 --absolute-path --print0、可选 --hidden / --follow / --exclude |
 | fd | 15 天到期后再次打开 Search Files | 15-day-refresh | 同上，依据用户搜索根目录构建索引 |
-| fzf | Fuzzy 模式输入非空查询、防抖后 | fuzzy-query | Node.js child_process.spawn，--read0 --print0 --filter，数据来自持久化索引 |
-| 无 fzf | Regex 模式 | 无 | 读取已有索引，在 JavaScript 进程内做正则匹配 |
+| fzf | Search Files 输入非空查询、防抖后 | fuzzy-query | Node.js child_process.spawn，--extended --read0 --print0 --filter，数据来自持久化索引 |
 
-**输入搜索词本身不允许触发 fd。** 只有手动重建和 15 天按需刷新可以调用 fd。15 天按需刷新可能在打开搜索命令后启动，但不会每个键盘输入都启动。Regex 模式不调用 fzf。
+
+**输入搜索词本身不允许触发 fd。** 只有手动重建和 15 天按需刷新可以调用 fd。15 天按需刷新可能在打开搜索命令后启动，但不会每个键盘输入都启动。所有查询都通过 fzf。
 
 ## 追踪格式
 
@@ -62,8 +62,7 @@
 - 关闭追踪：正常 Fuzzy 搜索，没有新的追踪文件写入
 - 开启后手动重建：出现 fd start/end 与结果数
 - 15 天未到期时连续搜索：不出现 fd start
-- Fuzzy 模式：出现 fzf start/end，能够看到耗时、结果数与退出状态
-- Regex 模式：不出现 fzf 子进程调用
+- Search Files 输入搜索词：出现 fzf start/end，能够看到耗时、结果数与退出状态
 - 模拟失败/取消：不泄露真实路径，索引及搜索功能不受诊断异常影响
 - 通过 Refresh Diagnostics 在已有 Debug Info 窗口查看新数据
 
