@@ -14,13 +14,13 @@
 
 如果完整文件路径在某个应用不适用，可按 **⌘K → Go to Containing Folder (Fallback)**，先进入该文件所在目录，再手动选文件。保存文件时通常也是进入目标文件夹，不自动填写或覆盖保存文件名。
 
-## 更快捷的唤起方式：只需设置一次 Hotkey
+## 更快捷的唤起方式：将 ⌘⇧F 设置为全局 Hotkey（一次性）
 
 使用 Raycast 官方的全局命令快捷键，无需再打开 Raycast 根搜索、输入插件名字：
 
-1. 打开 Raycast **Settings → Shortcuts**，找到 PathSeek 的 **Search in Open/Save Dialog**，选择 **Record Hotkey**。建议试用 `⌃⌥G`（若与本机软件冲突，换一个未占用的组合）。
+1. Raycast 的 **扩展 Manifest 无法自动注册全局 Hotkey**，也没有官方 API 可以直接替用户设置。因此只需在 Raycast 的根搜索中选中 **Search in Open/Save Dialog** → **⌘K → Configure Command → Set Hotkey**，录入 `⌘⇧F`；或在 **Settings → Shortcuts** 找到该命令选择 **Record Hotkey**。这是唯一需要人工设置的一次。用户指定推荐 `⌘⇧F`（Command + Shift + F）。若与其他应用的“在文件中搜索”等快捷键冲突，以 Raycast 冲突提示为准，选择是否覆盖或改用别的组合。
 2. 在原应用的 Open/Save 文件对话框按 **⌘⇧G** 打开 Go to Folder。
-3. 紧接着按刚设的 PathSeek Hotkey，直接进入搜索；找到结果后按 **Return** 粘贴。
+3. 紧接着按 `⌘⇧F`，直接进入 PathSeek 搜索；找到结果后按 **Return** 粘贴。
 4. 在原对话框自行确认目录导航或文件选择，不自动点击 Open/Save。
 
 **不要直接把 Raycast 命令绑定到系统的 ⌘⇧G**：同一个组合被 Raycast 拦截时，macOS 原有的 Go to Folder 不一定还能触发。公开的 Raycast 扩展 API 也没有让扩展窗口精确贴近其他应用小窗口的简单定位接口，不为此增加窗口控制依赖。
