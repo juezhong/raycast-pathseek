@@ -1,7 +1,7 @@
 # Findings — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-pr3-premerge-10
+- Checkpoint ID: pathseek-20261024-pr3-merged-11
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Evidence: [首轮 Code Review](../../docs/reviews/2026-10-24-initial-code-review.md) · [质量 Issue #4](https://github.com/juezhong/raycast-pathseek/issues/4) · [Draft PR #3](https://github.com/juezhong/raycast-pathseek/pull/3)
@@ -162,3 +162,15 @@ Issue #6 的 11/11 项用户可见 Mac 验收已完成，PR #3 最新 macOS CI �
 
 ## Active Next Step (pathseek-20261024-pr3-premerge-10)
 PR #3 核心代码已完成用户 Issue #6（11/11）验收及 macOS CI 的 npm ci、18/18 tests、TypeScript、源码 ESLint 与 Raycast build；合并前技术复审已出。下一步请维护者确认是否授权将 Draft PR #3 合并到 main；如确认，先转 Ready/核验 CI 并合并，再开始 P4 原应用 Open/Save 对话框导航的设计与最小原型。Store 账号/发布格式待正式上架前处理。
+
+## 2026-10-24 — PR #3 已得到维护者同意并合并到 main（pathseek-20261024-pr3-merged-11）
+
+- 用户明确回复“同意”，授权将 PR #3 合并到主分支。合并前再次确认 PR 的最新 head `60aa5577efb03e02075d9c63f974bd462d7d40ad` 与 macOS CI completed/success。
+- 已调用 GitHub Ready for Review → Squash Merge，GitHub 返回 **merged=true**，新主分支提交 `09d7a864257c88d9869aac545e90aea11c6b2558`；之后读取 PR 状态为 closed/merged，并验证 main 有 `cleanupStaleBuildTemps` 和 `package-lock.json`。
+- 合并后 main 包含 v2 自描述原子索引、用户显式选择扫描文件夹、Rebuild Index ⌘K 更换根目录、仅手动 fd 扫描、fzf-only 搜索与 150 结果上限、脱敏开发追踪、异常残留临时文件的手动重建时安全清理。
+- Issue #6 用户 GUI 11/11 验收，PR3 开发 CI 18/18 与 npm ci/tsc/源码 ESLint/ray build；**完整 Raycast Store lint 不是本轮通过项**，作者字段与 Prettier 仍待发布。
+- Issue #4 更新：PR 已合并；真实强制中断/端到端并发验证、失效路径提示、类型过滤等仍为后续工作，不再称 PR Draft。
+- Git worktree 可在用户本地从原仓库运行 `git worktree list`，核验目录后 `git worktree remove ../raycast-pathseek-pr3`；避免 `rm -rf`，先停掉 npm run dev，检查未提交文件。
+
+## Active Next Step (pathseek-20261024-pr3-merged-11)
+PR #3 已合并进 main（squash commit 09d7a864257c88d9869aac545e90aea11c6b2558），用户可在原始仓库 git switch main && git pull --ff-only origin main，检查 git worktree list 后安全移除 ../raycast-pathseek-pr3。下一阶段启动 P4：设计 macOS 原应用 Open/Save 面板中的安全路径导航，不自动确认 Open/Save，先调研 Accessibility、标准面板与第三方面板兼容性；剩余 P2 在 Issue #4 持续跟踪。
