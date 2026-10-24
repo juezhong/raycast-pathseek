@@ -4,11 +4,11 @@
 - Repository: juezhong/raycast-pathseek
 - Branch: main
 - Plan Directory: plans/pathseek-development/
-- Write Mode: manual_save
+- Write Mode: continuous_checkpoints
 - Status: active / code-review-quality-gate
-- Current Phase: Q1 — 首轮 Code Review 质量收口，暂停进入 P4
-- Checkpoint ID: pathseek-20261024-ci-dev-04
-- Last Checkpoint: pathseek-20261024-ci-dev-04 (2026-10-24; verified on three files)
+- Current Phase: Q1 — Code Review / Developer Observability / Mac acceptance
+- Checkpoint ID: pathseek-20261024-debug-trace-05
+- Last Checkpoint: pathseek-20261024-debug-trace-05 (2026-10-24; verified after three-file readback)
 - Last Updated: 2026-10-24
 - Storage: github_checkpointed
 
@@ -92,3 +92,17 @@
 - [ ] 后续 CR-03/04/05：15 天按需刷新的生命周期、重试退避，以及 Regex 性能安全。
 - 重要区别：**开发期 CI 成功 ≠ Raycast Store 上架检查通过**。保留发布门槛，不借用他人用户名或隐藏失败日志。
 - 关联：https://github.com/juezhong/raycast-pathseek/pull/3#issuecomment-6382410366
+
+## 2026-10-24 开发者追踪检查点（pathseek-20261024-debug-trace-05）
+
+- [x] 已实现默认关闭的 fd/fzf 开发者追踪（只在 opt-in 时写本地脱敏 JSONL），提供调用原因、参数结构、start/end、结果数量及耗时。
+- [x] 已在 Debug Info 添加追踪视图和刷新/复制功能。
+- [x] 已提交 [追踪文档](https://github.com/juezhong/raycast-pathseek/blob/fix/stable-index-file-atomic-swap/docs/developer-tracing.md) 与 [Issue #5](https://github.com/juezhong/raycast-pathseek/issues/5) 中文验收清单。
+- [x] 最新 Draft PR #3 macOS CI 通过代码测试、TypeScript、源码 ESLint 和 Raycast build。
+- [ ] 用户从 PR #3 独立工作目录验证：默认关闭不增加写盘、Fuzzy fzf 追踪、Rebuild fd 追踪、Regex 无 fzf、v1→v2 兼容及索引重建时查询。
+- [ ] 仍待完善 Code Review 的 CR-03/04/05（过期更新生命周期、失败重试状态、正则性能安全），并完成 macOS 功能验收。
+- [ ] PR #3 仍为 Draft，不能仅因为开发期 CI 成功就合并。Raycast Store 用户名与完整 lint 在**发布前**处理。
+- 本次在用户开发请求执行期间按 Planning with Files 的 `continuous_checkpoints` 模式保存三个指定计划文件；不表示存在后台自动执行。
+
+## Current Next Step (checkpoint pathseek-20261024-debug-trace-05)
+在 Mac 上从 Draft PR #3 独立工作目录加载扩展，验证 v1→v2 索引迁移、搜索与重建并发，以及开发者 fd/fzf 追踪的默认关闭/开启行为；到 Issue #5 和 PR #3 提交实测结果，再决定 Ready for Review / 合并。
