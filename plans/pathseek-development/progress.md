@@ -1,12 +1,12 @@
 # Progress — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-ci-dev-04
+- Checkpoint ID: pathseek-20261024-debug-trace-05
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Branch: main
 - Plan Directory: plans/pathseek-development/
-- Write Mode: manual_save
+- Write Mode: continuous_checkpoints
 - Current Phase: Q1 / 初轮质量审查
 - Storage: github_checkpointed（以三文件回读一致为准）
 
@@ -81,3 +81,17 @@
 - Store `npm run lint` 仍失败：未完成真实 Raycast 用户名确认和 Prettier 格式化，日志如实保留；**不能标记上架质量检查已通过**。
 - 本轮没有合并 Draft PR #3、没有更新 `main` 的插件运行代码，也没有 Mac 用户的 v2 GUI 验收。
 - 当前唯一下一步：整理并提交 Prettier 格式修复（保留作者信息不变），随后继续 PR #3 的 Mac 实机兼容与崩溃恢复验证。
+
+### 2026-10-24 — Debug Trace 开发与 macOS 测试交接（pathseek-20261024-debug-trace-05）
+
+- 根据用户反馈，在 Draft PR #3 新增 `src/lib/command-trace.ts`，仅开启 `enableCommandTracing` 时记录 fd/fzf 脱敏事件。
+- 接入 `src/lib/index-store.ts` 和 `src/lib/fuzzy-search.ts`：实际 spawn 触发原因、调用形态、执行时长和结果数量。
+- `src/debug-info.tsx` 添加追踪摘要、复制与 Refresh Diagnostics；Raycast manifest 追踪默认 Off。
+- PR 分支新增 `docs/developer-tracing.md`、更新英文/中文 README 和开发文档；中文验收清单 [Issue #5](https://github.com/juezhong/raycast-pathseek/issues/5)。
+- PR #3 添加详细评论：https://github.com/juezhong/raycast-pathseek/pull/3#issuecomment-6382534985。
+- macOS GitHub Actions 最近一次 **completed/success**：测试/tsc/源码 ESLint/构建均通过；Store lint 的非阻塞错误不能算通过正式发布审查。
+- PR #3 仍是 Draft，未合并 main；用户可使用 git worktree 在独立目录测试 PR 分支，不必改变 main。
+- **未做**：macOS Raycast 实机执行追踪测试、验收勾选、PR 合并、Open/Save Dialog Bridge。
+
+## Current Next Step (checkpoint pathseek-20261024-debug-trace-05)
+在 Mac 上从 Draft PR #3 独立工作目录加载扩展，验证 v1→v2 索引迁移、搜索与重建并发，以及开发者 fd/fzf 追踪的默认关闭/开启行为；到 Issue #5 和 PR #3 提交实测结果，再决定 Ready for Review / 合并。
