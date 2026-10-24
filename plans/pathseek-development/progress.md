@@ -1,13 +1,13 @@
 # Progress — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-pr3-premerge-10
+- Checkpoint ID: pathseek-20261024-pr3-merged-11
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Branch: main
 - Plan Directory: plans/pathseek-development/
 - Write Mode: continuous_checkpoints
-- Current Phase: Q1 / 初轮质量审查
+- Current Phase: P4 / 原应用文件选择面板导航设计
 - Storage: github_checkpointed（以三文件回读一致为准）
 
 ## 执行纪要
@@ -163,3 +163,14 @@ Issue #6 的 11/11 项用户可见 Mac 验收已完成，PR #3 最新 macOS CI �
 
 ## Active Next Step (pathseek-20261024-pr3-premerge-10)
 PR #3 核心代码已完成用户 Issue #6（11/11）验收及 macOS CI 的 npm ci、18/18 tests、TypeScript、源码 ESLint 与 Raycast build；合并前技术复审已出。下一步请维护者确认是否授权将 Draft PR #3 合并到 main；如确认，先转 Ready/核验 CI 并合并，再开始 P4 原应用 Open/Save 对话框导航的设计与最小原型。Store 账号/发布格式待正式上架前处理。
+
+### 2026-10-24 — 用户授权后 PR #3 成功合并（pathseek-20261024-pr3-merged-11）
+
+- GitHub PR #3 先从 Draft 改为 Ready，再以 **squash** 方式合并；返回 SHA `09d7a864257c88d9869aac545e90aea11c6b2558`。
+- 独立回读核验：PR 为 closed/merged，main 的 index-store 已包含最新维护逻辑，main 具有 npm lockfile。
+- 更新 Code Review Issue #4 的状态与 PR #3 已合并事实，留下后续技术增强项目。
+- 已向用户提供更新 main 与清理 PR3 测试 worktree 的可复制 Git 命令，强调先停止 npm run dev、核实 worktree 清单及改动，避免强删。
+- **下一阶段**：P4 进入设计阶段，目标是真正返回第三方应用原有 NSOpenPanel/NSSavePanel 中选定目录；不弹 Finder，也不自动按 Open/Save；Store 发布在后期。
+
+## Active Next Step (pathseek-20261024-pr3-merged-11)
+PR #3 已合并进 main（squash commit 09d7a864257c88d9869aac545e90aea11c6b2558），用户可在原始仓库 git switch main && git pull --ff-only origin main，检查 git worktree list 后安全移除 ../raycast-pathseek-pr3。下一阶段启动 P4：设计 macOS 原应用 Open/Save 面板中的安全路径导航，不自动确认 Open/Save，先调研 Accessibility、标准面板与第三方面板兼容性；剩余 P2 在 Issue #4 持续跟踪。
