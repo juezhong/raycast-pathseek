@@ -1,13 +1,13 @@
 # Progress — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-p4-assisted-12
+- Checkpoint ID: pathseek-20261024-p4-minimal-13
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Branch: main
 - Plan Directory: plans/pathseek-development/
 - Write Mode: continuous_checkpoints
-- Current Phase: P4.1 / 辅助导航代码及 CI 完成，Mac GUI 未验收
+- Current Phase: P4 / 最小文件选择与文件夹跳转，Mac GUI 待验收
 - Storage: github_checkpointed（以三文件回读一致为准）
 
 ## 执行纪要
@@ -187,3 +187,15 @@ PR #3 已合并进 main（squash commit 09d7a864257c88d9869aac545e90aea11c6b2558
 
 ## Active Next Step (pathseek-20261024-p4-assisted-12)
 等待维护者在 Mac 上测试 Draft PR #8 的 P4.1 辅助导航：在原应用 Open/Save 对话框按 ⌘⇧G，使用 Search in Open/Save Dialog 搜索并按 Return 粘贴父目录，再在原对话框手动按 Return；从反馈判断是否可用并更新 Issue #7。P4.2 自动识别目标文件面板的 AX/原应用焦点研究在 Issue #9，未经验证不注入键盘或自动确认 Open/Save；PR #8 不擅自合并。
+
+### 2026-10-24 — P4 从自动导航收敛为最小的选中文件/进入目录能力（pathseek-20261024-p4-minimal-13）
+
+- 用户拒绝超出需求的 Listary 式自动激活窗口/对话框管理；确认只要在原 Open/Save 对话框快速选中文件或跳入文件夹。
+- PR #8 默认 Action.Paste 由粘贴父目录调整为粘贴完整选中路径；⌘K 备用动作为 Go to Containing Folder (Fallback)；没有增加任何系统自动控制或磁盘 stat。
+- 更新路径工具说明和针对 primary/fallback 顺序的新测试；重写简明 `docs/open-save-dialog.md`，同步中英文 README、架构、开发说明与 PR #8 内容。
+- 更新简化 Issue #7，保留 6 项 Mac 体验勾选全部待用户验证；关闭不计划实现的 Issue #9（not_planned）。
+- PR #8 最新 macOS GitHub Actions completed/success，常规测试/类型/ESLint/build 通过。尚未有用户对“完整路径直接选中目标文件”的 macOS GUI 验证，不能声称已经实现且可用。
+- 当前 main 未合并 P4；PR #8 保持 Draft。无需另开自动窗口管理分支或对用户提出 Accessibility 权限问题。
+
+## Active Next Step (pathseek-20261024-p4-minimal-13)
+维护者在 Mac 上只验证 Draft PR #8 的两项基础场景：标准 Open 对话框通过 ⌘⇧G 接收完整文件路径后能否定位/选中文件；Open/Save 对话框接收目录完整路径后能否进入目录。若完整文件路径无法直接选中，使用 Go to Containing Folder (Fallback) 手动选文件。助理根据反馈维护 Issue #7。自动活动窗口管理 P4.2 明确取消（Issue #9 closed/not_planned）。PR #8 保持 Draft，未获用户确认不合并。
