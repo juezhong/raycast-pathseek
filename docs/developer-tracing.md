@@ -28,7 +28,7 @@
 - phase：start/end
 - reason：manual-rebuild、15-day-refresh、fuzzy-query
 - invocation：脱敏参数结构，不含真实扫描根目录和查询词
-- outcome：success/failure/cancelled
+- outcome：success/limit-reached/failure/cancelled
 - durationMs：毫秒
 - resultCount：扫描条目数或匹配数
 - exitCode：子进程退出码，信号终止时可能为空
