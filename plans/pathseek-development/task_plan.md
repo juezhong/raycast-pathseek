@@ -7,8 +7,8 @@
 - Write Mode: manual_save
 - Status: active / code-review-quality-gate
 - Current Phase: Q1 — 首轮 Code Review 质量收口，暂停进入 P4
-- Checkpoint ID: pathseek-20261024-pr3-v2-03
-- Last Checkpoint: pathseek-20261024-pr3-v2-03 (2026-10-24; after three-file verification)
+- Checkpoint ID: pathseek-20261024-ci-dev-04
+- Last Checkpoint: pathseek-20261024-ci-dev-04 (2026-10-24; verified on three files)
 - Last Updated: 2026-10-24
 - Storage: github_checkpointed
 
@@ -83,3 +83,12 @@
 
 ## Next Step
 确认正确的 Raycast 账户用户名（当前 package.json author=juezhong 被官方校验返回 404），据此修正 PR #3 的 manifest；随后修复 Prettier 格式并重新运行 macOS CI 的 lint/build。
+
+## 2026-10-24 阶段确认：开发 CI 通过，发布 lint 延后
+
+- [x] PR #3：`npm test` 7/7、`tsc --noEmit`、`npm run lint:code`、`npm run build` 在 macOS GitHub Actions **全部通过**。
+- [ ] `format:check` 与 Raycast Store `npm run lint`：**未通过**；Prettier 应在近期修正，真实 Raycast author 用户名在**发布前**补齐，不影响继续开发。
+- [ ] PR #3：macOS 实机 v1→v2 索引迁移/重建中搜索/手动中断测试，审查后再合并。
+- [ ] 后续 CR-03/04/05：15 天按需刷新的生命周期、重试退避，以及 Regex 性能安全。
+- 重要区别：**开发期 CI 成功 ≠ Raycast Store 上架检查通过**。保留发布门槛，不借用他人用户名或隐藏失败日志。
+- 关联：https://github.com/juezhong/raycast-pathseek/pull/3#issuecomment-6382410366
