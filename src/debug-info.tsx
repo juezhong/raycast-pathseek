@@ -2,7 +2,6 @@ import { Action, ActionPanel, Detail, environment } from "@raycast/api";
 import { execFile } from "node:child_process";
 import { readdir, stat } from "node:fs/promises";
 import os from "node:os";
-import path from "node:path";
 import { promisify } from "node:util";
 import { useEffect, useState } from "react";
 import { readIndex, indexFilePath } from "./lib/index-store";
