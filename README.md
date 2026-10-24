@@ -28,7 +28,7 @@ npm run dev
 
 On first install the repository might not yet have a `package-lock.json`; `npm install` will generate one. Commit that lockfile before a Store release. `npm run dev` imports the extension to Raycast and auto-reloads changes.
 
-1. In Raycast, run **Rebuild Index**. Default indexed root is your home directory (`~`). Review preferences first if this is too large.
+1. In Raycast, run **Rebuild Index**. Default indexed root is your home directory (`~`). Review preferences first if this is too large. Multiple roots can be separated with semicolons (`~/Projects;~/Downloads`), preserving spaces in directory names.
 2. Run **Search Files**, type part of the path, and choose a file.
 3. Subsequent searches read the saved index; rebuilding is **manual only**.
 
@@ -49,3 +49,5 @@ Plan and progress: [plans/pathseek-development/task_plan.md](plans/pathseek-deve
 ## License
 
 MIT. See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+> The development icon currently comes from the MIT-licensed upstream extension and will be replaced before store submission.
