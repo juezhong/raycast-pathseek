@@ -2,11 +2,12 @@ import { environment, getPreferenceValues } from "@raycast/api";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { createWriteStream, constants } from "node:fs";
-import { access, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Transform } from "node:stream";
+import lockfile from "proper-lockfile";
 
 export type Preferences = {
   searchRoots: string;
@@ -139,61 +140,129 @@ async function runFd(fdPath: string, args: string[], outputPath: string): Promis
   }
 }
 
-export async function rebuildIndex(): Promise<IndexMetadata> {
-  const prefs = getPreferences();
-  const roots = parseRoots(prefs.searchRoots);
-  if (!roots.length) throw new Error("Set at least one search root in PathSeek preferences.");
+export const AUTO_REBUILD_DAYS = 15;
+const AUTO_REBUILD_MS = AUTO_REBUILD_DAYS * 24 * 60 * 60 * 1000;
+const AUTO_RETRY_DELAY_MS = 24 * 60 * 60 * 1000;
+const autoRefreshStatePath = path.join(indexDirectory, "auto-refresh.json");
 
-  for (const root of roots) {
-    const info = await stat(root);
-    if (!info.isDirectory()) throw new Error(`Not a directory: ${root}`);
-  }
+export function isIndexStale(metadata: IndexMetadata, now = Date.now()): boolean {
+  const builtAt = Date.parse(metadata.createdAt);
+  return !Number.isFinite(builtAt) || now - builtAt >= AUTO_REBUILD_MS;
+}
 
-  const fd = await findBinary("fd", prefs.fdBinary);
-  await mkdir(indexDirectory, { recursive: true });
-
-  const id = randomUUID();
-  const indexName = `index-${id}.nul`;
-  const tempPath = path.join(indexDirectory, `${indexName}.tmp`);
-  const finalPath = path.join(indexDirectory, indexName);
-  const metadataTemp = path.join(indexDirectory, `index-${id}.json.tmp`);
-
-  const args = ["--absolute-path", "--print0"];
-  if (prefs.includeHidden) args.push("--hidden");
-  if (prefs.followSymlinks) args.push("--follow");
-  for (const pattern of (prefs.excludePatterns || "").split(",").map((x) => x.trim()).filter(Boolean)) {
-    args.push("--exclude", pattern);
-  }
-
-  let total = 0;
+/**
+ * Refresh only when Search Files is opened and the index is at least 15 days
+ * old. There is no always-on daemon or time-based background scheduler.
+ * Failed attempts are limited to once every 24 hours.
+ */
+export async function refreshExpiredIndex(metadata: IndexMetadata): Promise<IndexMetadata | null> {
+  if (!isIndexStale(metadata)) return null;
   try {
-    await writeFile(tempPath, "", { flag: "wx" });
+    const attempt = JSON.parse(await readFile(autoRefreshStatePath, "utf8")) as { lastAttempt?: string };
+    if (typeof attempt.lastAttempt === "string" &&
+        Date.now() - Date.parse(attempt.lastAttempt) < AUTO_RETRY_DELAY_MS) {
+      return null;
+    }
+  } catch {
+    // First run or damaged retry marker.
+  }
+
+  await mkdir(indexDirectory, { recursive: true });
+  await writeFile(autoRefreshStatePath, JSON.stringify({ lastAttempt: new Date().toISOString() }));
+  // Also serializes against a manual rebuild in another Raycast process.
+  return rebuildIndex();
+}
+
+/**
+ * Delete older index generations only AFTER a new file has been published.
+ * Runs within the exclusive cross-process rebuild lock.
+ */
+async function cleanupOldGenerations(current: IndexMetadata): Promise<void> {
+  const published = await readIndex();
+  if (!published || published.filename !== current.filename) return;
+
+  const generations = (await readdir(indexDirectory)).filter((filename) => /^index-[a-f0-9-]+\.nul$/.test(filename));
+  // Never remove the active generation, even when it is the only one.
+  for (const filename of generations) {
+    if (filename !== current.filename) {
+      await rm(path.join(indexDirectory, filename), { force: true });
+    }
+  }
+}
+
+export async function rebuildIndex(): Promise<IndexMetadata> {
+  await mkdir(indexDirectory, { recursive: true });
+  // Heartbeat prevents simultaneous rebuilds. Abandoned locks expire.
+  const release = await lockfile.lock(indexDirectory, {
+    realpath: false,
+    stale: 120_000,
+    update: 30_000,
+    retries: 0,
+  });
+
+  try {
+    const prefs = getPreferences();
+    const roots = parseRoots(prefs.searchRoots);
+    if (!roots.length) throw new Error("Set at least one search root in PathSeek preferences.");
+
     for (const root of roots) {
-      total += await runFd(fd, [...args, ".", root], tempPath);
+      const info = await stat(root);
+      if (!info.isDirectory()) throw new Error("Not a directory: " + root);
     }
 
-    // 元数据原子发布前，先生成完整的数据文件；失败时仍使用旧版索引。
-    await rename(tempPath, finalPath);
-    const metadata: IndexMetadata = {
-      version: 1,
-      filename: indexName,
-      createdAt: new Date().toISOString(),
-      count: total,
-      roots,
-    };
-    await writeFile(metadataTemp, JSON.stringify(metadata, null, 2), "utf8");
-    await rename(metadataTemp, metadataPath);
+    const fd = await findBinary("fd", prefs.fdBinary);
+    const id = randomUUID();
+    const indexName = "index-" + id + ".nul";
+    const tempPath = path.join(indexDirectory, indexName + ".tmp");
+    const finalPath = path.join(indexDirectory, indexName);
+    const metadataTemp = path.join(indexDirectory, "index-" + id + ".json.tmp");
+    const args = ["--absolute-path", "--print0"];
+    if (prefs.includeHidden) args.push("--hidden");
+    if (prefs.followSymlinks) args.push("--follow");
+    for (const pattern of (prefs.excludePatterns || "").split(",").map((x) => x.trim()).filter(Boolean)) {
+      args.push("--exclude", pattern);
+    }
 
-    // 不在重建流程中删除旧索引：并发执行时清理其他重建生成的文件会造成悬空元数据。
-    // 索引清理将由未来独立的显式维护操作实现。
-    await access(finalPath, constants.R_OK);
-    return metadata;
-  } catch (error) {
-    await Promise.all([
-      rm(tempPath, { force: true }).catch(() => undefined),
-      rm(metadataTemp, { force: true }).catch(() => undefined),
-      rm(finalPath, { force: true }).catch(() => undefined),
-    ]);
-    throw error;
+    let total = 0;
+    let metadataPublished = false;
+    try {
+      await writeFile(tempPath, "", { flag: "wx" });
+      for (const root of roots) {
+        total += await runFd(fd, [...args, ".", root], tempPath);
+      }
+
+      await rename(tempPath, finalPath);
+      const fileInfo = await stat(finalPath);
+      if (!fileInfo.isFile()) throw new Error("Index is not a regular file");
+
+      const metadata: IndexMetadata = {
+        version: 1,
+        filename: indexName,
+        createdAt: new Date().toISOString(),
+        count: total,
+        roots,
+      };
+      await writeFile(metadataTemp, JSON.stringify(metadata, null, 2), "utf8");
+      await rename(metadataTemp, metadataPath);
+      metadataPublished = true;
+
+      // Cleanup is best-effort; publish success does not depend on cleanup.
+      try {
+        await cleanupOldGenerations(metadata);
+      } catch (error) {
+        console.warn("Index cleanup deferred:", error);
+      }
+      return metadata;
+    } catch (error) {
+      await Promise.all([
+        rm(tempPath, { force: true }).catch(() => undefined),
+        rm(metadataTemp, { force: true }).catch(() => undefined),
+        // Never delete an index already referenced by index.json.
+        ...(metadataPublished ? [] : [rm(finalPath, { force: true }).catch(() => undefined)]),
+      ]);
+      throw error;
+    }
+  } finally {
+    await release();
   }
 }
