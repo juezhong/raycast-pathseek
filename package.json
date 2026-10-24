@@ -81,6 +81,12 @@
       "title": "Index Status",
       "description": "Inspect the persistent index and open its storage directory.",
       "mode": "view"
+    },
+    {
+      "name": "debug-info",
+      "title": "Debug Info",
+      "description": "Copy sanitized system, Raycast, Node.js and index diagnostics.",
+      "mode": "view"
     }
   ],
   "dependencies": {
