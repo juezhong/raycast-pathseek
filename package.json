@@ -75,6 +75,12 @@
       "title": "Rebuild Index",
       "description": "Manually regenerate the persistent file index with fd.",
       "mode": "view"
+    },
+    {
+      "name": "index-status",
+      "title": "Index Status",
+      "description": "Inspect the persistent index and open its storage directory.",
+      "mode": "view"
     }
   ],
   "dependencies": {
