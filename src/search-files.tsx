@@ -73,7 +73,7 @@ export function SearchFilesView({ dialogMode = false }: { dialogMode?: boolean }
   const emptyDescription = loadError
     ? loadError
     : !index
-      ? "No index yet. Choose your folders in Rebuild Index to begin. Nothing is indexed automatically."
+      ? "No index yet. Choose your folders in Build Index to begin. Nothing is indexed automatically."
       : !query.trim()
         ? "Indexed " + index.count.toLocaleString() + " paths on " + new Date(index.createdAt).toLocaleString() + "."
         : "Try a different pattern or rebuild the index to include new files.";

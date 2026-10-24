@@ -99,7 +99,7 @@ async function collectDiagnostics(): Promise<Diagnostics> {
       "Method: Node.js child_process.spawn, no shell",
       summarizeCommandTrace(records),
       "",
-      "> 正常查询不会启动 fd。**只有用户主动执行 Rebuild Index 才调用 fd；不存在定时或打开搜索时自动建索引。**",
+      "> 正常查询不会启动 fd。**只有用户主动执行 Build Index 才调用 fd；不存在定时或打开搜索时自动建索引。**",
       "> 记录中的 started 表示已尝试调用；若无对应结束事件，可能被取消、终止或仍在运行。",
     );
   } else {
