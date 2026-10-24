@@ -4,6 +4,7 @@ import { open, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import type { FileHandle } from "node:fs/promises";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
+import { Transform } from "node:stream";
 
 export const ACTIVE_INDEX_FILENAME = "index.nul";
 export const LEGACY_INDEX_REGEX = /^index-[a-f0-9-]+\.nul$/;
@@ -67,7 +68,19 @@ export async function prepareIndex(
   MAGIC.copy(prefix);
   prefix.writeUInt32LE(json.length, MAGIC.length);
   await writeFile(stagedPath, Buffer.concat([prefix, json]), { flag: "wx" });
-  await pipeline(createReadStream(rawPathsFile), createWriteStream(stagedPath, { flags: "a" }));
+  let seenPaths = 0;
+  let lastByte: number | undefined;
+  const counter = new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      for (const byte of chunk) if (byte === 0) seenPaths++;
+      if (chunk.length) lastByte = chunk[chunk.length - 1];
+      callback(null, chunk);
+    },
+  });
+  await pipeline(createReadStream(rawPathsFile), counter, createWriteStream(stagedPath, { flags: "a" }));
+  if (seenPaths !== metadata.count || (seenPaths > 0 && lastByte !== 0)) {
+    throw new Error("Invalid index paths: wrong NUL separator count or trailing byte");
+  }
   const parsed = await readIndexHeader(stagedPath);
   if (parsed.count !== metadata.count || parsed.roots.length !== metadata.roots.length) {
     throw new Error("Index metadata verification failed");
