@@ -1,7 +1,7 @@
 # Findings — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-p4-user-validated-14
+- Checkpoint ID: pathseek-20261024-p4-merged-hotkey-15
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Evidence: [首轮 Code Review](../../docs/reviews/2026-10-24-initial-code-review.md) · [质量 Issue #4](https://github.com/juezhong/raycast-pathseek/issues/4) · [Draft PR #3](https://github.com/juezhong/raycast-pathseek/pull/3)
@@ -215,3 +215,17 @@ PR #3 已合并进 main（squash commit 09d7a864257c88d9869aac545e90aea11c6b2558
 
 ## Active Next Step (pathseek-20261024-p4-user-validated-14)
 用户确认 PR #8 的核心文件与目录搜索路径粘贴体验在 macOS 实机正常，已经达到其所需最小功能。暂不添加其他窗口自动化或未提出的优化需求；保留文件高亮选中/备用父目录等未逐项描述的细节为可选验证。向用户征求是否将 Draft PR #8 合并到 main；取得明确授权后确认 CI/mergeable 并合并。后续优化由用户提供具体体验反馈再按最小改动推进。
+
+## 2026-10-24 — PR #8 已合并与真正所需的快捷键衔接优化（pathseek-20261024-p4-merged-hotkey-15）
+
+- 用户明确同意合并 PR #8。已核验 head `cabce692becc435ded85c7c2a458d2f2f70ec926` macOS GitHub Actions completed/success 和 GitHub PR mergeable，先 Mark Ready 再 Squash Merge，返回 **merged=true**，提交 `47ea3c2a8781e111a58abf4a4d400b7a03b2eb38`。PathSeek Open/Save 路径粘贴功能现已进入 `main`。
+- 用户澄清 **不需要** Listary 那种自动根据 Finder 当前目录跟随新文件对话框，也不需要活动窗口追踪/自动切换；需要减少“先按 ⌘⇧G 打开 Go to Folder，再从 Raycast 根菜单寻找 PathSeek”的认知及按键负担。理想状态是一次触发同时打开 Go to Folder 和 PathSeek，搜索框尽量靠近原对话框；如果代价高做不到可接受。
+- 经官方 Raycast 文档确认，**可以不写代码给专用命令配置全局 Hotkey**：Raycast Settings → Shortcuts → Search in Open/Save Dialog → Record Hotkey（可试 `⌃⌥G`，取决于本机冲突）；在 Open/Save 窗口 `⌘⇧G` 后直接按这个 Hotkey 进入搜索，无需先打开 Raycast Root Search。来源：https://manual.raycast.com/command-aliases-and-hotkeys
+- macOS 的 `⇧⌘G` 是原生 Go to Folder 系统快捷键，直接把相同组合交给 Raycast 会产生抢占风险，**单纯配置一个 Raycast Command Hotkey 不等于能顺序触发系统快捷键与插件**。参考：https://support.apple.com/zh-cn/102650
+- Raycast 公开设置可选 Compact Window Mode 及“Show Raycast on: Screen with active window”等屏幕级配置，但没有面向插件的轻量功能，让自身 Raycast 搜索视图精确贴到其他应用的 Go to Folder 对话框旁边。官方 Window Management API 关注应用窗口移动且受计划/权限限制，不应为此引入新 native/AX/window manager。来源：https://manual.raycast.com/settings 、https://developers.raycast.com/api-reference/window-management
+- 已建立 [Issue #10](https://github.com/juezhong/raycast-pathseek/issues/10) 集中处理**快捷键衔接与窗口邻近**这一实际 UX 问题，优先配置现有全局 Hotkey；只有用户试过仍不流畅才评估可选一键实验，不劫持系统快捷键，不增加后台常驻服务。
+- [Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7) 4 项已实测，剩余 3 项已以日常语言解释为：文件路径手动 Return 后是否直接高亮文件；目录路径 Return 后是否进入文件夹；若文件无法直选是否使用父目录备用动作。**非阻塞、用户未验证绝不勾选**，不影响主流程已获验收的结论。
+- `docs/open-save-dialog.md`、中英 README 在 `main` 增补**配置专属全局快捷键**的准确步骤，避免误导同快捷键能被两个不同处理器同时接收。
+
+## Active Next Step (pathseek-20261024-p4-merged-hotkey-15)
+用户已授权 PR #8 合并，GitHub 返回 merged=true，main squash commit 47ea3c2a8781e111a58abf4a4d400b7a03b2eb38。优先由用户在 Raycast Settings → Shortcuts 为 Search in Open/Save Dialog 设置未冲突的独立全局热键（例如 ⌃⌥G），形成原对话框 ⌘⇧G → 热键直接搜索 → Return 粘贴的短流程，并描述真实体验；根据反馈决定 Issue #10 是否有必要进一步探索可选一键衔接/窗口位置。Issue #7 三项未单独验证的文件高亮、目录最终进入、父目录备用动作不阻碍主功能。不得劫持系统 CmdShiftG、增加自动窗口管理或私自变更用户 Mac 快捷键。
