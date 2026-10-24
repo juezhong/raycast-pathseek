@@ -31,13 +31,14 @@ const metadataPath = path.join(indexDirectory, "index.json");
 <environment.supportPath>/
 ├── index.json                       # 当前生效索引的元数据
 ├── index-<UUID>.nul                 # 当前生效索引
-├── index-<UUID>.nul                 # 最多保留一份上一代索引（若曾重建）
+├── index-<UUID>.nul                 # 旧版本路径索引，可能保留多份
 ├── index-<UUID>.nul.tmp             # 扫描时临时路径索引；异常退出后可能残留
 └── index-<UUID>.json.tmp            # 元数据更新时的临时文件
 ```
 
 - `index.json` 是正式元数据入口；读取此文件的 `filename` 字段即可确定当前生效的索引文件。
-- 正常成功重建后，清理非当前和非上一代的旧 `.nul` 数据文件；在异常退出时仍可能留下临时文件。
+- **当前版本已停用旧索引自动清理**：Issue #1 曾报告刚完成重建但 `Index Status` 无法访问索引文件；代码审查发现重建清理与并发构建存在潜在竞态，现暂时保留所有历史代索引，等待安全的显式清理功能。
+- 异常退出时仍可能留下临时文件。旧 `.nul` 文件可能增加磁盘占用，不要在不了解 `index.json` 指向的文件时删除。
 - 元数据更新采用同目录 `rename()` 发布；不会直接改写旧的索引内容。
 - 目前**没有**图形化恢复上一代索引或删除索引的功能，请勿随意手动删除正在使用的文件。
 
@@ -118,7 +119,7 @@ Rebuild Index
   -> rename(.nul.tmp, .nul)
   -> 写入临时 index-UUID.json.tmp
   -> rename(临时元数据, index.json)
-  -> 清理多余的旧 .nul 文件
+  -> 保留历史索引，暂不自动删除（避免并发构建竞态）
 ```
 
 构建过程中如遇到扫描错误，不会使用部分扫描结果更新 `index.json`；旧索引仍能用于搜索。请注意：当程序在极端时机被系统强制中断时，可能残留临时文件。
@@ -153,7 +154,13 @@ Search Files
 - 请勿把 `index.json` 或 `.nul` 索引文件直接贴到公开 Issue 中；报告 Bug 时先脱敏。
 - 目前无需定期备份索引：用户可以重新运行 `Rebuild Index` 再生成；如需保留旧状态可手动复制支持目录作为备份。
 
-## 8. 对应实现文件
+## 8. 诊断索引文件缺失（Issue #1）
+
+运行 Raycast **Debug Info**，在 Action 菜单选择 **Copy Sanitized Debug Info**。报告自动收集：macOS 系统版本、Raycast 版本、Raycast 扩展运行时 Node.js 版本、`index.json` 有效性、当前索引文件是否存在、索引代数及数据文件大小（不包含用户名、完整路径或文件名）。
+
+如果 `active index file` 显示 `missing/unavailable (ENOENT)`，说明 `index.json` 当前引用的数据文件不存在。需要重新执行 Rebuild Index 并复测；修复前的重建版本可能存在并发索引清理竞态，**目前仍需本地复测验证因果关系**。诊断信息可直接作为 Issue 评论，不要直接粘贴未经脱敏的异常原始路径。
+
+## 9. 对应实现文件
 
 | 文件 | 职责 |
 | --- | --- |
@@ -162,3 +169,4 @@ Search Files
 | [`src/search-files.tsx`](../src/search-files.tsx) | Raycast 搜索界面和文件 Action |
 | [`src/rebuild-index.tsx`](../src/rebuild-index.tsx) | 手动重建界面 |
 | [`src/index-status.tsx`](../src/index-status.tsx) | 索引状态和打开实际支持目录 |
+| [`src/debug-info.tsx`](../src/debug-info.tsx) | 自动收集脱敏的系统与索引诊断信息 |
