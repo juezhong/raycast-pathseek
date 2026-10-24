@@ -8,7 +8,7 @@
 
 ## 主要功能
 
-- **持久化索引**：第一次运行 `Rebuild Index` 手动建索引。此后索引满 15 天后，在下次打开 Search Files 时尝试更新（无常驻定时器），也可随时手动重建。
+- **严格手动索引**：安装后不扫描；打开搜索或状态也不扫描。首次打开 Rebuild Index 时选择目录，确认后才执行首次构建；之后仅手动重建，**没有 15 天自动刷新**。
 - **统一 fzf 搜索**：`Search Files` 只使用 fzf 对索引路径进行模糊、精确、前后缀、排除和 OR 匹配；输入搜索词不会执行 `fd`，也不再提供独立正则模式。
 - **Finder 原生图标与文件操作**：显示文件夹及文件各自的 Finder 图标；支持打开、显示目录、快速预览与复制路径。
 - **查看索引状态**：`Index Status` 查看索引构建时间、路径数量及搜索范围，并在 Finder 中打开真实的索引目录。
@@ -35,17 +35,17 @@ npm run dev
 执行 `npm run dev` 后，Raycast 会导入本地扩展并进入开发模式。在 Raycast 中按以下顺序测试：
 
 1. **Index Status**：查看当前索引状态和真实磁盘保存位置；**不会触发扫描**。
-2. **Rebuild Index**：首次手动建立索引。**建议先把 Search Roots 改成一个较小的目录**，例如 `~/Projects`，不要一开始就扫描整个用户目录。
+2. **Rebuild Index**：首次进入显示目录选择器，选择一个或多个文件夹后点击 **Choose Folders and Build Index** 才开始扫描。以后在 Rebuild Index 按 **⌘K → Change Indexed Folders** 可以更换目录，按 **Rebuild Index Now** 才实际执行。
 3. **Search Files**：输入文件名、目录名或路径片段，在列表中选择结果并执行 Finder 相关操作。
 4. **Debug Info**：发现错误时复制不含本地绝对路径的诊断报告，粘贴到 GitHub Issue。
 
-**15 天更新规则**：索引满 15 天后，下次启动 Search Files 会尝试自动重建，不要求 Raycast 常驻。自动更新失败后 24 小时内不会自动重试；可随时手动重建获得最新文件。
+**绝不自动建立或更新索引**：安装、启动、搜索、查看状态、保存新目录均不运行 `fd`。无论过了多少天，索引都只会在手动点击构建/重建时更新。未建立索引时，Search Files 与 Index Status 会显示提示和引导动作。
 
 ### 插件配置
 
 | 设置 | 功能 | 示例 |
 | --- | --- | --- |
-| Search Roots | 指定扫描根目录，使用分号或换行分隔；支持 `~` 展开 | `~/Projects;~/Downloads` |
+| 索引目录 | 在 **Rebuild Index** 中使用目录选择器选择多个文件夹；保存在 Raycast 本地配置中 | 首次使用时选择 |
 | Include Hidden Files | 重建时是否包含隐藏文件/目录 | 默认关闭 |
 | Follow Symbolic Links | 重建时是否跟随目录软链接 | 默认关闭 |
 | Exclude Patterns | 逗号分隔的 `fd --exclude` 模式 | `.git,node_modules` |
@@ -97,7 +97,7 @@ Search Files 现在只有一个搜索框，使用 fzf 内置扩展搜索语法�
 
 ## 测试与问题反馈
 
-请使用 [Issue #1：初版安装与测试](https://github.com/juezhong/raycast-pathseek/issues/1) 与 [Issue #2：15 天更新、fzf 搜索及图标](https://github.com/juezhong/raycast-pathseek/issues/2)。
+请使用 [Issue #1：初版安装与测试](https://github.com/juezhong/raycast-pathseek/issues/1) 与 [Issue #2：手动索引、fzf 搜索及图标](https://github.com/juezhong/raycast-pathseek/issues/2)。
 
 **你可以在 Issue 勾选已经验证通过的项目，或者直接在评论中贴出脱敏后的错误日志、复现步骤及建议。** 后续开发可以根据 Issue 的最新状态继续迭代。
 
@@ -115,7 +115,7 @@ npm run build
 | 阶段 | 状态 |
 | --- | --- |
 | P1：上游审查和插件工程初始化 | 源码已提交，macOS 构建待验证 |
-| P2：15 天按需刷新及索引安全清理 | 初始实现已提交，实机待验证 |
+| P2：纯手动索引、首次选目录与安全发布 | 已提交 Draft PR，实机待验证 |
 | P3：统一 fzf 搜索与原生 Finder 图标 | 初始实现已提交，实机待验证 |
 | P4：原 Open/Save 对话框跳转 | 尚未实现 |
 | P5：测试和 Raycast Store 发布 | 尚未开始 |
