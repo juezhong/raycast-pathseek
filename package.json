@@ -4,7 +4,7 @@
   "title": "PathSeek",
   "description": "Find files and folders fast, open them, or select paths in macOS Open/Save dialogs. Index only when you choose.",
   "icon": "extension-icon.png",
-  "author": "juezhong",
+  "author": "liyunfeng",
   "platforms": [
     "macOS"
   ],
