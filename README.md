@@ -4,7 +4,7 @@
 
 **PathSeek** is an open-source macOS file-search extension for Raycast, inspired by the fast file navigation workflow of Windows Listary.
 
-> **Early development / local testing only.** Persistent indexing, fuzzy search and Finder actions have initial implementations but have **not yet passed macOS GUI/build verification**. Returning a result to an existing application's Open/Save dialog is a planned feature, **not implemented**.
+> **Early development / local testing only.** Persistent indexing, fuzzy search and Finder actions have initial implementations but have passed development CI and partial user macOS testing, but still need full regression verification. Returning a result to an existing application's Open/Save dialog is a planned feature, **not implemented**.
 
 ## Features
 
