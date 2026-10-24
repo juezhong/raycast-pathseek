@@ -6,9 +6,9 @@
 - Plan Directory: plans/pathseek-development/
 - Write Mode: continuous_checkpoints
 - Status: active / code-review-quality-gate
-- Current Phase: Q1 — Manual-only onboarding acceptance and remaining code review
-- Checkpoint ID: pathseek-20261024-manual-setup-08
-- Last Checkpoint: pathseek-20261024-manual-setup-08 (2026-10-24; three-file readback verified)
+- Current Phase: Q1 — GUI accepted, remaining technical Code Review
+- Checkpoint ID: pathseek-20261024-issue6-acceptance-09
+- Last Checkpoint: pathseek-20261024-issue6-acceptance-09 (2026-10-24; 3-file verification)
 - Last Updated: 2026-10-24
 - Storage: github_checkpointed
 
@@ -150,3 +150,15 @@
 
 ## Active Next Step (pathseek-20261024-manual-setup-08)
 用户在 Mac 更新 Draft PR #3 后，简短验证首次无索引提示、目录选择、打开 Rebuild 时不自动执行 fd、⌘K 更改目录及显式 Rebuild；由助理根据聊天反馈维护简单 Issue #6。之后集中代码审查剩余索引稳定性问题，用户授权后再讨论合并 PR #3。
+
+## 2026-10-24 — Issue #6 实机验收已全部完成（pathseek-20261024-issue6-acceptance-09）
+
+- [x] 用户已在 macOS/Raycast 完成 [Issue #6](https://github.com/juezhong/raycast-pathseek/issues/6) 所有 **11/11** 用户可见操作：空状态引导、首次选目录、手动 Build/Rebuild、⌘K 更换目录、不会自动 fd、搜索/图标/追踪。
+- [x] PR #3 的最新 macOS GitHub Actions 已确认 completed/success：npm test、TypeScript、源码 ESLint、Raycast build；不能将 Store lint 的非阻塞校验解释为正式上架通过。
+- [x] 已更新 Issue #4 的 Code Review 验收范围：自描述 v2 原子发布设计及现有测试完成、取消旧自动刷新待办；不再把复杂故障注入和锁测试交给用户。
+- [ ] **剩余合并前开发者工作**：真实 fd 的集成与异常中断/多写者风险评估、npm lockfile / 可复现构建、迁移后的索引完整性、文档一致性。针对可复现的问题修正并跑 CI。
+- [ ] 在质量复审完成后再将 Draft PR #3 变为 Ready；**合并需要维护者明确同意**，当前保持 main 不变。
+- [ ] P4 原应用 Open/Save Dialog Bridge 尚未开始；Raycast Store 作者身份/正式发布检查仍留到上架前。
+
+## Active Next Step (pathseek-20261024-issue6-acceptance-09)
+Issue #6 的 11/11 项用户可见 Mac 验收已完成，PR #3 最新 macOS CI 通过。下一步由助理完成技术 Code Review 剩余阻塞：重点核验 UUID→v2 升级及中断/并发安全、真实 fd 集成场景、可复现的 npm lockfile 与文档一致性；无需用户再做复杂测试。PR #3 仍 Draft，未经明确同意不合并 main。
