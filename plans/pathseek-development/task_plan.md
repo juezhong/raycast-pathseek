@@ -6,9 +6,9 @@
 - Plan Directory: plans/pathseek-development/
 - Write Mode: continuous_checkpoints
 - Status: active / code-review-quality-gate
-- Current Phase: P4.1 — Assisted Open/Save dialog navigation: CI passed, Mac acceptance pending
-- Checkpoint ID: pathseek-20261024-p4-assisted-12
-- Last Checkpoint: pathseek-20261024-p4-assisted-12 (2026-10-24; three-file readback verified)
+- Current Phase: P4 — Minimal file selection and folder jump (Draft PR #8; Mac GUI pending)
+- Checkpoint ID: pathseek-20261024-p4-minimal-13
+- Last Checkpoint: pathseek-20261024-p4-minimal-13 (2026-10-24; verified three-file readback)
 - Last Updated: 2026-10-24
 - Storage: github_checkpointed
 
@@ -204,3 +204,16 @@ PR #3 已合并进 main（squash commit 09d7a864257c88d9869aac545e90aea11c6b2558
 
 ## Active Next Step (pathseek-20261024-p4-assisted-12)
 等待维护者在 Mac 上测试 Draft PR #8 的 P4.1 辅助导航：在原应用 Open/Save 对话框按 ⌘⇧G，使用 Search in Open/Save Dialog 搜索并按 Return 粘贴父目录，再在原对话框手动按 Return；从反馈判断是否可用并更新 Issue #7。P4.2 自动识别目标文件面板的 AX/原应用焦点研究在 Issue #9，未经验证不注入键盘或自动确认 Open/Save；PR #8 不擅自合并。
+
+## 2026-10-24 — P4 产品范围正式缩减（pathseek-20261024-p4-minimal-13）
+
+- [x] 明确 P4 只保留两个目标：原 Open 对话框里**快速选中文件**，原 Open/Save 对话框里**快速进入文件夹**。
+- [x] 将 Draft PR #8 的首要 Action.Paste 改为完整所选路径；保留父目录备用操作。使用现有 fzf 索引，不调用额外 fd 或 stat，也不做自动窗口管理。
+- [x] 更新 README 中英、Open/Save 简明说明、架构、开发文档与针对主/备用动作顺序的测试。
+- [x] 简化 [Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7) 为用户易做的文件/目录操作测试，自动面板 P4.2 [Issue #9](https://github.com/juezhong/raycast-pathseek/issues/9) 已按 not_planned 关闭。
+- [x] PR #8 最新开发 CI 完成成功；此状态不代替用户 macOS GUI 验收或 Store 发布校验。
+- [ ] 用户在 Mac 简测：原 Open 对话框的 ⌘⇧G 是否接收完整文件路径并能直接选中它；完整目录路径是否跳到文件夹；若不支持，父目录备用操作是否实用。
+- [ ] 根据用户反馈做最小必要修复，之后再决定是否合并 PR #8。没有自动窗口管理/Accessibility/后台监听阶段。
+
+## Active Next Step (pathseek-20261024-p4-minimal-13)
+维护者在 Mac 上只验证 Draft PR #8 的两项基础场景：标准 Open 对话框通过 ⌘⇧G 接收完整文件路径后能否定位/选中文件；Open/Save 对话框接收目录完整路径后能否进入目录。若完整文件路径无法直接选中，使用 Go to Containing Folder (Fallback) 手动选文件。助理根据反馈维护 Issue #7。自动活动窗口管理 P4.2 明确取消（Issue #9 closed/not_planned）。PR #8 保持 Draft，未获用户确认不合并。
