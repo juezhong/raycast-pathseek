@@ -1,7 +1,7 @@
 # Progress — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-pr3-v2-03
+- Checkpoint ID: pathseek-20261024-ci-dev-04
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Branch: main
@@ -72,3 +72,12 @@
 
 ## Next Action
 确认正确的 Raycast 账户用户名（当前 package.json author=juezhong 被官方校验返回 404），据此修正 PR #3 的 manifest；随后修复 Prettier 格式并重新运行 macOS CI 的 lint/build。
+
+### 2026-10-24 — 开发期质量门槛已通过，发布检查延后
+
+- 用户明确表示：Raycast Store `author` 用户名发布前补齐即可；开发阶段无需向用户索要。
+- PR #3 功能分支增加源码 ESLint 与格式命令；调整 macOS CI：测试、类型、源码 ESLint、`ray build` 按严格阻塞执行；完整 `ray lint` 单列为非阻塞的发布审查。
+- 实际 macOS GitHub Actions 工作流 **完成成功**：`npm test` 7/7；`npx tsc --noEmit`；`npm run lint:code`；`npm run build` 均通过。
+- Store `npm run lint` 仍失败：未完成真实 Raycast 用户名确认和 Prettier 格式化，日志如实保留；**不能标记上架质量检查已通过**。
+- 本轮没有合并 Draft PR #3、没有更新 `main` 的插件运行代码，也没有 Mac 用户的 v2 GUI 验收。
+- 当前唯一下一步：整理并提交 Prettier 格式修复（保留作者信息不变），随后继续 PR #3 的 Mac 实机兼容与崩溃恢复验证。
