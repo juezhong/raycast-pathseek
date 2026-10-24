@@ -82,7 +82,7 @@ export function SearchFilesView({ dialogMode = false }: { dialogMode?: boolean }
     <List
       isLoading={index === undefined || isSearching}
       filtering={false}
-      searchBarPlaceholder={dialogMode ? "Find a folder to paste into the Open/Save Go to Folder field" : "Search with fzf: filename, path, .pdf$, !node_modules…"} 
+      searchBarPlaceholder={dialogMode ? "Search files or folders to locate in the Open/Save dialog" : "Search with fzf: filename, path, .pdf$, !node_modules…"} 
       onSearchTextChange={setQuery}
     >
       <List.EmptyView
@@ -122,14 +122,14 @@ export function SearchFilesView({ dialogMode = false }: { dialogMode?: boolean }
                 {dialogMode && (
                   <ActionPanel.Section title="Assisted Open/Save Navigation">
                     <Action.Paste
-                      title="Paste Containing Folder into Go to Folder"
-                      icon={Icon.Folder}
-                      content={getDialogNavigationPaths(filepath).containingFolder}
+                      title="Select File or Go to Folder (Paste Full Path)"
+                      icon={Icon.ArrowRight}
+                      content={getDialogNavigationPaths(filepath).selectedPath}
                     />
                     <Action.Paste
-                      title="Paste Selected Path (For Folder Results)"
-                      icon={Icon.Text}
-                      content={getDialogNavigationPaths(filepath).selectedPath}
+                      title="Go to Containing Folder (Fallback)"
+                      icon={Icon.Folder}
+                      content={getDialogNavigationPaths(filepath).containingFolder}
                     />
                   </ActionPanel.Section>
                 )}
