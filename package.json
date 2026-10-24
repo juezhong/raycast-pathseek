@@ -90,7 +90,8 @@
     }
   ],
   "dependencies": {
-    "@raycast/api": "^1.102.3"
+    "@raycast/api": "^1.102.3",
+    "proper-lockfile": "^4.1.2"
   },
   "devDependencies": {
     "@raycast/eslint-config": "^2.0.4",
@@ -98,7 +99,8 @@
     "@types/react": "^19.0.10",
     "eslint": "^9.22.0",
     "prettier": "^3.5.3",
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.2",
+    "@types/proper-lockfile": "^4.1.4"
   },
   "scripts": {
     "dev": "ray develop",
