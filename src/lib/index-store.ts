@@ -9,10 +9,10 @@ import { pipeline } from "node:stream/promises";
 import { Transform } from "node:stream";
 import lockfile from "proper-lockfile";
 import { beginCommandTrace } from "./command-trace";
+import { getConfiguredIndexRoots, normalizeIndexRoots } from "./index-roots";
 import { ACTIVE_INDEX_FILENAME, cleanupLegacyIndexes, prepareIndex, publishIndex, readIndexHeader, type SavedIndexMetadata } from "./index-files";
 
 export type Preferences = {
-  searchRoots: string;
   includeHidden: boolean;
   followSymlinks: boolean;
   excludePatterns?: string;
@@ -116,7 +116,7 @@ async function runFd(
   fdPath: string,
   args: string[],
   outputPath: string,
-  reason: "manual-rebuild" | "15-day-refresh",
+  reason: "manual-rebuild",
 ): Promise<number> {
   // Show effective flags without exposing directory names or exclude patterns.
   const flags = args.filter((arg) => ["--absolute-path", "--print0", "--hidden", "--follow"].includes(arg));
@@ -159,44 +159,12 @@ async function runFd(
   }
 }
 
-export const AUTO_REBUILD_DAYS = 15;
-const AUTO_REBUILD_MS = AUTO_REBUILD_DAYS * 24 * 60 * 60 * 1000;
-const AUTO_RETRY_DELAY_MS = 24 * 60 * 60 * 1000;
-const autoRefreshStatePath = path.join(indexDirectory, "auto-refresh.json");
-
-export function isIndexStale(metadata: IndexMetadata, now = Date.now()): boolean {
-  const builtAt = Date.parse(metadata.createdAt);
-  return !Number.isFinite(builtAt) || now - builtAt >= AUTO_REBUILD_MS;
-}
-
 /**
- * Refresh only when Search Files is opened and the index is at least 15 days
- * old. There is no always-on daemon or time-based background scheduler.
- * Failed attempts are limited to once every 24 hours.
+ * Only a deliberate call from the Rebuild Index command may start fd.
+ * Launching Search Files, opening Index Status and launching Raycast never
+ * invokes this function.
  */
-export async function refreshExpiredIndex(metadata: IndexMetadata): Promise<IndexMetadata | null> {
-  if (!isIndexStale(metadata)) return null;
-  try {
-    const attempt = JSON.parse(await readFile(autoRefreshStatePath, "utf8")) as { lastAttempt?: string };
-    if (typeof attempt.lastAttempt === "string" &&
-        Date.now() - Date.parse(attempt.lastAttempt) < AUTO_RETRY_DELAY_MS) {
-      return null;
-    }
-  } catch {
-    // First run or damaged retry marker.
-  }
-
-  await mkdir(indexDirectory, { recursive: true });
-  await writeFile(autoRefreshStatePath, JSON.stringify({ lastAttempt: new Date().toISOString() }));
-  // Also serializes against a manual rebuild in another Raycast process.
-  return rebuildIndex({ skipIfFresh: true });
-}
-
-/**
- * Delete older index generations only AFTER a new file has been published.
- * Runs within the exclusive cross-process rebuild lock.
- */
-export async function rebuildIndex(options: { skipIfFresh?: boolean } = {}): Promise<IndexMetadata> {
+export async function rebuildIndex(selectedRoots?: string[]): Promise<IndexMetadata> {
   await mkdir(indexDirectory, { recursive: true });
   // Heartbeat prevents simultaneous rebuilds. Abandoned locks expire.
   const release = await lockfile.lock(indexDirectory, {
@@ -207,15 +175,12 @@ export async function rebuildIndex(options: { skipIfFresh?: boolean } = {}): Pro
   });
 
   try {
-    // Another window may have finished rebuilding while this process waited
-    // for the lock. Do not scan again when the current index is already fresh.
-    if (options.skipIfFresh) {
-      const current = await readIndex().catch(() => null);
-      if (current && !isIndexStale(current)) return current;
-    }
     const prefs = getPreferences();
-    const roots = parseRoots(prefs.searchRoots);
-    if (!roots.length) throw new Error("Set at least one search root in PathSeek preferences.");
+    const previous = await readIndex();
+    const roots = selectedRoots
+      ? normalizeIndexRoots(selectedRoots)
+      : await getConfiguredIndexRoots(previous?.roots);
+    if (!roots.length) throw new Error("Choose folders in Rebuild Index before building your first index.");
 
     for (const root of roots) {
       const info = await stat(root);
@@ -237,7 +202,7 @@ export async function rebuildIndex(options: { skipIfFresh?: boolean } = {}): Pro
     try {
       await writeFile(rawTemp, "", { flag: "wx" });
       for (const root of roots) {
-        total += await runFd(fd, [...args, ".", root], rawTemp, options.skipIfFresh ? "15-day-refresh" : "manual-rebuild");
+        total += await runFd(fd, [...args, ".", root], rawTemp, "manual-rebuild");
       }
 
       const metadata: IndexMetadata = {
