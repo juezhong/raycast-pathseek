@@ -75,6 +75,8 @@ PathSeek 使用 Raycast 官方提供的 `environment.supportPath`，而不是存
 
 ### 搜索模式
 
+Search Files 最多显示 **150 条**匹配结果；达到上限后的追踪标为 `limit-reached`，可能伴随 `exit=null`，不是失败。
+
 Search Files 现在只有一个搜索框，使用 fzf 内置扩展搜索语法：`report` 模糊匹配、`'report` 精确包含、`.pdf$` 匹配 PDF 后缀、`!node_modules` 排除路径、`.ts$ | .tsx$` 表示二选一。**这不是完整正则表达式语法**（不支持 `.*` 或 `[a-z]+`）；搜索的是路径，不是文件内容。详见 [fzf 官方语法说明](https://junegunn.github.io/fzf/search-syntax/)。
 
 ## 技术设计与开发文档
