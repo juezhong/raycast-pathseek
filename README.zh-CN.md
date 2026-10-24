@@ -9,7 +9,7 @@
 ## 主要功能
 
 - **持久化索引**：第一次运行 `Rebuild Index` 手动建索引。此后索引满 15 天后，在下次打开 Search Files 时尝试更新（无常驻定时器），也可随时手动重建。
-- **模糊及正则搜索**：`Search Files` 可切换 Fuzzy (`fzf`) 与 Regex (JavaScript 正则匹配完整路径)；键入查询不会执行 `fd`。
+- **统一 fzf 搜索**：`Search Files` 只使用 fzf 对索引路径进行模糊、精确、前后缀、排除和 OR 匹配；输入搜索词不会执行 `fd`，也不再提供独立正则模式。
 - **Finder 原生图标与文件操作**：显示文件夹及文件各自的 Finder 图标；支持打开、显示目录、快速预览与复制路径。
 - **查看索引状态**：`Index Status` 查看索引构建时间、路径数量及搜索范围，并在 Finder 中打开真实的索引目录。
 - **诊断信息**：`Debug Info` 自动获取 macOS、Raycast、Node.js 版本及索引文件完整性状态，可复制脱敏报告到 GitHub Issue。
@@ -75,7 +75,7 @@ PathSeek 使用 Raycast 官方提供的 `environment.supportPath`，而不是存
 
 ### 搜索模式
 
-在 Search Files 右侧切换 **Fuzzy (fzf)** / **Regex (full path)**。正则示例：`\.tsx?$` 匹配 `.ts` 和 `.tsx`，`src/.*/config` 匹配路径片段。正则只匹配完整路径字符串，不会搜索文件内容。
+Search Files 现在只有一个搜索框，使用 fzf 内置扩展搜索语法：`report` 模糊匹配、`'report` 精确包含、`.pdf$` 匹配 PDF 后缀、`!node_modules` 排除路径、`.ts$ | .tsx$` 表示二选一。**这不是完整正则表达式语法**（不支持 `.*` 或 `[a-z]+`）；搜索的是路径，不是文件内容。详见 [fzf 官方语法说明](https://junegunn.github.io/fzf/search-syntax/)。
 
 ## 技术设计与开发文档
 
@@ -95,7 +95,7 @@ PathSeek 使用 Raycast 官方提供的 `environment.supportPath`，而不是存
 
 ## 测试与问题反馈
 
-请使用 [Issue #1：初版安装与测试](https://github.com/juezhong/raycast-pathseek/issues/1) 与 [Issue #2：15 天更新、正则搜索及图标](https://github.com/juezhong/raycast-pathseek/issues/2)。
+请使用 [Issue #1：初版安装与测试](https://github.com/juezhong/raycast-pathseek/issues/1) 与 [Issue #2：15 天更新、fzf 搜索及图标](https://github.com/juezhong/raycast-pathseek/issues/2)。
 
 **你可以在 Issue 勾选已经验证通过的项目，或者直接在评论中贴出脱敏后的错误日志、复现步骤及建议。** 后续开发可以根据 Issue 的最新状态继续迭代。
 
@@ -114,7 +114,7 @@ npm run build
 | --- | --- |
 | P1：上游审查和插件工程初始化 | 源码已提交，macOS 构建待验证 |
 | P2：15 天按需刷新及索引安全清理 | 初始实现已提交，实机待验证 |
-| P3：模糊/正则搜索与原生 Finder 图标 | 初始实现已提交，实机待验证 |
+| P3：统一 fzf 搜索与原生 Finder 图标 | 初始实现已提交，实机待验证 |
 | P4：原 Open/Save 对话框跳转 | 尚未实现 |
 | P5：测试和 Raycast Store 发布 | 尚未开始 |
 
