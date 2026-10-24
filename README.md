@@ -102,28 +102,30 @@ npm run lint
 npm run build
 ```
 
-A `package-lock.json` file has not yet been generated and committed as part of a verified Mac installation. Store submission will require the lockfile, dependency verification, a unique icon and passing Raycast's checks.
+A committed `package-lock.json` is installed with `npm ci` in macOS CI. Tests, TypeScript, source ESLint and Raycast build pass; a unique icon, author account validation and full Store formatting remain publication tasks.
 
 ## Status
 
 | Phase | Status |
 | --- | --- |
 | P1 — Upstream audit & scaffolding | Code submitted; Mac build verification pending |
-| P2 — explicit manual index, setup picker and safe index publishing | PR implementation; Mac verification pending |
-| P3 — Unified fzf search and Finder native icons | Initial implementation; Mac verification pending |
-| P4 — Open/Save Dialog Bridge | Not implemented |
+| P2 — manual index, setup picker and safe publishing | PR #3 merged; Mac verified |
+| P3 — Unified fzf search and Finder native icons | PR #3 merged; Mac verified |
+| P4 — Open/Save file selection and folder navigation | PR #8 merged; Mac verified |
 | P5 — Tests & Raycast Store submission | Not started |
 
 ## License
 
 [MIT License](LICENSE). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for upstream attribution. The current development icon is temporarily reused from the MIT-licensed Fuzzy File Search upstream extension; it must be replaced before publishing.
 
-## Quick file selection and folder navigation in Open/Save dialogs (development)
+## Quick file selection and folder navigation in Open/Save dialogs (Mac verified)
 
-**Search in Open/Save Dialog** focuses on two workflows: quickly selecting an indexed file in the original application's **Open** dialog, or navigating to an indexed folder in its **Open/Save** dialog.
+**Stable development snapshot: [v0.1.0](https://github.com/juezhong/raycast-pathseek/tree/v0.1.0)** (Git tag; not a Raycast Store release).
 
-Press **Cmd+Shift+G** in the original panel first, search with PathSeek, and press **Return** to paste the **full selected path**. Confirm Go to Folder in the original dialog. Standard Open dialogs may highlight a full file path, but this must be verified on the user's Mac and may vary by app. Use **Cmd+K → Go to Containing Folder (Fallback)** to navigate to the parent directory instead.
+In the original application's Open/Save file panel, press the configured **Cmd+Shift+F** to launch PathSeek directly, search for a file or folder, and press **Return** to paste its full absolute path. On the maintainer's Mac, this **works without first pressing Cmd+Shift+G**: the original panel selects the file or navigates to the folder. PathSeek itself does not simulate the keyboard, manage windows, open Finder or click Open/Save.
 
-There is **no automatic dialog detection, window manager, accessibility automation, background agent, or automatic Open/Save confirmation**. **Faster launch:** Assign **Search in Open/Save Dialog** its own global hotkey in Raycast Settings → Shortcuts (prefer `Cmd+Shift+F`, if available). Then use `Cmd+Shift+G` in the original dialog followed by `Cmd+Shift+F` to search immediately, skipping Raycast Root Search. Raycast's extension manifest does not support pre-assigning a global hotkey, so this requires a one-time user choice in Settings → Shortcuts or Root Search → Configure Command → Set Hotkey. If `Cmd+Shift+F` conflicts with another app, choose another shortcut. Do not override the system `Cmd+Shift+G` shortcut with the same Raycast hotkey, as doing so may prevent Go to Folder from appearing. No automatic window manager is needed.
+For apps that do not accept the path directly, use **Cmd+Shift+G** in the original panel first, then launch PathSeek and paste; the **Go to Containing Folder (Fallback)** action can help locate files through their parent directory. Compatibility may differ between apps.
 
-See [simple instructions](docs/open-save-dialog.md), [Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7) and [Issue #10: hotkey workflow](https://github.com/juezhong/raycast-pathseek/issues/10).
+Raycast does not let extensions pre-register a global hotkey: **Cmd+Shift+F** is a one-time configuration in Raycast's **Configure Command → Set Hotkey** or Settings → Shortcuts, not something the extension can silently set.
+
+See [Open/Save guide](docs/open-save-dialog.md), [Mac acceptance Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7), and [hotkey Issue #10](https://github.com/juezhong/raycast-pathseek/issues/10).
