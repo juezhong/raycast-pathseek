@@ -1,7 +1,7 @@
 # Findings — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-ci-dev-04
+- Checkpoint ID: pathseek-20261024-debug-trace-05
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Evidence: [首轮 Code Review](../../docs/reviews/2026-10-24-initial-code-review.md) · [质量 Issue #4](https://github.com/juezhong/raycast-pathseek/issues/4) · [Draft PR #3](https://github.com/juezhong/raycast-pathseek/pull/3)
@@ -76,3 +76,17 @@
 - macOS GitHub Actions 已确认 `npm install`、`npm test` 7/7、`npx tsc --noEmit`、`npm run lint:code`、`npm run build` **全部通过**。
 - 完整 `npm run lint` 在 CI 中标注为**非阻塞发布审查项**：仍会显示 `author` 404 和 Prettier 格式错误，故不得误报“Raycast Store lint 通过”。详细情况在 [PR 评论](https://github.com/juezhong/raycast-pathseek/pull/3#issuecomment-6382410366)。
 - 质量说明：新自描述 v2 单文件索引、旧版兼容逻辑通过代码构建与辅助函数单测，但尚未完成 macOS GUI 实测、实际 `fd` 长目录构建性能或 FSEvents/对话框交互测试。
+
+## 2026-10-24 — 默认关闭的 fd/fzf 开发者追踪（pathseek-20261024-debug-trace-05）
+
+- 用户提出必须可见 fd/fzf **何时运行、由什么触发、参数形式、执行状态、耗时、结果数量**；日常用户不应因诊断拖慢搜索。
+- 已在 [Draft PR #3](https://github.com/juezhong/raycast-pathseek/pull/3) 的 `fix/stable-index-file-atomic-swap` 分支实现 `src/lib/command-trace.ts` 和 `enableCommandTracing` 配置：**默认 false**。
+- fd 只在手动 Rebuild Index（manual-rebuild）或 15 天到期按需更新（15-day-refresh）时由 child_process.spawn 启动；fzf 只在 Fuzzy 查询（fuzzy-query）时 spawn。Regex 搜索不调用 fzf。
+- 开启开发者追踪后，fd/fzf 记录 start/end、触发原因、脱敏的参数形式、耗时、条目/匹配数量、退出状态、错误代码；Debug Info 显示最近 50 条记录并可刷新或复制脱敏报告。
+- 日志存 `environment.supportPath/command-trace.jsonl`，达到约 256KiB 后轮换到 previous。绝不写搜索词、用户绝对路径、扫描根目录、排除规则原文、完整 stderr。关闭后无额外诊断磁盘 I/O，仅检查设置布尔值；开启可能增加轻微 I/O。
+- [docs/developer-tracing.md](https://github.com/juezhong/raycast-pathseek/blob/fix/stable-index-file-atomic-swap/docs/developer-tracing.md) 与 [Issue #5](https://github.com/juezhong/raycast-pathseek/issues/5) 已创建。
+- 最新 PR #3 的 GitHub Actions 已确认 **completed/success**，包括 7 个索引单测、TypeScript、源码 ESLint 和 Raycast build。完整 Raycast Store lint 作为非阻塞审核步骤，作者用户名与 Prettier 仍未达发布要求。
+- **仍需 Mac 实测**：确认日志在追踪关闭时没有写入、快速输入时 fzf 取消状态可解释、没有意外 fd 调用以及 v1→v2 迁移正确。
+
+## Current Next Step (checkpoint pathseek-20261024-debug-trace-05)
+在 Mac 上从 Draft PR #3 独立工作目录加载扩展，验证 v1→v2 索引迁移、搜索与重建并发，以及开发者 fd/fzf 追踪的默认关闭/开启行为；到 Issue #5 和 PR #3 提交实测结果，再决定 Ready for Review / 合并。
