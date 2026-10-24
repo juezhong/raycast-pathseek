@@ -1,10 +1,11 @@
 import { Action, ActionPanel, Detail, environment } from "@raycast/api";
 import { execFile } from "node:child_process";
-import { readFile, readdir, stat } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import os from "node:os";
-import path from "node:path";
 import { promisify } from "node:util";
 import { useEffect, useState } from "react";
+import { readIndex, indexFilePath } from "./lib/index-store";
+import { commandTracingEnabled, readCommandTrace, summarizeCommandTrace } from "./lib/command-trace";
 
 const run = promisify(execFile);
 
@@ -53,53 +54,32 @@ async function collectDiagnostics(): Promise<Diagnostics> {
 
   try {
     const entries = await readdir(root);
-    generationCount = String(entries.filter((name) => /^index-[a-f0-9-]+\.nul$/.test(name)).length);
+    generationCount = String(entries.filter((name) => name === "index.nul" || /^index-[a-f0-9-]+\.nul$/.test(name)).length);
   } catch (error) {
     generationCount = `unavailable (${errorCode(error)})`;
   }
 
-  let raw: string | undefined;
   try {
-    raw = await readFile(path.join(root, "index.json"), "utf8");
-    metadataStatus = "present";
-  } catch (error) {
-    metadataStatus = `unavailable (${errorCode(error)})`;
-    activeStatus = "not checked";
-  }
-
-  if (raw !== undefined) {
-    try {
-      const meta: unknown = JSON.parse(raw);
-      if (
-        !meta ||
-        typeof meta !== "object" ||
-        !("filename" in meta) ||
-        typeof meta.filename !== "string" ||
-        !/^index-[a-f0-9-]+\.nul$/.test(meta.filename)
-      ) {
-        metadataStatus = "invalid structure";
-        activeStatus = "not checked";
-      } else {
-        const payload = meta as Record<string, unknown>;
-        declaredCount = typeof payload.count === "number" ? String(payload.count) : "invalid";
-        createdAt = typeof payload.createdAt === "string" ? payload.createdAt : "invalid";
-        rootCount = Array.isArray(payload.roots) ? String(payload.roots.length) : "invalid";
-        try {
-          const info = await stat(path.join(root, meta.filename));
-          activeStatus = info.isFile() ? "present" : "not a regular file";
-          indexBytes = String(info.size);
-        } catch (error) {
-          activeStatus = `missing/unavailable (${errorCode(error)})`;
-        }
-      }
-    } catch {
-      metadataStatus = "invalid JSON";
+    const metadata = await readIndex();
+    if (!metadata) {
+      metadataStatus = "not built";
       activeStatus = "not checked";
+    } else {
+      metadataStatus = metadata.version === 2 ? "v2 embedded header" : "v1 legacy index.json";
+      declaredCount = String(metadata.count);
+      rootCount = String(metadata.roots.length);
+      createdAt = metadata.createdAt;
+      const info = await stat(indexFilePath(metadata));
+      activeStatus = info.isFile() ? "present" : "not a regular file";
+      indexBytes = String(info.size);
     }
+  } catch (error) {
+    metadataStatus = "invalid or inaccessible";
+    activeStatus = "missing/unavailable (" + errorCode(error) + ")";
   }
 
   report.push(
-    `- index.json: ${metadataStatus}`,
+    `- index format/metadata: ${metadataStatus}`,
     `- active index file: ${activeStatus}`,
     `- active index size (bytes): ${indexBytes}`,
     `- metadata path count: ${declaredCount}`,
@@ -111,6 +91,21 @@ async function collectDiagnostics(): Promise<Diagnostics> {
     "> 终端 `node --version` 显示的是系统 Node.js 版本，可能不同于 Raycast 内部 Node.js。",
   );
 
+  report.push("", "## fd/fzf 调用记录（开发者选项）");
+  if (commandTracingEnabled()) {
+    const records = await readCommandTrace();
+    report.push(
+      "Tracing: enabled (local, sanitized, maximum 256 KiB per file)",
+      "Method: Node.js child_process.spawn, no shell",
+      summarizeCommandTrace(records),
+      "",
+      "> 正常查询不会启动 fd。**只有用户主动执行 Rebuild Index 才调用 fd；不存在定时或打开搜索时自动建索引。**",
+      "> 记录中的 started 表示已尝试调用；若无对应结束事件，可能被取消、终止或仍在运行。",
+    );
+  } else {
+    report.push("Tracing: disabled (default). No fd/fzf trace file is written during normal searches.");
+  }
+
   const copyText = report.join("\n");
   return { markdown: copyText, copyText };
 }
@@ -118,6 +113,7 @@ async function collectDiagnostics(): Promise<Diagnostics> {
 export default function DebugInfo() {
   const [data, setData] = useState<Diagnostics | null>(null);
   const [error, setError] = useState<string>();
+  const [refreshCount, setRefreshCount] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -127,7 +123,7 @@ export default function DebugInfo() {
         if (active) setError(`Failed to collect diagnostics (${errorCode(failure)})`);
       });
     return () => { active = false; };
-  }, []);
+  }, [refreshCount]);
 
   return (
     <Detail
@@ -137,6 +133,7 @@ export default function DebugInfo() {
         data ? (
           <ActionPanel>
             <Action.CopyToClipboard title="Copy Sanitized Debug Info" content={data.copyText} />
+            <Action title="Refresh Diagnostics" onAction={() => setRefreshCount((count) => count + 1)} />
             <Action.Open title="Open PathSeek GitHub Issue" target="https://github.com/juezhong/raycast-pathseek/issues/1" />
           </ActionPanel>
         ) : undefined

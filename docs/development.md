@@ -24,8 +24,8 @@ npm run dev
 `npm run dev` 启动 Raycast 开发扩展，按 Raycast 搜索启动命令：
 
 1. **Index Status**：查看索引状态/复制目录，不触发扫描。
-2. **Rebuild Index**：手动触发 `fd` 扫描，第一次使用必须执行一次。
-3. **Search Files**：输入任意部分文件名、目录名或路径，切换 Fuzzy / Regex 模式；结果显示 Finder 原生文件/目录图标。
+2. **Rebuild Index**：首次打开后先使用目录选择器选择一个或多个目录，点击 Build 才开始扫描。后续打开仅显示状态；按 ⌘K 可以更换目录或显式 Rebuild，**不会因打开命令而自动运行 fd**。
+3. **Search Files**：使用 fzf 单一搜索框输入文件名、目录或路径片段；支持精确/后缀/排除等 fzf 自带语法，显示 Finder 原生图标。
 4. **Debug Info**：自动收集 macOS、Raycast、Node.js（扩展运行时）及当前索引文件的状态，复制不含用户绝对路径的诊断报告。
 
 项目首次 `npm install` 会生成依赖锁文件。当前仓库尚未将实测产生的 `package-lock.json` 提交，正式发布前需加入并跑 CI。
@@ -36,7 +36,7 @@ npm run dev
 
 | 参数 | 作用 | 示例 |
 | --- | --- | --- |
-| Search Roots | 分号或换行分隔多个绝对/用户目录 | `~/Projects;~/Downloads` |
+| 索引目录 | 在 Rebuild Index 里使用 Raycast 目录选择器选择，⌘K 可随时修改 | 第一次使用时选择 |
 | Include Hidden Files | 重建时包含隐藏文件和目录 | 默认关闭 |
 | Follow Symbolic Links | 重建时进入软链接目录 | 默认关闭 |
 | Exclude Patterns | `fd --exclude`，多个模式以英文逗号分隔 | `.git,node_modules` |
@@ -53,7 +53,7 @@ npm run dev
 
 ## 5. 提交测试反馈
 
-测试任务：[Issue #1 — macOS/Raycast 初版验收](https://github.com/juezhong/raycast-pathseek/issues/1)；新增功能：[Issue #2 — 15 天刷新 / Regex / Finder 图标](https://github.com/juezhong/raycast-pathseek/issues/2)。
+测试任务：[Issue #1 — macOS/Raycast 初版验收](https://github.com/juezhong/raycast-pathseek/issues/1)；新增功能：[Issue #2 — 纯手动索引 / fzf / Finder 图标](https://github.com/juezhong/raycast-pathseek/issues/2)。
 
 请逐项勾选已通过项目；未通过的直接评论：
 
@@ -69,6 +69,27 @@ Node.js 版本：
 ```
 
 优先从 Raycast 执行 **Debug Info → Copy Sanitized Debug Info**，粘贴到 Issue 评论；如果还要贴原始日志，请注意其中可能包含用户主目录名称、项目敏感名称、绝对路径和凭证，必须先脱敏。**不要上传完整索引文件到公开 Issue。**
+
+## 开发者 fd / fzf 调用追踪
+
+开发版可在偏好设置中开启 **Developer: Trace fd/fzf Calls**（默认关闭）。开启后，通过 **Debug Info → Refresh Diagnostics** 查看最近 fd/fzf 子进程调用的时间、触发原因、参数形态、执行结果与耗时。
+
+**普通搜索不应调用 fd**；所有搜索统一由 fzf 查询现有索引，不再提供 Regex 引擎。追踪只在显式开启时写入本地脱敏日志，详见 [开发者追踪说明](developer-tracing.md)。
+
+### 在独立工作目录测试未合并 PR #3
+
+以下命令不会改变原始 main 工作目录：
+
+```bash
+cd /path/to/raycast-pathseek
+git fetch origin
+git worktree add --detach ../raycast-pathseek-pr3 origin/fix/stable-index-file-atomic-swap
+cd ../raycast-pathseek-pr3
+npm install
+npm run dev
+```
+
+PR #3 仍为 Draft，运行此分支测试并不等于它已经合并。请先退出其他工作目录的开发服务，以免两份同名扩展混淆。验证后在 [Issue #5](https://github.com/juezhong/raycast-pathseek/issues/5) 或 [PR #3](https://github.com/juezhong/raycast-pathseek/pull/3) 留下记录。
 
 ## 6. 构建与排查
 
@@ -93,8 +114,8 @@ npm run build
 
 ## 7. 当前限制和后续开发
 
-- **索引每满 15 天后按需更新**：下次打开 Search Files 才尝试执行 fd 重建（没有常驻服务）；手动 Rebuild Index 随时可用，自动失败 24 小时内不反复尝试。
-- 普通键入查询不会运行 `fd`；`fzf` 和正则搜索均从已有索引读取路径（有 CPU、内存与缓存/SSD 读取成本）。
+- **永不自动建立或更新索引**：只有 Rebuild Index 的明确用户操作才调用 fd；Search Files、Index Status 和目录变更都不扫描。索引不会按时间过期自动重建。
+- 普通键入查询不会运行 `fd`；`fzf` 从已有索引读取路径（有 CPU、内存与缓存/SSD 读取成本）。
 - 索引文件内含绝对路径，按普通本地文件处理，而非 Raycast 加密数据库。
 - P4 对话框导航、跨应用兼容、自动下载依赖与正式发布工作尚未完成。
 - 本地试用不代表 Raycast Store 的发布验收已经通过。

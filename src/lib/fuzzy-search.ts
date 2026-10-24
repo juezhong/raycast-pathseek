@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
-import { createReadStream } from "node:fs";
+import { beginCommandTrace } from "./command-trace";
+import { openIndexDataStream } from "./index-files";
+import { appendFzfOutputChunk, createFzfOutputState } from "./fzf-output";
 import { findBinary, getPreferences, indexFilePath, type IndexMetadata } from "./index-store";
-
-const MAX_RESULTS = 150;
 
 /**
  * 仅搜索已经持久化的索引；此函数不会运行 fd 或遍历目录树。
@@ -16,11 +16,15 @@ export async function fuzzySearch(
   if (signal?.aborted) return [];
 
   const binary = await findBinary("fzf", getPreferences().fzfBinary);
-  const input = createReadStream(indexFilePath(index));
+  const input = await openIndexDataStream(indexFilePath(index));
+  // Actual argv contains the search query; never write it to the trace.
+  const trace = await beginCommandTrace("fzf", "fuzzy-query", "fzf --extended --read0 --print0 --filter <redacted>");
+  let exitCode: number | null | undefined;
+  let wasLimited = false;
 
-  return await new Promise<string[]>((resolve, reject) => {
-    const results: string[] = [];
-    let pending = Buffer.alloc(0);
+  try {
+    const output = await new Promise<string[]>((resolve, reject) => {
+    const outputState = createFzfOutputState();
     let limited = false;
     let stderr = "";
     let finished = false;
@@ -30,10 +34,10 @@ export async function fuzzySearch(
       finished = true;
       input.destroy();
       if (error) reject(error);
-      else resolve(results);
+      else resolve(outputState.results);
     };
 
-    const child = spawn(binary, ["--read0", "--print0", "--filter", query], {
+    const child = spawn(binary, ["--extended", "--read0", "--print0", "--filter", query], {
       stdio: ["pipe", "pipe", "pipe"],
       signal,
     });
@@ -49,18 +53,13 @@ export async function fuzzySearch(
     input.pipe(child.stdin);
 
     child.stdout.on("data", (data: Buffer) => {
-      pending = Buffer.concat([pending, data]);
-      while (true) {
-        const boundary = pending.indexOf(0);
-        if (boundary < 0) break;
-        const filename = pending.subarray(0, boundary).toString("utf8");
-        pending = pending.subarray(boundary + 1);
-        if (filename) results.push(filename);
-        if (results.length >= MAX_RESULTS) {
-          limited = true;
-          child.kill();
-          break;
-        }
+      if (limited) return;
+      appendFzfOutputChunk(outputState, data);
+      if (outputState.limitReached) {
+        limited = true;
+        wasLimited = true;
+        // This intentional stop may yield exitCode=null (SIGTERM).
+        child.kill();
       }
     });
 
@@ -74,11 +73,18 @@ export async function fuzzySearch(
     });
 
     child.once("close", (code) => {
+      exitCode = code;
       if (signal?.aborted || limited || code === 0 || (code === 1 && !stderr)) {
         finish();
       } else {
         finish(new Error(`fzf failed (exit ${code}): ${stderr.trim()}`));
       }
     });
-  });
+    });
+    await trace?.finish(signal?.aborted ? "cancelled" : wasLimited ? "limit-reached" : "success", output.length, exitCode);
+    return output;
+  } catch (error) {
+    await trace?.finish(signal?.aborted ? "cancelled" : "failure", undefined, exitCode, error);
+    throw error;
+  }
 }

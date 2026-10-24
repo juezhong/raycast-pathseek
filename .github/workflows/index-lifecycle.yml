@@ -1,0 +1,45 @@
+name: PathSeek quality gates
+
+on:
+  push:
+    paths:
+      - "src/**"
+      - "tests/**"
+      - ".github/workflows/index-lifecycle.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.json"
+  pull_request:
+    paths:
+      - "src/**"
+      - "tests/**"
+      - ".github/workflows/index-lifecycle.yml"
+      - "package.json"
+      - "tsconfig.json"
+
+jobs:
+  verify:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install locked npm dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install fd for real-scan integration tests
+        run: command -v fd || brew install fd
+      - name: Index format and atomic-publish tests
+        run: npm test
+      - name: TypeScript typecheck
+        run: npx tsc --noEmit
+      - name: Source ESLint (independent of Store account validation)
+        run: npm run lint:code
+      - name: Raycast build
+        run: npm run build
+      # Raycast's full lint also validates the extension's Store author.
+      # The owner will provide their Raycast username at publication time.
+      # Keep the result visible without blocking the developer-only CI.
+      - name: Store metadata and formatting audit (publication gate)
+        continue-on-error: true
+        run: npm run lint

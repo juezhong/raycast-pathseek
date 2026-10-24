@@ -1,172 +1,116 @@
-# PathSeek 索引存储与维护说明
+# PathSeek 索引格式、生命周期与维护
 
-> 对应当前开发版实现：[`src/lib/index-store.ts`](../src/lib/index-store.ts)、[`src/lib/fuzzy-search.ts`](../src/lib/fuzzy-search.ts)。本文描述已提交的代码行为，不代表所有 macOS 环境均已实测通过。
+> 本文描述 **Draft PR #3 中的新索引格式 v2**。合并之前的 \`main\` 仍使用旧的 \`index.json + index-UUID.nul\`。本 PR 必须经过 GitHub CI 和 macOS 实测才考虑合并。
+>
+> 相关源码：[index-files.ts](../src/lib/index-files.ts)、[index-store.ts](../src/lib/index-store.ts)、[fuzzy-search.ts](../src/lib/fuzzy-search.ts)、[开发者调用追踪](developer-tracing.md)。
 
-## 1. 索引实际存在哪里？
+## 1. 索引实际存储在哪里？
 
-**不在 GitHub 仓库，也不是 Raycast 的加密 LocalStorage 数据库。**
+索引位于 Raycast 提供的 \`environment.supportPath\`，不是 GitHub 项目目录，也不是 LocalStorage 数据库。绝对路径由 Raycast 运行时确定；不要硬编码用户主目录。
 
-PathSeek 通过 Raycast 官方 `environment.supportPath` API 获取**当前扩展自己的支持目录绝对路径**，相关代码：
+在 Raycast 执行 **Index Status → Open Index Directory in Finder** 即可查看；或者选择 **Copy Index Directory Path** 复制路径。索引可暴露私人文件名和绝对路径，不要上传到公开 Issue。
 
-```ts
-const indexDirectory = environment.supportPath;
-const metadataPath = path.join(indexDirectory, "index.json");
-```
+## 2. v2 索引目录与文件格式
 
-官方说明：[Raycast Environment API](https://developers.raycast.com/api-reference/environment)；[Raycast Storage API](https://developers.raycast.com/api-reference/storage)。官方建议大型数据使用支持目录中的文件，不要存入 LocalStorage。
-
-**注意：不要假设 supportPath 的绝对路径固定。** 不同安装方式或 Raycast 实现可能有差异，应以运行时返回的路径为准。
-
-### 在 Raycast 里查看精确位置
-
-1. 打开 Raycast，运行 **Index Status**。
-2. 打开 Action 菜单，选择 **Open Index Directory in Finder**，直接查看文件。
-3. 或选择 **Copy Index Directory Path**，将绝对路径复制出来。
-
-查看索引状态**不会运行 fd**，因此不会触发全盘扫描或重建。
-
-## 2. 文件布局
-
-```text
+\`\`\`text
 <environment.supportPath>/
-├── index.json                       # 当前生效索引的元数据
-├── index-<UUID>.nul                 # 当前生效索引
-├── index-<UUID>.nul                 # 历史版本（构建后会清理，异常中断可能暂时残留）
-├── index-<UUID>.nul.tmp             # 扫描时临时路径索引；异常退出后可能残留
-└── index-<UUID>.json.tmp            # 元数据更新时的临时文件
-```
+├── index.nul                  # 唯一的当前生效索引（包含元数据头和路径）
+├── index-<UUID>.paths.tmp     # fd 扫描中的临时路径数据，正常完成会清理
+├── index-<UUID>.nul.tmp       # 已封装头部的临时索引，正常完成后原子替换
+├── index.json                # v1 历史元数据，新版不再读取它作为 v2 数据来源
+└── index-<UUID>.nul          # v1 旧索引；迁移后至少留 24 小时保护旧窗口
+\`\`\`
 
-- `index.json` 是正式元数据入口；读取此文件的 `filename` 字段即可确定当前生效的索引文件。
-- **当前已恢复安全清理**：重建使用 `proper-lockfile` 跨进程锁防止多个扫描互相清理。只有新索引数据和 `index.json` 成功发布且验证读取后，才删除旧 `.nul` 文件；即使只有一个有效索引，也始终保留它。Issue #1 之前的 ENOENT 已由用户在评论中报告修复。
-- 异常退出时仍可能留下临时文件。旧 `.nul` 文件可能增加磁盘占用，不要在不了解 `index.json` 指向的文件时删除。
-- 元数据更新采用同目录 `rename()` 发布；不会直接改写旧的索引内容。
-- 目前**没有**图形化恢复上一代索引或删除索引的功能，请勿随意手动删除正在使用的文件。
+正式文件 **\`index.nul\`** 不再使用 UUID 文件名，也不会出现「新索引和元数据分别原子提交」的问题。
 
-## 3. 元数据格式
+其二进制布局：
 
-`index.json` 示例（内容仅为示意，并非实测产生）：
+\`\`\`text
+[8 字节 ASCII "PSIDX002"]
+[4 字节小端 JSON 字节长度 N]
+[N 字节 UTF-8 JSON 元数据]
+[UTF-8 绝对路径 #1][NUL]
+[UTF-8 绝对路径 #2][NUL]
+...
+\`\`\`
 
-```json
-{
-  "version": 1,
-  "filename": "index-11111111-2222-4333-8444-555555555555.nul",
-  "createdAt": "2026-10-24T08:00:00.000Z",
-  "count": 123456,
-  "roots": [
-    "/Users/example/Projects",
-    "/Users/example/Downloads"
-  ]
-}
-```
+JSON 元数据包含：
+- \`version: 2\`
+- \`createdAt\`：最近一次成功构建完成的时间（ISO 8601）
+- \`count\`：NUL 分隔的路径条目数量
+- \`roots\`：此次构建的扫描根目录数组
 
-| 字段 | 类型 | 含义 |
-| --- | --- | --- |
-| `version` | number | 元数据格式版本，目前是 `1` |
-| `filename` | string | 当前生效的 `.nul` 文件名 |
-| `createdAt` | ISO 8601 字符串 | 最近一次成功完成的重建时间 |
-| `count` | number | `fd` 扫描返回的路径项数，不一定等于去重后的实际文件数 |
-| `roots` | string[] | 当次构建使用的搜索根目录绝对路径 |
+路径数据使用 NUL（\`0x00\`）而不是换行分隔，允许文件名包含空格、中文与换行。查询时，插件会先读取文件头，**从同一个已打开的文件描述符**按正确偏移量读取路径。无论重建何时发生，都不会把旧文件的元数据偏移量应用到新文件。
 
-> 目前元数据没有存储排除规则、隐藏文件和符号链接开关的快照。修改插件偏好设置不会自动重建；下一次手动重建才会应用新配置。后续应完善配置快照与索引版本兼容策略。
+## 3. 构建、发布与失败保护
 
-## 4. 路径索引文件格式
+\`\`\`text
+用户主动在 Rebuild Index 中选择 Build / Rebuild
+    ↓
+独占写入锁（仅防止多个扫描互相交错）
+    ↓
+fd → index-<UUID>.paths.tmp
+    ↓
+验证路径数量、末尾 NUL 与输出字节数
+    ↓
+写入元数据头并封装为 index-<UUID>.nul.tmp
+    ↓
+验证临时完整索引
+    ↓
+rename(临时封装文件, index.nul)   ← 唯一的原子发布点
+    ↓
+清理临时文件，按兼容策略清理 v1 旧索引
+\`\`\`
 
-`index-<UUID>.nul` 使用 **UTF-8 编码的绝对路径 + NUL（`0x00`）分隔符**，形式如下：
+如果扫描、编码、文件校验或写入临时文件失败，已有的 \`index.nul\` 原封不动。只有完整的新索引准备好，才会执行 \`rename\`。
 
-```text
-/Users/example/Projects/linux/Makefile\0
-/Users/example/Projects/linux/drivers/tty/serial/8250/8250_core.c\0
-/Users/example/Downloads/report.pdf\0
-```
+操作系统上已经打开旧 \`index.nul\` 的读者可以继续读旧文件；新读者打开同一个固定路径会读到新文件。**不需要以锁限制读者**。
 
-上面的 `\0` 用于说明分隔字节，实际文件是二进制 NUL 字节，不是文本的反斜杠和数字 0。通常不建议直接用文本编辑器打开。
+异常断电与文件系统持久化语义不同于进程级原子可见性；当前仍没有每一层强制 \`fsync\` 保证，因此不能承诺断电后绝对不会丢失最近一次更新。
 
-使用 NUL 分隔，是因为合法的 macOS 文件名可以包含换行，而不能包含 NUL 字节。
+## 4. v1 升级兼容
 
-### 只读查看索引内容
+旧版本采用：
+- \`index.json\`：保存 \`filename/index-UUID.nul\`、构建时间、数量与根目录
+- \`index-UUID.nul\`：NUL 分隔路径，文件内没有头部
 
-先从 **Index Status** 进入该目录，再在终端运行：
+如果没有 \`index.nul\`，新版本的 \`readIndex()\` 会回退读取旧 \`index.json\` 和对应的 UUID 索引，用户不必因为升级立即丢失搜索能力。
 
-```bash
-cat index.json
-python3 - <<'PY'
-import json
-from pathlib import Path
+完成首次 v2 重建后，\`index.nul\` 成为新的权威文件。旧 UUID 索引至少保留 **24 小时**，以保护仍在使用旧元数据的搜索窗口。它们只在以后触发维护/重建时按时间清理；旧 \`index.json\` 作为兼容遗留文件暂时保留，但不再决定 v2 的 \`createdAt\` 或 \`count\`。
 
-meta = json.loads(Path("index.json").read_text(encoding="utf-8"))
-data = Path(meta["filename"]).read_bytes()
-paths = [x.decode("utf-8", errors="replace") for x in data.split(b"\0") if x]
-print("Metadata count:", meta["count"])
-print("Actual entries:", len(paths))
-for value in paths[:10]:
-    print(repr(value))
-PY
-```
+因此，**首次升级后的短时间内看见两份索引是预期的迁移现象，不代表新版本每次重建都生成两个正式索引。**
 
-以上是**只读检查**，不会触发 `fd`，也不会重建索引。大索引读取全部字节可能占用较多内存；这段脚本适合初期验证，中大型索引建议采用流式解析工具。
+## 5. 纯手动索引与首次使用
 
-## 5. 构建与搜索数据流
+- 安装 PathSeek 后，插件不会自动建立索引。首次打开 Search Files 和 Index Status 只显示未建立索引的引导，**不调用 fd**。
+- 首次打开 Rebuild Index 也不会自动扫描。通过 Raycast Form.FilePicker 选择一个或多个目录，主动点击 **Choose Folders and Build Index** 后才调用 fd。
+- 后续打开 Rebuild Index 仅展示上次构建及选定目录；通过 **⌘K → Change Indexed Folders** 修改范围并保存在 Raycast LocalStorage 中，保存目录**不触发扫描**。
+- 选定目录后须主动点击 **Rebuild Index Now** 才更新持久化索引。无论经过多少天都不会自动重建；原先设计过的 15 天按需自动刷新已被正式取消。
+- 对升级用户，如果 LocalStorage 还没有目录选择但已有 v1/v2 索引，可从现有索引元数据的 roots 读取扫描范围；旧索引继续可用，不会因升级自动重建。
+- 原有索引在新索引成功发布前保持可搜索；更换文件夹后新目录的文件只有手动重建成功后才会出现在搜索结果中。
 
-### 手动构建（会遍历配置的文件树）
 
-```text
-Rebuild Index
-  -> 读取 Search Roots / Include Hidden / Exclusions / Follow Symlinks
-  -> 校验根目录存在
-  -> 找到 fd 可执行文件
-  -> fd --absolute-path --print0 [选项] . <root>
-  -> 追加到新的 .nul.tmp 临时文件
-  -> rename(.nul.tmp, .nul)
-  -> 写入临时 index-UUID.json.tmp
-  -> rename(临时元数据, index.json)
-  -> 验证当前 index.json 指向新文件，然后清理旧 .nul，始终保留当前一份
-```
+## 6. 验证与测试
 
-构建过程中如遇到扫描错误，不会使用部分扫描结果更新 `index.json`；旧索引仍能用于搜索。请注意：当程序在极端时机被系统强制中断时，可能残留临时文件。
+运行 \`Index Status\` 查看格式版本、构建时间、索引条目数、扫描根目录；\`Debug Info\` 允许复制脱敏环境和索引完整性报告。不要将原始索引数据上传至公开 GitHub。
 
-### 日常搜索（不会运行 fd）
+可用 Node 内置测试运行器执行回归测试：
 
-```text
-Search Files
-  -> 读取 index.json
-  -> 得到当前 index-UUID.nul
-  -> 每次查询调用 fzf --read0 --print0 --filter <query>
-  -> 最多返回 150 条结果
-  -> Finder / Open / Copy Path
-```
+\`\`\`bash
+npm test
+\`\`\`
 
-当前实现每次模糊搜索可能重新读取索引文件；macOS 文件缓存可能减少真实 SSD 读取，但**不能理解为零 I/O**。查询会产生 CPU/内存开销，搜索 UI 目前约 180 ms 防抖。
+当前测试覆盖：
+- 元数据和文件路径在同一个正式文件中原子发布；
+- 新旧索引头部长度不同时，已打开读者保持一致；
+- 临时文件准备或校验失败不覆盖已有数据；
+- v1 UUID 旧索引无头部读取；
+- 迁移宽限期及清理不会删除 \`index.nul\`。
 
-## 6. 索引生命周期和预期局限
+完整 macOS Raycast GUI、首次目录选择和 ⌘K 修改目录的交互、异常中断行为仍需要在 Issue 中验证。
 
-- **15 天按需刷新**：上次成功构建后满 15 天，下一次打开 Search Files 才尝试自动更新（没有常驻定时器或后台服务），自动失败后 24 小时内不重复尝试；未到期的文件变化不会即时同步。
-- **手动重建**：仍可随时通过独立的 `Rebuild Index` 命令立即执行。
-- **跨启动复用**：只要支持目录的数据未丢失、索引未损坏，重新启动 Raycast 后仍可读取。
-- **重建失败**：原则上继续使用先前有效的索引文件。
-- **更改搜索范围/排除规则**：必须手动重新构建才生效。
-- **多个根目录重叠**：可能造成重复路径；后续需要完善去重。
-- **权限不足、外置卷离线、损坏数据、无效 UTF-8**：尚未完成完整实机测试与所有回退策略。
+## 7. 相关任务
 
-## 7. 隐私和备份
-
-- 索引包含**真实的本机绝对路径**，可能暴露用户主目录名称、项目结构、文件名。
-- 索引以普通本地文件保存；**不是加密存储，也不会自动上传 GitHub**。
-- 请勿把 `index.json` 或 `.nul` 索引文件直接贴到公开 Issue 中；报告 Bug 时先脱敏。
-- 目前无需定期备份索引：用户可以重新运行 `Rebuild Index` 再生成；如需保留旧状态可手动复制支持目录作为备份。
-
-## 8. 诊断索引文件缺失（Issue #1）
-
-运行 Raycast **Debug Info**，在 Action 菜单选择 **Copy Sanitized Debug Info**。报告自动收集：macOS 系统版本、Raycast 版本、Raycast 扩展运行时 Node.js 版本、`index.json` 有效性、当前索引文件是否存在、索引代数及数据文件大小（不包含用户名、完整路径或文件名）。
-
-如果 `active index file` 显示 `missing/unavailable (ENOENT)`，说明 `index.json` 当前引用的数据文件不存在。请先使用 Debug Info 记录诊断，再手动 Rebuild Index；当前加入互斥锁与先发布后清理策略，仍须进行并发与异常中断实测。诊断信息可直接作为 Issue 评论，不要直接粘贴未经脱敏的异常原始路径。
-
-## 9. 对应实现文件
-
-| 文件 | 职责 |
-| --- | --- |
-| [`src/lib/index-store.ts`](../src/lib/index-store.ts) | 配置、索引位置、构建、写入与读取元数据 |
-| [`src/lib/fuzzy-search.ts`](../src/lib/fuzzy-search.ts) | 在现有索引上调用 `fzf` |
-| [`src/search-files.tsx`](../src/search-files.tsx) | Raycast 搜索界面和文件 Action |
-| [`src/rebuild-index.tsx`](../src/rebuild-index.tsx) | 手动重建界面 |
-| [`src/index-status.tsx`](../src/index-status.tsx) | 索引状态和打开实际支持目录 |
-| [`src/debug-info.tsx`](../src/debug-info.tsx) | 自动收集脱敏的系统与索引诊断信息 |
+- [Code Review Issue #4](https://github.com/juezhong/raycast-pathseek/issues/4)
+- [功能验收 Issue #2](https://github.com/juezhong/raycast-pathseek/issues/2)
+- [固定索引格式 Draft PR #3](https://github.com/juezhong/raycast-pathseek/pull/3)

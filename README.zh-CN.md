@@ -4,12 +4,12 @@
 
 **PathSeek** 是一款基于 Raycast 的开源 macOS 文件搜索与路径导航插件，目标是提供接近 Windows Listary 的“输入文件名快速搜索、定位所在目录，以及在应用文件选择窗口中跳转”的体验。
 
-> **当前为开发测试版。** 持久化索引、模糊搜索和 Finder 文件操作已提交初始实现，但**尚未完成 macOS 上的构建与 GUI 实测**。直接导航其他应用已弹出的 Open/Save 文件对话框（Dialog Bridge）**尚未开发**，请勿将其误认为已支持。
+> **当前为开发测试版。** 持久化索引、模糊搜索和 Finder 文件操作已提交初始实现，但**开发期 CI 构建已通过，用户完成了部分 Mac 实测，但仍需完整回归验证**。直接导航其他应用已弹出的 Open/Save 文件对话框（Dialog Bridge）**尚未开发**，请勿将其误认为已支持。
 
 ## 主要功能
 
-- **持久化索引**：第一次运行 `Rebuild Index` 手动建索引。此后索引满 15 天后，在下次打开 Search Files 时尝试更新（无常驻定时器），也可随时手动重建。
-- **模糊及正则搜索**：`Search Files` 可切换 Fuzzy (`fzf`) 与 Regex (JavaScript 正则匹配完整路径)；键入查询不会执行 `fd`。
+- **严格手动索引**：安装后不扫描；打开搜索或状态也不扫描。首次打开 Rebuild Index 时选择目录，确认后才执行首次构建；之后仅手动重建，**没有 15 天自动刷新**。
+- **统一 fzf 搜索**：`Search Files` 只使用 fzf 对索引路径进行模糊、精确、前后缀、排除和 OR 匹配；输入搜索词不会执行 `fd`，也不再提供独立正则模式。
 - **Finder 原生图标与文件操作**：显示文件夹及文件各自的 Finder 图标；支持打开、显示目录、快速预览与复制路径。
 - **查看索引状态**：`Index Status` 查看索引构建时间、路径数量及搜索范围，并在 Finder 中打开真实的索引目录。
 - **诊断信息**：`Debug Info` 自动获取 macOS、Raycast、Node.js 版本及索引文件完整性状态，可复制脱敏报告到 GitHub Issue。
@@ -35,17 +35,17 @@ npm run dev
 执行 `npm run dev` 后，Raycast 会导入本地扩展并进入开发模式。在 Raycast 中按以下顺序测试：
 
 1. **Index Status**：查看当前索引状态和真实磁盘保存位置；**不会触发扫描**。
-2. **Rebuild Index**：首次手动建立索引。**建议先把 Search Roots 改成一个较小的目录**，例如 `~/Projects`，不要一开始就扫描整个用户目录。
+2. **Rebuild Index**：首次进入显示目录选择器，选择一个或多个文件夹后点击 **Choose Folders and Build Index** 才开始扫描。以后在 Rebuild Index 按 **⌘K → Change Indexed Folders** 可以更换目录，按 **Rebuild Index Now** 才实际执行。
 3. **Search Files**：输入文件名、目录名或路径片段，在列表中选择结果并执行 Finder 相关操作。
 4. **Debug Info**：发现错误时复制不含本地绝对路径的诊断报告，粘贴到 GitHub Issue。
 
-**15 天更新规则**：索引满 15 天后，下次启动 Search Files 会尝试自动重建，不要求 Raycast 常驻。自动更新失败后 24 小时内不会自动重试；可随时手动重建获得最新文件。
+**绝不自动建立或更新索引**：安装、启动、搜索、查看状态、保存新目录均不运行 `fd`。无论过了多少天，索引都只会在手动点击构建/重建时更新。未建立索引时，Search Files 与 Index Status 会显示提示和引导动作。
 
 ### 插件配置
 
 | 设置 | 功能 | 示例 |
 | --- | --- | --- |
-| Search Roots | 指定扫描根目录，使用分号或换行分隔；支持 `~` 展开 | `~/Projects;~/Downloads` |
+| 索引目录 | 在 **Rebuild Index** 中使用目录选择器选择多个文件夹；保存在 Raycast 本地配置中 | 首次使用时选择 |
 | Include Hidden Files | 重建时是否包含隐藏文件/目录 | 默认关闭 |
 | Follow Symbolic Links | 重建时是否跟随目录软链接 | 默认关闭 |
 | Exclude Patterns | 逗号分隔的 `fd --exclude` 模式 | `.git,node_modules` |
@@ -61,20 +61,23 @@ PathSeek 使用 Raycast 官方提供的 `environment.supportPath`，而不是存
 
 ```text
 <environment.supportPath>/
-├── index.json            # 当前索引元数据：文件名、构建时间、数量、扫描目录
-├── index-<UUID>.nul      # 当前路径索引：绝对路径与 NUL 分隔符
-└── index-<UUID>.nul      # 重建时的旧索引暂存；成功切换后会安全清理
+├── index.nul              # 当前有效索引：元数据头 + NUL 分隔的绝对路径
+├── index-<UUID>.nul.tmp   # 正在生成的新索引，构建成功后原子替换
+├── index.json             # 旧版兼容文件，新版本不再使用其作为元数据来源
+└── index-<UUID>.nul       # 升级时保留的旧索引（至少 24 小时）
 ```
 
 索引文件包含本机绝对路径、项目名称和文件名，**不要直接上传至公开 GitHub Issue**。
 
-新版本引入跨进程索引构建锁；新索引写入并成功切换后才删除旧 `.nul` 文件，始终保留当前索引。异常中断仍可能留有临时文件。
+新索引把构建时间、路径数量、搜索根目录和 NUL 路径数据存储于**同一个文件**，验证后用一次原子重命名替换 `index.nul`，不再存在数据和 `index.json` 两次提交的问题；跨进程锁仅协调多个建索引任务。原有 v1 索引可以读取，升级后旧文件会暂时保留。
 
 完整的存储格式、手动构建流程、失败保护、查看方法与只读检查命令，请看：[索引存储与维护说明](docs/index-storage.md)。
 
 ### 搜索模式
 
-在 Search Files 右侧切换 **Fuzzy (fzf)** / **Regex (full path)**。正则示例：`\.tsx?$` 匹配 `.ts` 和 `.tsx`，`src/.*/config` 匹配路径片段。正则只匹配完整路径字符串，不会搜索文件内容。
+Search Files 最多显示 **150 条**匹配结果；达到上限后的追踪标为 `limit-reached`，可能伴随 `exit=null`，不是失败。
+
+Search Files 现在只有一个搜索框，使用 fzf 内置扩展搜索语法：`report` 模糊匹配、`'report` 精确包含、`.pdf$` 匹配 PDF 后缀、`!node_modules` 排除路径、`.ts$ | .tsx$` 表示二选一。**这不是完整正则表达式语法**（不支持 `.*` 或 `[a-z]+`）；搜索的是路径，不是文件内容。详见 [fzf 官方语法说明](https://junegunn.github.io/fzf/search-syntax/)。
 
 ## 技术设计与开发文档
 
@@ -86,9 +89,15 @@ PathSeek 使用 Raycast 官方提供的 `environment.supportPath`，而不是存
 | [开发计划与验收](plans/pathseek-development/task_plan.md) | 开发阶段、任务状态、交付与验收 |
 | [English README](README.md) | 英文使用说明 |
 
+### 开发者专用 fd/fzf 调用追踪
+
+在 Raycast 的 PathSeek 偏好设置里开启 **Developer: Trace fd/fzf Calls**（默认关闭），然后运行 **Rebuild Index** 或 Search Files 的 Fuzzy 模式；在 **Debug Info** 中查看调用时间、调用原因、参数结构、耗时、退出状态与匹配/索引条目数，并可复制脱敏报告。关闭后不会为正常搜索写入诊断日志。
+
+详见 [开发者命令追踪说明](docs/developer-tracing.md) 与 [Issue #5 追踪验收](https://github.com/juezhong/raycast-pathseek/issues/5)。
+
 ## 测试与问题反馈
 
-请使用 [Issue #1：初版安装与测试](https://github.com/juezhong/raycast-pathseek/issues/1) 与 [Issue #2：15 天更新、正则搜索及图标](https://github.com/juezhong/raycast-pathseek/issues/2)。
+请使用 [Issue #1：初版安装与测试](https://github.com/juezhong/raycast-pathseek/issues/1) 与 [Issue #2：手动索引、fzf 搜索及图标](https://github.com/juezhong/raycast-pathseek/issues/2)。
 
 **你可以在 Issue 勾选已经验证通过的项目，或者直接在评论中贴出脱敏后的错误日志、复现步骤及建议。** 后续开发可以根据 Issue 的最新状态继续迭代。
 
@@ -106,8 +115,8 @@ npm run build
 | 阶段 | 状态 |
 | --- | --- |
 | P1：上游审查和插件工程初始化 | 源码已提交，macOS 构建待验证 |
-| P2：15 天按需刷新及索引安全清理 | 初始实现已提交，实机待验证 |
-| P3：模糊/正则搜索与原生 Finder 图标 | 初始实现已提交，实机待验证 |
+| P2：纯手动索引、首次选目录与安全发布 | 已提交 Draft PR，实机待验证 |
+| P3：统一 fzf 搜索与原生 Finder 图标 | 初始实现已提交，实机待验证 |
 | P4：原 Open/Save 对话框跳转 | 尚未实现 |
 | P5：测试和 Raycast Store 发布 | 尚未开始 |
 
