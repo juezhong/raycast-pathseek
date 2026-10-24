@@ -61,12 +61,13 @@ Run **Index Status → Open Index Directory in Finder** (or **Copy Index Directo
 
 ```text
 <environment.supportPath>/
-├── index.json            # Active index metadata: filename, timestamp, count, search roots
-├── index-<UUID>.nul      # Active index; UTF-8 absolute paths separated by NUL bytes
-└── index-<UUID>.nul      # Old version may coexist briefly during rebuild
+├── index.nul             # Active index: embedded metadata + NUL-separated paths
+├── index-<UUID>.nul.tmp  # Staged index before atomic replacement
+├── index.json            # Legacy v1 metadata only; no longer authoritative
+└── index-<UUID>.nul      # Migration-only legacy generations retained temporarily
 ```
 
-The index may contain private file names and paths; do not upload it to public GitHub Issues. Rebuilds are serialized with a cross-process lock, and older generations are removed only after the new index has been published and verified. See [Index Storage & Maintenance (中文)](docs/index-storage.md) for the file format, update/rollback strategy and read-only inspection commands.
+The index may contain private file names and paths; do not upload it to public GitHub Issues. The active v2 index is self-contained: metadata and paths are published in a single atomic rename, rather than separate data and JSON commits. Writer locks prevent redundant overlapping builds; legacy v1 files are retained briefly for migration. See [Index Storage & Maintenance (中文)](docs/index-storage.md) for the file format, update/rollback strategy and read-only inspection commands.
 
 ### Search modes
 
