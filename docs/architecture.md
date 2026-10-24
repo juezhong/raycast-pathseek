@@ -60,7 +60,7 @@ PathSeek 是一款面向 macOS 的 Raycast Extension，目标对齐 Windows List
 
 **建索引：** 用户执行 Rebuild Index 或索引满 15 天后进入 Search Files → 获取跨进程锁 → 校验配置 → `fd` 扫描 → 新 `.nul` 临时文件 → 新正式文件 → 原子切换 `index.json` → 重新读取验证新索引 → 清理旧 `.nul`。错误/中断时保留已发布的当前索引。
 
-**搜索：** 用户执行 Search Files → 读取元数据和索引文件 → 模式选择（`fzf` 模糊或 JavaScript 正则流式扫描路径）→ 最多展示 150 条 → 显示 Finder 原生图标 → 打开或定位。查询时不执行 `fd`。
+**搜索：** 用户执行 Search Files → 读取已有索引 → 统一调用 `fzf --extended --read0 --print0 --filter` 按文件名及路径匹配 → 最多展示 150 条 → Finder 原生图标 → 文件操作。支持 fzf 的模糊、精确、前后缀、排除、OR 语法，无独立 Regex 引擎。查询时不执行 `fd`。
 
 **查看索引：** 用户执行 Index Status → `readIndex()` → 展示统计、时间、搜索目录，提供打开/复制 `environment.supportPath` 动作；这条路径不运行 `fd`。
 
