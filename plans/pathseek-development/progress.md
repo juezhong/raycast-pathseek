@@ -1,13 +1,13 @@
 # Progress — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-pr3-merged-11
+- Checkpoint ID: pathseek-20261024-p4-assisted-12
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Branch: main
 - Plan Directory: plans/pathseek-development/
 - Write Mode: continuous_checkpoints
-- Current Phase: P4 / 原应用文件选择面板导航设计
+- Current Phase: P4.1 / 辅助导航代码及 CI 完成，Mac GUI 未验收
 - Storage: github_checkpointed（以三文件回读一致为准）
 
 ## 执行纪要
@@ -174,3 +174,16 @@ PR #3 核心代码已完成用户 Issue #6（11/11）验收及 macOS CI 的 npm 
 
 ## Active Next Step (pathseek-20261024-pr3-merged-11)
 PR #3 已合并进 main（squash commit 09d7a864257c88d9869aac545e90aea11c6b2558），用户可在原始仓库 git switch main && git pull --ff-only origin main，检查 git worktree list 后安全移除 ../raycast-pathseek-pr3。下一阶段启动 P4：设计 macOS 原应用 Open/Save 面板中的安全路径导航，不自动确认 Open/Save，先调研 Accessibility、标准面板与第三方面板兼容性；剩余 P2 在 Issue #4 持续跟踪。
+
+### 2026-10-24 — P4.1 辅助导航编码、文档、质量检查完成（pathseek-20261024-p4-assisted-12）
+
+- 读取 main 源码和 Apple/Raycast API，确认不用自行注入键盘也可以通过原生 Action.Paste 把搜索路径发送回已聚焦的原应用输入位置。
+- 从最新 main 创建 `feat/p4-assisted-open-save-navigation`，新建 `src/dialog-search.tsx`、`src/lib/dialog-navigation.ts`，重用 `src/search-files.tsx` 的可选 dialogMode，添加 Paste Containing Folder/Selected Path 两种安全动作。
+- package.json 注册新命令 Search in Open/Save Dialog；原 Search Files 默认动作不改变、严格手动索引与 fzf 查询不改变。
+- 追加 `tests/dialog-navigation.test.mjs`，覆盖文件路径/目录父级/中文与换行/NUL 或相对路径拒绝、不出现 spawn/osascript/rebuildIndex 静默调用。
+- [P4.1 技术文档](https://github.com/juezhong/raycast-pathseek/blob/feat/p4-assisted-open-save-navigation/docs/open-save-dialog.md)、README 中英/architecture/development 已更新；创建 [Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7)、[Issue #9](https://github.com/juezhong/raycast-pathseek/issues/9)；创建 [Draft PR #8](https://github.com/juezhong/raycast-pathseek/pull/8)。
+- macOS GitHub Actions for PR #8 head `ef4727def17b84f01d6686f0c30660514c7034c4` **completed/success**：23/23 tests、TS、ESLint、Raycast build；Store lint 仍有作者身份及 Prettier 错误，按既定计划延后。
+- **未完成**：用户 Mac GUI 的 Open/Save 粘贴焦点测试；自动识别目标窗口的 P4.2；PR #8 Ready/合并。main 仍维持此前稳定 P2/P3，无 P4.1 代码合并。
+
+## Active Next Step (pathseek-20261024-p4-assisted-12)
+等待维护者在 Mac 上测试 Draft PR #8 的 P4.1 辅助导航：在原应用 Open/Save 对话框按 ⌘⇧G，使用 Search in Open/Save Dialog 搜索并按 Return 粘贴父目录，再在原对话框手动按 Return；从反馈判断是否可用并更新 Issue #7。P4.2 自动识别目标文件面板的 AX/原应用焦点研究在 Issue #9，未经验证不注入键盘或自动确认 Open/Save；PR #8 不擅自合并。
