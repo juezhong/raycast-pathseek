@@ -1,5 +1,7 @@
 import { createReadStream, createWriteStream } from "node:fs";
-import { open, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import type { ReadStream } from "node:fs";
+import { open, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import type { FileHandle } from "node:fs/promises";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 
@@ -77,25 +79,51 @@ export async function prepareIndex(
   return parsed;
 }
 
+async function readHeader(handle: FileHandle): Promise<SavedIndexMetadata> {
+  const prefix = Buffer.alloc(PREFIX_SIZE);
+  const first = await handle.read(prefix, 0, PREFIX_SIZE, 0);
+  if (first.bytesRead !== PREFIX_SIZE || !prefix.subarray(0, MAGIC.length).equals(MAGIC)) {
+    throw new Error("Unsupported index format; run Rebuild Index");
+  }
+  const length = prefix.readUInt32LE(MAGIC.length);
+  if (!length || length > MAX_HEADER_BYTES) throw new Error("Invalid index header length");
+  const info = await handle.stat();
+  if (PREFIX_SIZE + length > info.size) throw new Error("Incomplete index header");
+  const json = Buffer.alloc(length);
+  const result = await handle.read(json, 0, length, PREFIX_SIZE);
+  if (result.bytesRead !== length) throw new Error("Incomplete index metadata");
+  const metadata = validateMetadata(JSON.parse(json.toString("utf8")) as unknown);
+  return { ...metadata, dataOffset: PREFIX_SIZE + length };
+}
+
 export async function readIndexHeader(indexPath: string): Promise<SavedIndexMetadata> {
   const handle = await open(indexPath, "r");
   try {
-    const prefix = Buffer.alloc(PREFIX_SIZE);
-    const first = await handle.read(prefix, 0, PREFIX_SIZE, 0);
-    if (first.bytesRead !== PREFIX_SIZE || !prefix.subarray(0, MAGIC.length).equals(MAGIC)) {
-      throw new Error("Unsupported index format; run Rebuild Index");
-    }
-    const length = prefix.readUInt32LE(MAGIC.length);
-    if (!length || length > MAX_HEADER_BYTES) throw new Error("Invalid index header length");
-    const info = await handle.stat();
-    if (PREFIX_SIZE + length > info.size) throw new Error("Incomplete index header");
-    const json = Buffer.alloc(length);
-    const result = await handle.read(json, 0, length, PREFIX_SIZE);
-    if (result.bytesRead !== length) throw new Error("Incomplete index metadata");
-    const metadata = validateMetadata(JSON.parse(json.toString("utf8")) as unknown);
-    return { ...metadata, dataOffset: PREFIX_SIZE + length };
+    return await readHeader(handle);
   } finally {
     await handle.close();
+  }
+}
+
+/**
+ * Open exactly ONE file descriptor and parse its own header before streaming
+ * its paths. Atomic rebuilds may occur between UI metadata-read and search.
+ * Using the offset from THIS open descriptor avoids accidentally applying
+ * the previous generation's offset to the new generation.
+ */
+export async function openIndexDataStream(indexPath: string): Promise<ReadStream> {
+  const handle = await open(indexPath, "r");
+  try {
+    let offset = 0;
+    if (path.basename(indexPath) === ACTIVE_INDEX_FILENAME) {
+      offset = (await readHeader(handle)).dataOffset ?? 0;
+    }
+    // FileHandle-created stream keeps the same inode after atomic rename,
+    // even if new builds publish a file with a differently sized header.
+    return handle.createReadStream({ start: offset, autoClose: true });
+  } catch (error) {
+    await handle.close();
+    throw error;
   }
 }
 
