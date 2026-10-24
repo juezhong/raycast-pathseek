@@ -208,7 +208,6 @@ export async function rebuildIndex(options: { skipIfFresh?: boolean } = {}): Pro
     const id = randomUUID();
     const indexName = ACTIVE_INDEX_FILENAME;
     const tempPath = path.join(indexDirectory, "index-" + id + ".nul.tmp");
-    const finalPath = path.join(indexDirectory, indexName);
     const metadataTemp = path.join(indexDirectory, "index-" + id + ".json.tmp");
     const args = ["--absolute-path", "--print0"];
     if (prefs.includeHidden) args.push("--hidden");
@@ -224,9 +223,6 @@ export async function rebuildIndex(options: { skipIfFresh?: boolean } = {}): Pro
         total += await runFd(fd, [...args, ".", root], tempPath);
       }
 
-      // Always replace a stable pathname, never publish/deallocate UUID files.
-      await publishIndex(tempPath, indexDirectory);
-
       const metadata: IndexMetadata = {
         version: 1,
         filename: indexName,
@@ -234,7 +230,10 @@ export async function rebuildIndex(options: { skipIfFresh?: boolean } = {}): Pro
         count: total,
         roots,
       };
+      // Stage metadata first, then publish the complete data through one
+      // atomic rename, followed by a second metadata rename.
       await writeFile(metadataTemp, JSON.stringify(metadata, null, 2), "utf8");
+      await publishIndex(tempPath, indexDirectory);
       await rename(metadataTemp, metadataPath);
 
       // Cleanup is best-effort; publish success does not depend on cleanup.
