@@ -1,7 +1,7 @@
 # Findings — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-issue6-acceptance-09
+- Checkpoint ID: pathseek-20261024-pr3-premerge-10
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Evidence: [首轮 Code Review](../../docs/reviews/2026-10-24-initial-code-review.md) · [质量 Issue #4](https://github.com/juezhong/raycast-pathseek/issues/4) · [Draft PR #3](https://github.com/juezhong/raycast-pathseek/pull/3)
@@ -148,3 +148,17 @@
 
 ## Active Next Step (pathseek-20261024-issue6-acceptance-09)
 Issue #6 的 11/11 项用户可见 Mac 验收已完成，PR #3 最新 macOS CI 通过。下一步由助理完成技术 Code Review 剩余阻塞：重点核验 UUID→v2 升级及中断/并发安全、真实 fd 集成场景、可复现的 npm lockfile 与文档一致性；无需用户再做复杂测试。PR #3 仍 Draft，未经明确同意不合并 main。
+
+## 2026-10-24 — PR #3 合并前技术复审与 18 项测试（pathseek-20261024-pr3-premerge-10）
+
+- 用户已通过 Issue #6 的 11/11 项普通 Mac 操作验收；不再要求重复 GUI 测试。
+- [Draft PR #3](https://github.com/juezhong/raycast-pathseek/pull/3) 增加并提交实际 macOS CI 生成的 `package-lock.json`，CI 改为 `npm ci`，用于生成锁文件的一次性 CI 写权限已移除。
+- 新增 `tests/fd-integration.test.mjs`（真实 fd 生成 NUL 路径，含中文与换行，扫描失败保留已有索引）；`tests/rebuild-lock.test.mjs`（两个写者排斥与读者快照）；`tests/index-files.test.mjs` 增加旧临时文件安全清理测试。
+- 索引存储 `src/lib/index-files.ts` 增加 `cleanupStaleBuildTemps`；`src/lib/index-store.ts` 仅在手动 Rebuild 并获取写入锁后调用，清理超过 24 小时并严格匹配 UUID 临时索引文件的残留，不触发后台 fd。
+- 真实 macOS GitHub Actions 已确认 `npm ci`、`npm test` **18/18 通过**、`npx tsc --noEmit`、`npm run lint:code`、`npm run build` 全部通过。Raycast Store 全量 lint 非阻塞仍有真实用户名 404/Prettier 格式问题，不纳入开发 CI 的通过声明。
+- [PR3 合并前复审报告](https://github.com/juezhong/raycast-pathseek/blob/fix/stable-index-file-atomic-swap/docs/reviews/2026-10-24-pr3-premerge-review.md) 已提交，与最初历史代码审查分别保存，确认 CR-01/02/06 与纯手动索引设计已解决主要风险。
+- [Issue #4](https://github.com/juezhong/raycast-pathseek/issues/4) 已更新：CR-06 可复现构建与实际 fd/互斥测试检查通过，CR-09 当前文档一致性检查通过；仍有极端强制中断、Debug Info 过期临时文件计数、失效路径提示/类型过滤等 P2 项。
+- PR3 仍 open/draft/未合并，mergeable 最近查询为 true；未得到用户合并授权。**不要自动合并**。
+
+## Active Next Step (pathseek-20261024-pr3-premerge-10)
+PR #3 核心代码已完成用户 Issue #6（11/11）验收及 macOS CI 的 npm ci、18/18 tests、TypeScript、源码 ESLint 与 Raycast build；合并前技术复审已出。下一步请维护者确认是否授权将 Draft PR #3 合并到 main；如确认，先转 Ready/核验 CI 并合并，再开始 P4 原应用 Open/Save 对话框导航的设计与最小原型。Store 账号/发布格式待正式上架前处理。
