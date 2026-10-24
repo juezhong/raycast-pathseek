@@ -1,8 +1,8 @@
 {
   "$schema": "https://www.raycast.com/schemas/extension.json",
   "name": "pathseek",
-  "title": "PathSeek – File Navigator",
-  "description": "Search a manually built local file index with fzf and Finder actions. No automatic scans.",
+  "title": "PathSeek",
+  "description": "Find files and folders fast, open them, or select paths in macOS Open/Save dialogs. Index only when you choose.",
   "icon": "extension-icon.png",
   "author": "juezhong",
   "platforms": [
@@ -67,38 +67,38 @@
   "commands": [
     {
       "name": "search-files",
-      "title": "Search Files",
-      "description": "Search files and folders using the saved index.",
+      "title": "Search Files and Folders",
+      "description": "Search indexed files and folders, then open or reveal them in Finder.",
       "mode": "view"
     },
     {
       "name": "dialog-search",
-      "title": "Search in Open/Save Dialog",
-      "description": "Find files and folders in Open/Save dialogs; paste the full path. Suggested global hotkey: Cmd+Shift+F (assign once in Raycast).",
+      "title": "Find in Open/Save",
+      "description": "Find a file or folder and paste its path into the original Open/Save dialog.",
       "mode": "view",
       "keywords": [
-        "file dialog",
-        "file picker",
         "open save",
-        "Cmd Shift F"
+        "file picker",
+        "find file",
+        "folder"
       ]
     },
     {
       "name": "rebuild-index",
-      "title": "Rebuild Index",
-      "description": "Choose index folders and manually build or rebuild your local file index.",
+      "title": "Build Index",
+      "description": "Choose which folders to index, then build or update the index manually.",
       "mode": "view"
     },
     {
       "name": "index-status",
-      "title": "Index Status",
-      "description": "Inspect the persistent index and open its storage directory.",
+      "title": "View Index Status",
+      "description": "See indexed folders, file counts, and the time of the last rebuild.",
       "mode": "view"
     },
     {
       "name": "debug-info",
-      "title": "Debug Info",
-      "description": "Copy sanitized system, Raycast, Node.js and index diagnostics.",
+      "title": "View Diagnostics",
+      "description": "View or copy privacy-safe diagnostics for troubleshooting.",
       "mode": "view"
     }
   ],
