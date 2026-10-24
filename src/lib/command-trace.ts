@@ -12,7 +12,7 @@ import { performance } from "node:perf_hooks";
  * paths, configured roots, exclusion patterns or stderr messages.
  */
 export type CommandTraceTool = "fd" | "fzf";
-export type CommandTraceOutcome = "success" | "failure" | "cancelled";
+export type CommandTraceOutcome = "success" | "limit-reached" | "failure" | "cancelled";
 export type CommandTraceRecord = {
   id: string;
   at: string;
