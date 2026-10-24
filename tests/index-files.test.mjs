@@ -151,7 +151,7 @@ test("stale-temp maintenance removes only old recognized build artifacts", async
     assert.equal(await cleanupStaleBuildTemps(dir), 2);
     assert.deepEqual(
       (await readdir(dir)).filter((name) => name.endsWith(".tmp")).sort(),
-      ["index-33333333-3333-4333-8333-333333333333.paths.tmp", "user-notes.tmp"],
+      ["first.paths.tmp", "index-33333333-3333-4333-8333-333333333333.paths.tmp", "user-notes.tmp"],
     );
     assert.equal((await readIndexHeader(active)).version, 2);
     assert.equal(await cleanupStaleBuildTemps(dir), 0);
