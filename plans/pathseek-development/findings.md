@@ -1,7 +1,7 @@
 # Findings — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-mac-log-limit-07
+- Checkpoint ID: pathseek-20261024-manual-setup-08
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Evidence: [首轮 Code Review](../../docs/reviews/2026-10-24-initial-code-review.md) · [质量 Issue #4](https://github.com/juezhong/raycast-pathseek/issues/4) · [Draft PR #3](https://github.com/juezhong/raycast-pathseek/pull/3)
@@ -9,7 +9,7 @@
 ## 已确认的用户需求与技术决策
 1. 目标是 Listary 风格的 **独立全局文件/目录搜索 + Finder 操作 + 原应用 Open/Save 对话框原位导航**，不是只把路径显示到 Finder。
 2. 当前最新决策：**fd 建立插件自有持久化索引 + fzf-only 统一搜索**；先前的独立 Regex 为历史版本设计，已在 PR #3 删除。不使用 Raycast 私有搜索索引，不在每个搜索字符上执行 fd。
-3. 首次显式 Rebuild Index；自上次成功构建满 **15 天后，下一次打开 Search Files** 时尝试按需更新；手动重建始终允许。没有常驻后台定时服务，不能保证关闭 Raycast 时准时刷新。
+3. **当前有效需求**：首次显式选择目录并点击 Build；之后只有明确点击 Rebuild 才调用 fd。15 天自动刷新已正式取消；安装、启动、搜索及读取状态均不建索引。
 4. 当前实现将索引放在 `environment.supportPath`，索引包含用户私人绝对路径，禁止上传至 GitHub。支持自定义根目录、隐藏文件开关、排除 glob、跟随符号链接。
 5. 结果提供原生 Finder 文件类型图标、Open、Show in Finder、Open With、Copy Path、Quick Look；未来增加类型过滤与失效路径提示。
 6. 对话框集成必须返回原应用已有 Open/Save 面板，不能弹出额外 Finder；未经用户确认不能自动提交 Save。
@@ -119,3 +119,19 @@
 
 ## Active Next Step (pathseek-20261024-mac-log-limit-07)
 用户在 Mac 上更新 PR #3 独立 worktree，搜索一个能匹配超过 150 条路径的词，检查 Debug Info 最新记录为 limit-reached / results=150（不再有 151–159）；通过后对 Draft PR #3 进行最终 Code Review 与剩余 P1 风险评估，再征得用户明确同意后考虑合并 main。
+
+## 2026-10-24 — 用户明确要求严格手动索引与首次目录选择（pathseek-20261024-manual-setup-08）
+
+- 用户实测前一轮 fzf 严格 150 条上限已恢复正常：更新后结果全部为 150；已直接确认，不需再次重复询问。
+- 新的最终索引策略 **完全手动**：安装/打开 Search Files/Index Status/进入 Rebuild Index/保存根目录/15 天到期均不得自动调用 fd。用户点击首次 Form 提交 Build 或已有索引的 Rebuild Index Now 才可扫描；15 天刷新及失败重试逻辑被**彻底撤销**。
+- Draft PR #3 移除 src/lib/index-store.ts 中 refreshExpiredIndex、isIndexStale 与 15 天计划，src/search-files.tsx 删除自动刷新 React Effect；index-status 和 debug-info 清除到期刷新承诺。
+- 新增 src/lib/index-roots.ts：Raycast LocalStorage 持久保存用户通过目录选择器明确选择的根目录；首次无根目录时必须设置，**不再默认扫描整个 home**。升级用户若已有 v1/v2 索引，使用 metadata.roots 作为兼容选择，不会自动重建。
+- src/rebuild-index.tsx 改为首次 Raycast Form.FilePicker（仅目录，可多选），手动提交 Build 开始 fd；以后进入只读状态，⌘K 操作菜单提供 Rebuild Index Now / Change Indexed Folders，后者只保存配置，必须再次点 Rebuild 才更新。
+- Search Files / Index Status 的空状态内提供用户可见的设置/构建入口。
+- 中英文 README、架构、存储、开发、追踪文档均更新；新增 tests/manual-index-contract.test.mjs 静态回归保护。开发时仍须真实 Mac 用户验证 GUI，静态测试不等于完整用户体验。
+- macOS GitHub Actions 已完成成功，包括索引与 fzf 单元测试、手动索引静态回归检查、TypeScript、源码 ESLint、Raycast build；Store 发布检查非阻塞，不代表正式上架通过。
+- 用户反馈旧 Issue 复杂难懂；[Issue #6](https://github.com/juezhong/raycast-pathseek/issues/6) 只包含简单 Mac 日常点击测试，Issue #2/#4/#5 加说明：复杂技术测试由开发者和 CI 负责。可直接在聊天中询问用户看到了什么，由助理负责判断与勾选；不能擅自称其测试了并发/故障。
+- PR #3 继续 Draft，尚未合并 main；技术日志： https://github.com/juezhong/raycast-pathseek/pull/3#issuecomment-6382966413
+
+## Active Next Step (pathseek-20261024-manual-setup-08)
+用户在 Mac 更新 Draft PR #3 后，简短验证首次无索引提示、目录选择、打开 Rebuild 时不自动执行 fd、⌘K 更改目录及显式 Rebuild；由助理根据聊天反馈维护简单 Issue #6。之后集中代码审查剩余索引稳定性问题，用户授权后再讨论合并 PR #3。
