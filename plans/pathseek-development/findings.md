@@ -1,14 +1,14 @@
 # Findings — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-debug-trace-05
+- Checkpoint ID: pathseek-20261024-fzf-only-06
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Evidence: [首轮 Code Review](../../docs/reviews/2026-10-24-initial-code-review.md) · [质量 Issue #4](https://github.com/juezhong/raycast-pathseek/issues/4) · [Draft PR #3](https://github.com/juezhong/raycast-pathseek/pull/3)
 
 ## 已确认的用户需求与技术决策
 1. 目标是 Listary 风格的 **独立全局文件/目录搜索 + Finder 操作 + 原应用 Open/Save 对话框原位导航**，不是只把路径显示到 Finder。
-2. 搜索架构为 **fd 建立插件自有持久化索引 + fzf 模糊匹配 + 正则表达式路径匹配**。不使用 Raycast 私有搜索索引，不在每个搜索字符上执行 fd。
+2. 当前最新决策：**fd 建立插件自有持久化索引 + fzf-only 统一搜索**；先前的独立 Regex 为历史版本设计，已在 PR #3 删除。不使用 Raycast 私有搜索索引，不在每个搜索字符上执行 fd。
 3. 首次显式 Rebuild Index；自上次成功构建满 **15 天后，下一次打开 Search Files** 时尝试按需更新；手动重建始终允许。没有常驻后台定时服务，不能保证关闭 Raycast 时准时刷新。
 4. 当前实现将索引放在 `environment.supportPath`，索引包含用户私人绝对路径，禁止上传至 GitHub。支持自定义根目录、隐藏文件开关、排除 glob、跟随符号链接。
 5. 结果提供原生 Finder 文件类型图标、Open、Show in Finder、Open With、Copy Path、Quick Look；未来增加类型过滤与失效路径提示。
@@ -90,3 +90,17 @@
 
 ## Current Next Step (checkpoint pathseek-20261024-debug-trace-05)
 在 Mac 上从 Draft PR #3 独立工作目录加载扩展，验证 v1→v2 索引迁移、搜索与重建并发，以及开发者 fd/fzf 追踪的默认关闭/开启行为；到 Issue #5 和 PR #3 提交实测结果，再决定 Ready for Review / 合并。
+
+## 2026-10-24 — 搜索方案收敛为 fzf-only（pathseek-20261024-fzf-only-06）
+
+- 用户已经对 PR #3 的初版功能做了本地测试并表示可以使用；具体的成功/失败项目以 [Issue #2](https://github.com/juezhong/raycast-pathseek/issues/2)（之前 6 项已通过）及 [Issue #5](https://github.com/juezhong/raycast-pathseek/issues/5)（之前 4 项通过）的实时勾选为准，不推定所有场景通过。
+- 用户明确决定**取消独立 Regex 搜索，统一使用 fzf**；fzf **不支持完整正则表达式**，但有内建扩展搜索：普通模糊、`'report` 精确包含、`.pdf$` 后缀、`!node_modules` 排除以及 `.ts$ | .tsx$` OR。官方语法：https://junegunn.github.io/fzf/search-syntax/
+- Draft PR #3 已删除 `src/lib/regex-search.ts`，Search Files 不再有 Fuzzy/Regex 切换菜单，所有查询统一调用 `fuzzySearch()`，并给 fzf 显式增加 `--extended`。
+- **CR-05 原 JavaScript Regex 主线程灾难性回溯风险已通过移除功能消除**；这是范围变化，不是单独 Regex 防护功能验证通过。
+- 单一 fzf 仍读取已有自描述 v2 索引；普通用户输入查询不启动 fd；手动重建和 15 天过期时的下次 Search Files 启动才可能运行 fd。
+- 中英文 README、架构、开发、索引和调用追踪文档均同步；Issue #2（fzf 搜索）与 Issue #4（移除已撤销 Regex 修复项）、Issue #5（日志验收）已更新。
+- 以上变更只写到 PR #3 分支 **fix/stable-index-file-atomic-swap**，`main` 仍保留旧 Regex 代码直至 PR 合并；不得让用户以为 `git pull main` 已获得更新。
+- GitHub Actions 对最新 PR3 commit 返回 completed/success；仅为开发期测试/tsc/源码 lint/build，不含完整发布 Store lint 和 macOS 用户对**最新 fzf-only 改动**的手动测试。
+
+## Latest Next Step (pathseek-20261024-fzf-only-06)
+请维护者继续在 Mac 上用 Draft PR #3 独立 worktree 验收单一 fzf 搜索（含 .pdf$、'report、!node_modules、OR）、fd/fzf 调用追踪和索引重建；根据 Issue #2 / #5 实测与剩余 Code Review 风险决定 PR #3 是否 Ready / 合并。
