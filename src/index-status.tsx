@@ -1,7 +1,19 @@
-import { Action, ActionPanel, Detail, environment, Icon, launchCommand, LaunchType } from "@raycast/api";
+import {
+  Action,
+  ActionPanel,
+  Detail,
+  environment,
+  Icon,
+  launchCommand,
+  LaunchType,
+} from "@raycast/api";
 import { useEffect, useState } from "react";
 import path from "node:path";
-import { indexFilePath, readIndex, type IndexMetadata } from "./lib/index-store";
+import {
+  indexFilePath,
+  readIndex,
+  type IndexMetadata,
+} from "./lib/index-store";
 
 type IndexState =
   | { status: "loading" }
@@ -17,7 +29,9 @@ export default function IndexStatus() {
     readIndex()
       .then((metadata) => {
         if (!active) return;
-        setState(metadata ? { status: "ready", metadata } : { status: "empty" });
+        setState(
+          metadata ? { status: "ready", metadata } : { status: "empty" },
+        );
       })
       .catch((error: unknown) => {
         if (active) setState({ status: "error", message: String(error) });
@@ -28,7 +42,10 @@ export default function IndexStatus() {
   }, []);
 
   const directory = environment.supportPath;
-  const activeFile = state.status === "ready" ? indexFilePath(state.metadata) : path.join(directory, "index.nul");
+  const activeFile =
+    state.status === "ready"
+      ? indexFilePath(state.metadata)
+      : path.join(directory, "index.nul");
 
   const markdown =
     state.status === "loading"
@@ -46,15 +63,36 @@ export default function IndexStatus() {
       actions={
         <ActionPanel>
           <Action
-            title={state.status === "empty" ? "Choose Folders and Build Index" : "Open Build Index"}
+            title={
+              state.status === "empty"
+                ? "Choose Folders and Build Index"
+                : "Open Build Index"
+            }
             icon={Icon.Folder}
-            onAction={() => launchCommand({ name: "rebuild-index", type: LaunchType.UserInitiated })}
+            onAction={() =>
+              launchCommand({
+                name: "rebuild-index",
+                type: LaunchType.UserInitiated,
+              })
+            }
           />
-          <Action.Open title="Open Index Directory in Finder" target={directory} />
-          <Action.CopyToClipboard title="Copy Index Directory Path" content={directory} />
-          <Action.CopyToClipboard title="Copy Active Index File Path" content={activeFile} />
+          <Action.Open
+            title="Open Index Directory in Finder"
+            target={directory}
+          />
+          <Action.CopyToClipboard
+            title="Copy Index Directory Path"
+            content={directory}
+          />
+          <Action.CopyToClipboard
+            title="Copy Active Index File Path"
+            content={activeFile}
+          />
           {state.status === "ready" && (
-            <Action.CopyToClipboard title="Copy Index Details" content={JSON.stringify(state.metadata, null, 2)} />
+            <Action.CopyToClipboard
+              title="Copy Index Details"
+              content={JSON.stringify(state.metadata, null, 2)}
+            />
           )}
         </ActionPanel>
       }

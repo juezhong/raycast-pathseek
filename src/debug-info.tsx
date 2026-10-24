@@ -5,7 +5,11 @@ import os from "node:os";
 import { promisify } from "node:util";
 import { useEffect, useState } from "react";
 import { readIndex, indexFilePath } from "./lib/index-store";
-import { commandTracingEnabled, readCommandTrace, summarizeCommandTrace } from "./lib/command-trace";
+import {
+  commandTracingEnabled,
+  readCommandTrace,
+  summarizeCommandTrace,
+} from "./lib/command-trace";
 
 const run = promisify(execFile);
 
@@ -22,7 +26,9 @@ function errorCode(error: unknown): string {
 
 async function getMacOSVersion(): Promise<string> {
   try {
-    const { stdout } = await run("/usr/bin/sw_vers", ["-productVersion"], { timeout: 3000 });
+    const { stdout } = await run("/usr/bin/sw_vers", ["-productVersion"], {
+      timeout: 3000,
+    });
     return stdout.trim() || "unavailable";
   } catch {
     return `unavailable (Darwin ${os.release()})`;
@@ -54,7 +60,11 @@ async function collectDiagnostics(): Promise<Diagnostics> {
 
   try {
     const entries = await readdir(root);
-    generationCount = String(entries.filter((name) => name === "index.nul" || /^index-[a-f0-9-]+\.nul$/.test(name)).length);
+    generationCount = String(
+      entries.filter(
+        (name) => name === "index.nul" || /^index-[a-f0-9-]+\.nul$/.test(name),
+      ).length,
+    );
   } catch (error) {
     generationCount = `unavailable (${errorCode(error)})`;
   }
@@ -65,7 +75,8 @@ async function collectDiagnostics(): Promise<Diagnostics> {
       metadataStatus = "not built";
       activeStatus = "not checked";
     } else {
-      metadataStatus = metadata.version === 2 ? "v2 embedded header" : "v1 legacy index.json";
+      metadataStatus =
+        metadata.version === 2 ? "v2 embedded header" : "v1 legacy index.json";
       declaredCount = String(metadata.count);
       rootCount = String(metadata.roots.length);
       createdAt = metadata.createdAt;
@@ -103,7 +114,9 @@ async function collectDiagnostics(): Promise<Diagnostics> {
       "> 记录中的 started 表示已尝试调用；若无对应结束事件，可能被取消、终止或仍在运行。",
     );
   } else {
-    report.push("Tracing: disabled (default). No fd/fzf trace file is written during normal searches.");
+    report.push(
+      "Tracing: disabled (default). No fd/fzf trace file is written during normal searches.",
+    );
   }
 
   const copyText = report.join("\n");
@@ -118,23 +131,40 @@ export default function DebugInfo() {
   useEffect(() => {
     let active = true;
     collectDiagnostics()
-      .then((value) => { if (active) setData(value); })
+      .then((value) => {
+        if (active) setData(value);
+      })
       .catch((failure: unknown) => {
-        if (active) setError(`Failed to collect diagnostics (${errorCode(failure)})`);
+        if (active)
+          setError(`Failed to collect diagnostics (${errorCode(failure)})`);
       });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [refreshCount]);
 
   return (
     <Detail
       isLoading={!data && !error}
-      markdown={data?.markdown || `# Debug Info\n\n${error || "Collecting system and index status…"}`}
+      markdown={
+        data?.markdown ||
+        `# Debug Info\n\n${error || "Collecting system and index status…"}`
+      }
       actions={
         data ? (
           <ActionPanel>
-            <Action.CopyToClipboard title="Copy Sanitized Debug Info" content={data.copyText} />
-            <Action title="Refresh Diagnostics" onAction={() => setRefreshCount((count) => count + 1)} />
-            <Action.Open title="Open PathSeek GitHub Issue" target="https://github.com/juezhong/raycast-pathseek/issues/1" />
+            <Action.CopyToClipboard
+              title="Copy Sanitized Debug Info"
+              content={data.copyText}
+            />
+            <Action
+              title="Refresh Diagnostics"
+              onAction={() => setRefreshCount((count) => count + 1)}
+            />
+            <Action.Open
+              title="Open PathSeek GitHub Issue"
+              target="https://github.com/juezhong/raycast-pathseek/issues/1"
+            />
           </ActionPanel>
         ) : undefined
       }
