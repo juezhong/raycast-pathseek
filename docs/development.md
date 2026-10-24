@@ -25,6 +25,7 @@ npm run dev
 1. **Index Status**：查看索引状态/复制目录，不触发扫描。
 2. **Rebuild Index**：手动触发 `fd` 扫描，第一次使用必须执行一次。
 3. **Search Files**：输入任意部分文件名、目录名或路径，搜索持久化索引。
+4. **Debug Info**：自动收集 macOS、Raycast、Node.js（扩展运行时）及当前索引文件的状态，复制不含用户绝对路径的诊断报告。
 
 项目首次 `npm install` 会生成依赖锁文件。当前仓库尚未将实测产生的 `package-lock.json` 提交，正式发布前需加入并跑 CI。
 
@@ -66,7 +67,7 @@ Node.js 版本：
 复现步骤：
 ```
 
-日志中如包含用户主目录名称、项目敏感名称、绝对路径和凭证，请先脱敏。**不要上传完整索引文件到公开 Issue。**
+优先从 Raycast 执行 **Debug Info → Copy Sanitized Debug Info**，粘贴到 Issue 评论；如果还要贴原始日志，请注意其中可能包含用户主目录名称、项目敏感名称、绝对路径和凭证，必须先脱敏。**不要上传完整索引文件到公开 Issue。**
 
 ## 6. 构建与排查
 
@@ -85,6 +86,7 @@ npm run build
 | 找不到搜索结果 | 先确认已构建索引，且指定目录/排除规则允许访问目标路径 |
 | 修改搜索范围后结果仍旧 | 手动运行 `Rebuild Index` |
 | 找不到数据存储位置 | `Index Status` 复制支持目录路径 |
+| `Rebuild Index` 成功但 `Index Status` 报 `ENOENT` | 运行 `Debug Info` 记录 `active index file` 和 `index generation files`；更新代码后重建并复测。旧索引自动清理已暂时停用，避免并发竞态 |
 | 部分目录无法读取 | 检查 Raycast 的文件访问权限、磁盘挂载与权限错误 |
 | Finder 成功但 Open/Save 对话框未联动 | Dialog Bridge 尚未实现，属于后续阶段 |
 
