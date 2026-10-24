@@ -39,8 +39,8 @@
 ```text
 2026-10-24T09:00:00Z | fd | manual-rebuild | fd --absolute-path --print0 . <root> | started
 2026-10-24T09:00:01Z | fd | manual-rebuild | fd --absolute-path --print0 . <root> | success, 832ms, results=2048, exit=0
-2026-10-24T09:01:00Z | fzf | fuzzy-query | fzf --read0 --print0 --filter <redacted> | started
-2026-10-24T09:01:00Z | fzf | fuzzy-query | fzf --read0 --print0 --filter <redacted> | success, 26ms, results=19, exit=0
+2026-10-24T09:01:00Z | fzf | fuzzy-query | fzf --extended --read0 --print0 --filter <redacted> | started
+2026-10-24T09:01:00Z | fzf | fuzzy-query | fzf --extended --read0 --print0 --filter <redacted> | success, 26ms, results=19, exit=0
 ```
 
 只有 start 而没有 end 的记录表示「发生过启动尝试」，**不能断定进程仍在运行**；它也可能已因 Raycast 退出而终止。
