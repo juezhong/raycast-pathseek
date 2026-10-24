@@ -53,15 +53,18 @@ PathSeek 是一款面向 macOS 的 Raycast Extension，目标对齐 Windows List
 | 文件搜索界面 | [`src/search-files.tsx`](../src/search-files.tsx) | 查询、防抖、结果展示、Finder Actions |
 | 重建命令 | [`src/rebuild-index.tsx`](../src/rebuild-index.tsx) | 显式启动 `fd` 索引构建 |
 | 索引状态命令 | [`src/index-status.tsx`](../src/index-status.tsx) | 查看元数据、打开/复制支持目录 |
+| Debug Info | [`src/debug-info.tsx`](../src/debug-info.tsx) | 收集系统版本与索引完整性报告（默认隐藏本地绝对路径） |
 | Dialog Bridge | 尚未创建 | 原应用 Open/Save 对话框定位（P4） |
 
 ## 4. 控制流与数据流
 
-**建索引：** 用户执行 Rebuild Index → 获取偏好设置 → 校验搜索根目录 → `fd` 扫描输出 NUL 分隔路径 → 临时文件 → 正式文件 → 更新 `index.json`。
+**建索引：** 用户执行 Rebuild Index → 获取偏好设置 → 校验搜索根目录 → `fd` 扫描输出 NUL 分隔路径 → 临时文件 → 正式文件 → 更新 `index.json`。为避免并发清理竞态，当前代码暂不自动删除旧版索引；未来增加单独的安全清理操作。
 
 **搜索：** 用户执行 Search Files → 读取元数据和索引文件 → `fzf` 过滤已有路径 → 最多展示 150 条 → 通过 Raycast Action 打开或定位文件。
 
 **查看索引：** 用户执行 Index Status → `readIndex()` → 展示统计、时间、搜索目录，提供打开/复制 `environment.supportPath` 动作；这条路径不运行 `fd`。
+
+**问题诊断：** 用户执行 Debug Info → 读取 Raycast 环境和 macOS 版本 → 检查当前元数据与数据文件是否存在 → 生成脱敏报告，不触发文件树扫描。
 
 ## 5. 错误与边界
 
