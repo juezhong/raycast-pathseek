@@ -31,13 +31,13 @@ const metadataPath = path.join(indexDirectory, "index.json");
 <environment.supportPath>/
 ├── index.json                       # 当前生效索引的元数据
 ├── index-<UUID>.nul                 # 当前生效索引
-├── index-<UUID>.nul                 # 旧版本路径索引，可能保留多份
+├── index-<UUID>.nul                 # 历史版本（构建后会清理，异常中断可能暂时残留）
 ├── index-<UUID>.nul.tmp             # 扫描时临时路径索引；异常退出后可能残留
 └── index-<UUID>.json.tmp            # 元数据更新时的临时文件
 ```
 
 - `index.json` 是正式元数据入口；读取此文件的 `filename` 字段即可确定当前生效的索引文件。
-- **当前版本已停用旧索引自动清理**：Issue #1 曾报告刚完成重建但 `Index Status` 无法访问索引文件；代码审查发现重建清理与并发构建存在潜在竞态，现暂时保留所有历史代索引，等待安全的显式清理功能。
+- **当前已恢复安全清理**：重建使用 `proper-lockfile` 跨进程锁防止多个扫描互相清理。只有新索引数据和 `index.json` 成功发布且验证读取后，才删除旧 `.nul` 文件；即使只有一个有效索引，也始终保留它。Issue #1 之前的 ENOENT 已由用户在评论中报告修复。
 - 异常退出时仍可能留下临时文件。旧 `.nul` 文件可能增加磁盘占用，不要在不了解 `index.json` 指向的文件时删除。
 - 元数据更新采用同目录 `rename()` 发布；不会直接改写旧的索引内容。
 - 目前**没有**图形化恢复上一代索引或删除索引的功能，请勿随意手动删除正在使用的文件。
@@ -119,7 +119,7 @@ Rebuild Index
   -> rename(.nul.tmp, .nul)
   -> 写入临时 index-UUID.json.tmp
   -> rename(临时元数据, index.json)
-  -> 保留历史索引，暂不自动删除（避免并发构建竞态）
+  -> 验证当前 index.json 指向新文件，然后清理旧 .nul，始终保留当前一份
 ```
 
 构建过程中如遇到扫描错误，不会使用部分扫描结果更新 `index.json`；旧索引仍能用于搜索。请注意：当程序在极端时机被系统强制中断时，可能残留临时文件。
@@ -139,8 +139,8 @@ Search Files
 
 ## 6. 索引生命周期和预期局限
 
-- **默认不自动刷新**：新建、删除、重命名文件不会立即同步到索引。
-- **手动重建**：通过独立的 `Rebuild Index` 命令执行。
+- **15 天按需刷新**：上次成功构建后满 15 天，下一次打开 Search Files 才尝试自动更新（没有常驻定时器或后台服务），自动失败后 24 小时内不重复尝试；未到期的文件变化不会即时同步。
+- **手动重建**：仍可随时通过独立的 `Rebuild Index` 命令立即执行。
 - **跨启动复用**：只要支持目录的数据未丢失、索引未损坏，重新启动 Raycast 后仍可读取。
 - **重建失败**：原则上继续使用先前有效的索引文件。
 - **更改搜索范围/排除规则**：必须手动重新构建才生效。
@@ -158,7 +158,7 @@ Search Files
 
 运行 Raycast **Debug Info**，在 Action 菜单选择 **Copy Sanitized Debug Info**。报告自动收集：macOS 系统版本、Raycast 版本、Raycast 扩展运行时 Node.js 版本、`index.json` 有效性、当前索引文件是否存在、索引代数及数据文件大小（不包含用户名、完整路径或文件名）。
 
-如果 `active index file` 显示 `missing/unavailable (ENOENT)`，说明 `index.json` 当前引用的数据文件不存在。需要重新执行 Rebuild Index 并复测；修复前的重建版本可能存在并发索引清理竞态，**目前仍需本地复测验证因果关系**。诊断信息可直接作为 Issue 评论，不要直接粘贴未经脱敏的异常原始路径。
+如果 `active index file` 显示 `missing/unavailable (ENOENT)`，说明 `index.json` 当前引用的数据文件不存在。请先使用 Debug Info 记录诊断，再手动 Rebuild Index；当前加入互斥锁与先发布后清理策略，仍须进行并发与异常中断实测。诊断信息可直接作为 Issue 评论，不要直接粘贴未经脱敏的异常原始路径。
 
 ## 9. 对应实现文件
 
