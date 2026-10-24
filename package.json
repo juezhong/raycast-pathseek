@@ -17,7 +17,7 @@
     {
       "name": "searchRoots",
       "title": "Search Roots",
-      "description": "Absolute directories to index, one per line. ~ expands to your home directory.",
+      "description": "Directories to index, separated by semicolons. ~ expands to your home directory.",
       "type": "textfield",
       "default": "~",
       "required": true
