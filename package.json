@@ -72,6 +72,12 @@
       "mode": "view"
     },
     {
+      "name": "dialog-search",
+      "title": "Search in Open/Save Dialog",
+      "description": "Paste a found folder into an existing macOS Open/Save Go to Folder field; no automatic confirmation.",
+      "mode": "view"
+    },
+    {
       "name": "rebuild-index",
       "title": "Rebuild Index",
       "description": "Choose index folders and manually build or rebuild your local file index.",

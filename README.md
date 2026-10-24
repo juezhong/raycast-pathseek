@@ -117,3 +117,11 @@ A `package-lock.json` file has not yet been generated and committed as part of a
 ## License
 
 [MIT License](LICENSE). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for upstream attribution. The current development icon is temporarily reused from the MIT-licensed Fuzzy File Search upstream extension; it must be replaced before publishing.
+
+## Quick file selection and folder navigation in Open/Save dialogs (development)
+
+**Search in Open/Save Dialog** focuses on two workflows: quickly selecting an indexed file in the original application's **Open** dialog, or navigating to an indexed folder in its **Open/Save** dialog.
+
+Press **Cmd+Shift+G** in the original panel first, search with PathSeek, and press **Return** to paste the **full selected path**. Confirm Go to Folder in the original dialog. Standard Open dialogs may highlight a full file path, but this must be verified on the user's Mac and may vary by app. Use **Cmd+K → Go to Containing Folder (Fallback)** to navigate to the parent directory instead.
+
+There is **no automatic dialog detection, window manager, accessibility automation, background agent, or automatic Open/Save confirmation**. See [simple instructions](docs/open-save-dialog.md) and [Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7).

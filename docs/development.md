@@ -126,3 +126,9 @@ npm run build
 - [总体架构](architecture.md)
 - [索引文件格式](index-storage.md)
 - [开发计划](../plans/pathseek-development/task_plan.md)
+
+## P4：只验证选中文件与进入目录
+
+在 TextEdit 等标准 macOS Open 对话框先按 ⌘⇧G，然后执行 **Search in Open/Save Dialog**。搜索一个文件，按 Return 把完整绝对路径粘贴回原对话框，手动确认 Go to Folder，观察能否直接定位/选中目标文件。再用文件夹结果尝试进入目录。若文件路径不被该对话框接受，可使用 ⌘K → **Go to Containing Folder (Fallback)**。
+
+此阶段仅做上述体验，不开发活动文件面板自动管理、Accessibility 或自动点击 Open/Save。完整说明：[open-save-dialog.md](open-save-dialog.md)，简单实测：[Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7)。

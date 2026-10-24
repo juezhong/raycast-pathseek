@@ -92,3 +92,13 @@ PathSeek 是一款面向 macOS 的 Raycast Extension，目标对齐 Windows List
 - [Raycast Environment API](https://developers.raycast.com/api-reference/environment)
 - [Raycast Storage API](https://developers.raycast.com/api-reference/storage)
 - [Raycast Store 审核指南](https://developers.raycast.com/basics/prepare-an-extension-for-store)
+
+## P4：只做文件选择与目录跳转，不实现自动窗口管理
+
+- `src/dialog-search.tsx` 提供专用搜索入口，复用 `SearchFilesView`、同一份持久化索引与 fzf。
+- 在用户于原 Open/Save 面板主动按下 ⌘⇧G 后，用 Raycast `Action.Paste` 默认粘贴搜索结果**完整绝对路径**；另有父目录备用操作。
+- 文件路径可尝试在标准 Open 面板里定位/选中目标文件；目录路径可尝试进入该文件夹。实际应用行为需 Mac 端验收。
+- **不做**活动窗口自动检测、Accessibility、Swift helper、AppleScript、额外 Finder、自动确认 Open/Save。不存在未来必须实现的 P4.2 自动导航阶段。
+- 路径计算在 `src/lib/dialog-navigation.ts` 中完成，无额外 fd 搜索或目录遍历。
+
+详见 [Open/Save 简明说明](open-save-dialog.md) 和 [Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7)。

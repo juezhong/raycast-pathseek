@@ -123,3 +123,11 @@ npm run build
 ## 许可证
 
 采用 [MIT License](LICENSE)。上游来源与版权通知见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。当前开发图标临时使用 MIT 许可的 Fuzzy File Search 上游资源，提交 Raycast Store 前需要更换为 PathSeek 原创图标。
+
+## Open/Save 对话框中快速选择文件或目录（开发版）
+
+新命令 **Search in Open/Save Dialog** 只负责两件事：让你在原应用的 **Open** 文件选择框中快速定位并选择文件，或者在 **Open/Save** 对话框中快速进入目标文件夹。
+
+在原应用先按 **⌘⇧G** 打开「前往文件夹」，呼出 PathSeek 搜索文件/目录，按 **Return** 粘贴**完整路径**，回原应用按 Return 查看定位结果。对文件，标准 Open 对话框可能直接选中目标文件；具体行为待你的 Mac 实测。备用动作 **⌘K → Go to Containing Folder (Fallback)** 则只进入文件所在目录。
+
+不会自动弹出文件管理器、识别/控制活动窗口或确认 Open/Save。**不做更复杂的“自动导航”方案**。详见 [简明操作说明](docs/open-save-dialog.md) 与 [Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7)。

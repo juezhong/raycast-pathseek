@@ -4,8 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import { fuzzySearch } from "./lib/fuzzy-search";
 import { readIndex, type IndexMetadata } from "./lib/index-store";
+import { getDialogNavigationPaths } from "./lib/dialog-navigation";
 
-export default function SearchFiles() {
+export function SearchFilesView({ dialogMode = false }: { dialogMode?: boolean }) {
   const [index, setIndex] = useState<IndexMetadata | null>();
   const [loadError, setLoadError] = useState<string>();
   const [query, setQuery] = useState("");
@@ -81,7 +82,7 @@ export default function SearchFiles() {
     <List
       isLoading={index === undefined || isSearching}
       filtering={false}
-      searchBarPlaceholder="Search with fzf: filename, path, .pdf$, !node_modules…" 
+      searchBarPlaceholder={dialogMode ? "Search files or folders to locate in the Open/Save dialog" : "Search with fzf: filename, path, .pdf$, !node_modules…"} 
       onSearchTextChange={setQuery}
     >
       <List.EmptyView
@@ -118,12 +119,28 @@ export default function SearchFiles() {
             quickLook={{ path: filepath, name: path.basename(filepath) }}
             actions={
               <ActionPanel>
+                {dialogMode && (
+                  <ActionPanel.Section title="Assisted Open/Save Navigation">
+                    <Action.Paste
+                      title="Select File or Go to Folder (Paste Full Path)"
+                      icon={Icon.ArrowRight}
+                      content={getDialogNavigationPaths(filepath).selectedPath}
+                    />
+                    <Action.Paste
+                      title="Go to Containing Folder (Fallback)"
+                      icon={Icon.Folder}
+                      content={getDialogNavigationPaths(filepath).containingFolder}
+                    />
+                  </ActionPanel.Section>
+                )}
+                <ActionPanel.Section title="Other File Actions">
                 <Action.Open title="Open" target={filepath} />
                 <Action.ShowInFinder title="Show in Finder" path={filepath} />
                 <Action.Open title="Open Containing Folder" target={path.dirname(filepath)} />
                 <Action.OpenWith path={filepath} shortcut={{ modifiers: ["cmd"], key: "o" }} />
                 <Action.CopyToClipboard title="Copy Absolute Path" content={filepath} shortcut={{ modifiers: ["cmd"], key: "c" }} />
                 <Action.ToggleQuickLook shortcut={{ modifiers: ["cmd"], key: "y" }} />
+                </ActionPanel.Section>
               </ActionPanel>
             }
           />
@@ -131,4 +148,9 @@ export default function SearchFiles() {
       })}
     </List>
   );
+}
+
+/** Default Search Files keeps its existing file-open behavior. */
+export default function SearchFiles() {
+  return <SearchFilesView />;
 }
