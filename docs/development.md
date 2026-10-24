@@ -7,6 +7,7 @@
 - macOS、Raycast 已安装且登录。
 - Node.js 22.14 或以上、npm 7 或以上。
 - Homebrew 安装的 `fd` 和 `fzf`：`brew install fd fzf`。
+- 本版新增 `proper-lockfile` npm 依赖，拉取更新后请重新执行 `npm install`。
 - Git；建议用较小的测试目录，避免首次测试扫描整个主目录。
 
 Raycast 官方要求参考：[Getting Started](https://developers.raycast.com/basics/getting-started)。
@@ -24,7 +25,7 @@ npm run dev
 
 1. **Index Status**：查看索引状态/复制目录，不触发扫描。
 2. **Rebuild Index**：手动触发 `fd` 扫描，第一次使用必须执行一次。
-3. **Search Files**：输入任意部分文件名、目录名或路径，搜索持久化索引。
+3. **Search Files**：输入任意部分文件名、目录名或路径，切换 Fuzzy / Regex 模式；结果显示 Finder 原生文件/目录图标。
 4. **Debug Info**：自动收集 macOS、Raycast、Node.js（扩展运行时）及当前索引文件的状态，复制不含用户绝对路径的诊断报告。
 
 项目首次 `npm install` 会生成依赖锁文件。当前仓库尚未将实测产生的 `package-lock.json` 提交，正式发布前需加入并跑 CI。
@@ -52,7 +53,7 @@ npm run dev
 
 ## 5. 提交测试反馈
 
-测试任务：[Issue #1 — macOS/Raycast 安装与验收](https://github.com/juezhong/raycast-pathseek/issues/1)。
+测试任务：[Issue #1 — macOS/Raycast 初版验收](https://github.com/juezhong/raycast-pathseek/issues/1)；新增功能：[Issue #2 — 15 天刷新 / Regex / Finder 图标](https://github.com/juezhong/raycast-pathseek/issues/2)。
 
 请逐项勾选已通过项目；未通过的直接评论：
 
@@ -92,8 +93,8 @@ npm run build
 
 ## 7. 当前限制和后续开发
 
-- **不自动刷新索引**；只有用户运行 Rebuild Index 时才遍历配置的目录。
-- 查询时不会运行 `fd`；`fzf` 按查询读取索引，可能发生内存/缓存/SSD 读取。
+- **索引每满 15 天后按需更新**：下次打开 Search Files 才尝试执行 fd 重建（没有常驻服务）；手动 Rebuild Index 随时可用，自动失败 24 小时内不反复尝试。
+- 普通键入查询不会运行 `fd`；`fzf` 和正则搜索均从已有索引读取路径（有 CPU、内存与缓存/SSD 读取成本）。
 - 索引文件内含绝对路径，按普通本地文件处理，而非 Raycast 加密数据库。
 - P4 对话框导航、跨应用兼容、自动下载依赖与正式发布工作尚未完成。
 - 本地试用不代表 Raycast Store 的发布验收已经通过。
