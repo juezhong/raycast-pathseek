@@ -6,9 +6,9 @@
 - Plan Directory: plans/pathseek-development/
 - Write Mode: continuous_checkpoints
 - Status: active / code-review-quality-gate
-- Current Phase: P4 merged; improve Open/Save command hotkey workflow without automation
-- Checkpoint ID: pathseek-20261024-p4-merged-hotkey-15
-- Last Checkpoint: pathseek-20261024-p4-merged-hotkey-15 (2026-10-24; 3-file readback verified)
+- Current Phase: P4 merged — user preferred Cmd-Shift-F setup documented and manifest updated
+- Checkpoint ID: pathseek-20261024-cmdshiftf-16
+- Last Checkpoint: pathseek-20261024-cmdshiftf-16 (2026-10-24; verified three-file readback)
 - Last Updated: 2026-10-24
 - Storage: github_checkpointed
 
@@ -244,3 +244,16 @@ PR #3 已合并进 main（squash commit 09d7a864257c88d9869aac545e90aea11c6b2558
 
 ## Active Next Step (pathseek-20261024-p4-merged-hotkey-15)
 用户已授权 PR #8 合并，GitHub 返回 merged=true，main squash commit 47ea3c2a8781e111a58abf4a4d400b7a03b2eb38。优先由用户在 Raycast Settings → Shortcuts 为 Search in Open/Save Dialog 设置未冲突的独立全局热键（例如 ⌃⌥G），形成原对话框 ⌘⇧G → 热键直接搜索 → Return 粘贴的短流程，并描述真实体验；根据反馈决定 Issue #10 是否有必要进一步探索可选一键衔接/窗口位置。Issue #7 三项未单独验证的文件高亮、目录最终进入、父目录备用动作不阻碍主功能。不得劫持系统 CmdShiftG、增加自动窗口管理或私自变更用户 Mac 快捷键。
+
+## 2026-10-24 — ⌘⇧F 作为推荐 Hotkey，用户已证实文件高亮（pathseek-20261024-cmdshiftf-16）
+
+- [x] 根据 Raycast 官方 Manifest / Hotkey 手册确认扩展无法在安装时**自动注册全局键**；不虚构设置接口或操作用户本地私有数据库。
+- [x] main 的 `package.json` 给 `dialog-search` 更新完整路径搜索描述、推荐的 Cmd+Shift+F 与关键词，既有 fd/fzf 与 PathSeek 文件选择功能不变。
+- [x] 同步中英文 README 与 Open/Save 使用文档，写明快捷键需**由用户手动设置一次**，并提醒和其他软件可能冲突。
+- [x] 用户再次明确确认原 Open 面板能**高亮选中**由 PathSeek 返回的完整路径文件；[Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7) 已更新至 5/7。
+- [x] [Issue #10](https://github.com/juezhong/raycast-pathseek/issues/10) 同步技术约束和已完成的文档说明，取消“可以静默注册热键”的错误期待。
+- [ ] 用户仅需**一次性**在 Raycast Configure Command → Set Hotkey 指定 `⌘⇧F`；其余已通过的搜索、粘贴与高亮流程无需重复测试。
+- [ ] 之后只按用户提出的具体体验痛点继续最小优化，不做自动活动窗口管理或重复验证未提及的兼容性场景。
+
+## Active Next Step (pathseek-20261024-cmdshiftf-16)
+Raycast 扩展官方 Manifest 不支持自动分配全局 Hotkey，也没有稳定的可编程设置 API。已在 main 的 dialog-search 命令元数据、README 中英及 docs/open-save-dialog.md 中推荐用户指定的 ⌘⇧F，用户只需在 Raycast 的 Configure Command → Set Hotkey 手动设置一次；不修改私有数据库、不安装后台按键监听。用户已确认完整路径提交后原 Open 对话框高亮选中文件（Issue #7 5/7 通过）。下一步是让用户直接使用已合并 main 版本、如愿只设置一次 ⌘⇧F；不要求重复已有成功测试，按实际使用情况继续最小优化。
