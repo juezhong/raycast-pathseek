@@ -117,3 +117,9 @@ A `package-lock.json` file has not yet been generated and committed as part of a
 ## License
 
 [MIT License](LICENSE). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for upstream attribution. The current development icon is temporarily reused from the MIT-licensed Fuzzy File Search upstream extension; it must be replaced before publishing.
+
+## Assisted Open/Save dialog navigation (P4.1 · development)
+
+The **Search in Open/Save Dialog** command can paste a search result's **containing folder** into the native macOS Go to Folder field. In the original application's Open/Save panel press **Cmd+Shift+G** first, invoke the Raycast command, choose a result, press **Return** to paste the folder, and then confirm Go to Folder in the original dialog yourself. For indexed folder results, choose **Paste Selected Path (For Folder Results)** from the Action Panel.
+
+**This is an assisted flow, not automatic panel detection/navigation.** It never presses Open/Save, opens a new Finder window or starts an index build. See [Open/Save workflow and limitations](docs/open-save-dialog.md) and [Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7).
