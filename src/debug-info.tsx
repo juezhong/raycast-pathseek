@@ -5,6 +5,7 @@ import os from "node:os";
 import { promisify } from "node:util";
 import { useEffect, useState } from "react";
 import { readIndex, indexFilePath } from "./lib/index-store";
+import { commandTracingEnabled, readCommandTrace, summarizeCommandTrace } from "./lib/command-trace";
 
 const run = promisify(execFile);
 
@@ -90,6 +91,21 @@ async function collectDiagnostics(): Promise<Diagnostics> {
     "> 终端 `node --version` 显示的是系统 Node.js 版本，可能不同于 Raycast 内部 Node.js。",
   );
 
+  report.push("", "## fd/fzf 调用记录（开发者选项）");
+  if (commandTracingEnabled()) {
+    const records = await readCommandTrace();
+    report.push(
+      "Tracing: enabled (local, sanitized, maximum 256 KiB per file)",
+      "Method: Node.js child_process.spawn, no shell",
+      summarizeCommandTrace(records),
+      "",
+      "> 正常查询不会启动 fd。只有手动重建或 15 天到期刷新才调用 fd。",
+      "> 记录中的 started 表示已尝试调用；若无对应结束事件，可能被取消、终止或仍在运行。",
+    );
+  } else {
+    report.push("Tracing: disabled (default). No fd/fzf trace file is written during normal searches.");
+  }
+
   const copyText = report.join("\n");
   return { markdown: copyText, copyText };
 }
@@ -97,6 +113,7 @@ async function collectDiagnostics(): Promise<Diagnostics> {
 export default function DebugInfo() {
   const [data, setData] = useState<Diagnostics | null>(null);
   const [error, setError] = useState<string>();
+  const [refreshCount, setRefreshCount] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -106,7 +123,7 @@ export default function DebugInfo() {
         if (active) setError(`Failed to collect diagnostics (${errorCode(failure)})`);
       });
     return () => { active = false; };
-  }, []);
+  }, [refreshCount]);
 
   return (
     <Detail
@@ -116,6 +133,7 @@ export default function DebugInfo() {
         data ? (
           <ActionPanel>
             <Action.CopyToClipboard title="Copy Sanitized Debug Info" content={data.copyText} />
+            <Action title="Refresh Diagnostics" onAction={() => setRefreshCount((count) => count + 1)} />
             <Action.Open title="Open PathSeek GitHub Issue" target="https://github.com/juezhong/raycast-pathseek/issues/1" />
           </ActionPanel>
         ) : undefined
