@@ -1,13 +1,13 @@
 # Progress — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-p4-merged-hotkey-15
+- Checkpoint ID: pathseek-20261024-cmdshiftf-16
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Branch: main
 - Plan Directory: plans/pathseek-development/
 - Write Mode: continuous_checkpoints
-- Current Phase: P4 基础功能已合并 main；优先用 Raycast 原生 Hotkey 精简调用流程
+- Current Phase: P4 / 核心路径粘贴已合并、推荐 ⌘⇧F 已写入主分支，用户首次绑定待完成
 - Storage: github_checkpointed（以三文件回读一致为准）
 
 ## 执行纪要
@@ -222,3 +222,14 @@ PR #3 已合并进 main（squash commit 09d7a864257c88d9869aac545e90aea11c6b2558
 
 ## Active Next Step (pathseek-20261024-p4-merged-hotkey-15)
 用户已授权 PR #8 合并，GitHub 返回 merged=true，main squash commit 47ea3c2a8781e111a58abf4a4d400b7a03b2eb38。优先由用户在 Raycast Settings → Shortcuts 为 Search in Open/Save Dialog 设置未冲突的独立全局热键（例如 ⌃⌥G），形成原对话框 ⌘⇧G → 热键直接搜索 → Return 粘贴的短流程，并描述真实体验；根据反馈决定 Issue #10 是否有必要进一步探索可选一键衔接/窗口位置。Issue #7 三项未单独验证的文件高亮、目录最终进入、父目录备用动作不阻碍主功能。不得劫持系统 CmdShiftG、增加自动窗口管理或私自变更用户 Mac 快捷键。
+
+### 2026-10-24 — 将用户指定 ⌘⇧F 作为推荐快捷键，记入直接实测结果（pathseek-20261024-cmdshiftf-16）
+
+- 查询 Raycast 官方 Hotkey 说明、Manifest 与 Feature Request，确认 Raycast 扩展不能通过源码注册默认全局 Hotkey；无官方稳定 CLI/SDK 可代替用户写入。
+- 已提交 main 的 package.json：修正 `dialog-search` 旧的“仅粘贴父目录”描述，更新为完整文件/文件夹路径搜索及推荐 Cmd+Shift+F；增加命令关键词。未添加无效全局 hotkey 属性或模拟键盘监听。
+- 修改 main 的 `docs/open-save-dialog.md`、`README.zh-CN.md` 和 `README.md`，把之前示例 `⌃⌥G` 换成维护者要求的 `⌘⇧F`，给出一次性 Configure Command → Set Hotkey 操作，说明可能与其他应用搜索快捷键冲突。
+- 更新 Issue #10 的官方限制与文档完成项；更新 Issue #7 的文件高亮选中为用户实测已通过（5/7）。
+- 未要求用户重复 Open/Save 路径粘贴测试，没有自动合并新的 PR，也没有修改用户本地 Raycast 配置；主分支以最小改动完成本轮元数据和文档更新。
+
+## Active Next Step (pathseek-20261024-cmdshiftf-16)
+Raycast 扩展官方 Manifest 不支持自动分配全局 Hotkey，也没有稳定的可编程设置 API。已在 main 的 dialog-search 命令元数据、README 中英及 docs/open-save-dialog.md 中推荐用户指定的 ⌘⇧F，用户只需在 Raycast 的 Configure Command → Set Hotkey 手动设置一次；不修改私有数据库、不安装后台按键监听。用户已确认完整路径提交后原 Open 对话框高亮选中文件（Issue #7 5/7 通过）。下一步是让用户直接使用已合并 main 版本、如愿只设置一次 ⌘⇧F；不要求重复已有成功测试，按实际使用情况继续最小优化。
