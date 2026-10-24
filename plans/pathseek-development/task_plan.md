@@ -6,9 +6,9 @@
 - Plan Directory: plans/pathseek-development/
 - Write Mode: continuous_checkpoints
 - Status: active / code-review-quality-gate
-- Current Phase: P4 — Minimal Open/Save path transfer user-validated; PR #8 merge decision
-- Checkpoint ID: pathseek-20261024-p4-user-validated-14
-- Last Checkpoint: pathseek-20261024-p4-user-validated-14 (2026-10-24; verified after three-file readback)
+- Current Phase: P4 merged; improve Open/Save command hotkey workflow without automation
+- Checkpoint ID: pathseek-20261024-p4-merged-hotkey-15
+- Last Checkpoint: pathseek-20261024-p4-merged-hotkey-15 (2026-10-24; 3-file readback verified)
 - Last Updated: 2026-10-24
 - Storage: github_checkpointed
 
@@ -230,3 +230,17 @@ PR #3 已合并进 main（squash commit 09d7a864257c88d9869aac545e90aea11c6b2558
 
 ## Active Next Step (pathseek-20261024-p4-user-validated-14)
 用户确认 PR #8 的核心文件与目录搜索路径粘贴体验在 macOS 实机正常，已经达到其所需最小功能。暂不添加其他窗口自动化或未提出的优化需求；保留文件高亮选中/备用父目录等未逐项描述的细节为可选验证。向用户征求是否将 Draft PR #8 合并到 main；取得明确授权后确认 CI/mergeable 并合并。后续优化由用户提供具体体验反馈再按最小改动推进。
+
+## 2026-10-24 — PR #8 已合并，重点转向快捷键衔接（pathseek-20261024-p4-merged-hotkey-15）
+
+- [x] 用户明确同意合并 PR #8；已转 Ready 并以 Squash Merge 并入 `main`（commit `47ea3c2a8781e111a58abf4a4d400b7a03b2eb38`）。
+- [x] P4 最小功能：用户 Mac 已验证原 Open/Save 中 `⌘⇧G` → PathSeek 搜索文件/目录 → 粘贴路径回原输入框；不扩大为自动窗口管理。
+- [x] 清晰解释 Issue #7 剩余的 3 项为非阻塞、未分别实测的细节；保持勾选事实。
+- [x] 创建 [Issue #10](https://github.com/juezhong/raycast-pathseek/issues/10) 作为用户实际体验优化任务；研究原生全局命令 Hotkey、系统快捷键冲突、Raycast 窗口位置限制。
+- [x] 主分支更新 [Open/Save 操作说明](https://github.com/juezhong/raycast-pathseek/blob/main/docs/open-save-dialog.md) 与中英 README，说明如何设定 `Search in Open/Save Dialog` 专属快捷键，不抢占系统 `⌘⇧G`。
+- [ ] 用户自愿给该命令设置独立 Hotkey（例如 `⌃⌥G`），测试 `⌘⇧G` → Hotkey → 输入搜索 → Return 是否足够顺畅。
+- [ ] 如果用户仍认为两步不够流畅，仅研究轻量可选的快捷键衔接实验；精准贴近 Go to Folder 的悬浮位置不作为阻塞功能，不能为了此引入后台窗口管理或无条件 Accessibility 自动操作。
+- [ ] 文件/文件夹最终高亮与进入、备用 Action 是否工作只在用户实际反馈时单独确认；不要求复杂测试。
+
+## Active Next Step (pathseek-20261024-p4-merged-hotkey-15)
+用户已授权 PR #8 合并，GitHub 返回 merged=true，main squash commit 47ea3c2a8781e111a58abf4a4d400b7a03b2eb38。优先由用户在 Raycast Settings → Shortcuts 为 Search in Open/Save Dialog 设置未冲突的独立全局热键（例如 ⌃⌥G），形成原对话框 ⌘⇧G → 热键直接搜索 → Return 粘贴的短流程，并描述真实体验；根据反馈决定 Issue #10 是否有必要进一步探索可选一键衔接/窗口位置。Issue #7 三项未单独验证的文件高亮、目录最终进入、父目录备用动作不阻碍主功能。不得劫持系统 CmdShiftG、增加自动窗口管理或私自变更用户 Mac 快捷键。
