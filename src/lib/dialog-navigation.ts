@@ -5,9 +5,11 @@ import path from "node:path";
  * No AppleScript, Accessibility automation, keyboard injection, Finder
  * opening or Open/Save confirmation is performed here.
  *
- * With indexed file paths, the containing folder is the safest default
- * for macOS' native "Go to Folder" field. For folder results users can
- * instead paste the exact selected path through the secondary action.
+ * Paste the full selected path as the primary action. Standard macOS Open
+ * dialogs may highlight the exact file; a selected directory opens via
+ * Go to Folder. Parent directory remains an explicit fallback action.
+ * File selection must be verified on the user's Mac, not assumed for
+ * every third-party application or Save panel.
  */
 export function getDialogNavigationPaths(filepath: string): {
   containingFolder: string;
