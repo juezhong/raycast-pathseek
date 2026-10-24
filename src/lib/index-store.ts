@@ -2,7 +2,7 @@ import { environment, getPreferenceValues } from "@raycast/api";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { createWriteStream, constants } from "node:fs";
-import { access, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
@@ -151,6 +151,7 @@ export async function rebuildIndex(): Promise<IndexMetadata> {
 
   const fd = await findBinary("fd", prefs.fdBinary);
   await mkdir(indexDirectory, { recursive: true });
+  const previousIndex = await readIndex().catch(() => null);
 
   const id = randomUUID();
   const indexName = `index-${id}.nul`;
@@ -183,6 +184,18 @@ export async function rebuildIndex(): Promise<IndexMetadata> {
     };
     await writeFile(metadataTemp, JSON.stringify(metadata, null, 2), "utf8");
     await rename(metadataTemp, metadataPath);
+
+    // 仅保留现用索引和上一代索引，避免反复手动重建持续占用磁盘。
+    // 清理失败不应让已成功发布的新索引失效。
+    try {
+      for (const filename of await readdir(indexDirectory)) {
+        if (!/^index-[a-f0-9-]+\\.nul$/.test(filename)) continue;
+        if (filename === metadata.filename || filename === previousIndex?.filename) continue;
+        await rm(path.join(indexDirectory, filename), { force: true });
+      }
+    } catch (error) {
+      console.warn("Could not clean up retired indexes:", error);
+    }
     return metadata;
   } catch (error) {
     await Promise.all([
