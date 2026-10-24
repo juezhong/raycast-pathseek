@@ -1,7 +1,7 @@
 # Findings — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-p4-assisted-12
+- Checkpoint ID: pathseek-20261024-p4-minimal-13
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Evidence: [首轮 Code Review](../../docs/reviews/2026-10-24-initial-code-review.md) · [质量 Issue #4](https://github.com/juezhong/raycast-pathseek/issues/4) · [Draft PR #3](https://github.com/juezhong/raycast-pathseek/pull/3)
@@ -189,3 +189,17 @@ PR #3 已合并进 main（squash commit 09d7a864257c88d9869aac545e90aea11c6b2558
 
 ## Active Next Step (pathseek-20261024-p4-assisted-12)
 等待维护者在 Mac 上测试 Draft PR #8 的 P4.1 辅助导航：在原应用 Open/Save 对话框按 ⌘⇧G，使用 Search in Open/Save Dialog 搜索并按 Return 粘贴父目录，再在原对话框手动按 Return；从反馈判断是否可用并更新 Issue #7。P4.2 自动识别目标文件面板的 AX/原应用焦点研究在 Issue #9，未经验证不注入键盘或自动确认 Open/Save；PR #8 不擅自合并。
+
+## 2026-10-24 — 维护者要求 P4 缩到文件选择与目录跳转，不做自动窗口管理（pathseek-20261024-p4-minimal-13）
+
+- 用户明确表示不需要 Listary 的自动管理器激活、自动识别当前文件面板，也不希望过度设计。核心目标仅为：**通过 PathSeek 搜索后，Open 对话框中快速选择文件；Open/Save 对话框中快速跳到文件夹。**
+- 上次 Draft PR #8 的默认动作仅粘贴父目录，不能满足文件直接选中。已修改为**默认粘贴所选项目的完整绝对路径**；父目录成为 ⌘K 的备用操作 `Go to Containing Folder (Fallback)`，不需每个结果额外 stat 磁盘判定文件类型。
+- macOS 社区使用经验表明在标准 Open 对话框通过 ⌘⇧G 输入完整文件路径可能选中文件；尚无维护者 macOS 15.1.1 GUI 验证，不保证所有第三方应用一致。参考：https://superuser.com/questions/1538458/is-it-possible-to-paste-the-file-path-into-open-file-dialog-in-macos/1538558
+- 使用原生 Raycast `Action.Paste` 在用户事先聚焦的 Go to Folder 字段中粘贴，**不**自动按 ⌘⇧G、注入键盘、识别/唤醒活动窗口、点击 Open/Save，也不额外打开 Finder。若没有事先聚焦正确字段可能粘贴错位，提示清楚。
+- 已更新 `src/search-files.tsx` 操作优先顺序、`src/lib/dialog-navigation.ts` 注释与 `tests/dialog-navigation.test.mjs` 断言，`docs/open-save-dialog.md` 及中英 README/架构/开发文档；[PR #8](https://github.com/juezhong/raycast-pathseek/pull/8) 标题/正文同步产品范围。
+- [Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7) 改为仅验收快速文件定位和目录进入（6 项简单操作）；原 [Issue #9](https://github.com/juezhong/raycast-pathseek/issues/9) 的自动窗口管理 P4.2 已依用户要求关闭为 `not_planned`，不是实现完成。
+- 最新 PR #8 commit `cabce692becc435ded85c7c2a458d2f2f70ec926` 的 macOS CI 已完成成功（npm ci、测试、TypeScript、源码 ESLint、Raycast build）；正式 Raycast Store lint 的旧遗留问题另列，不能误报完整发布审核通过。
+- PR #8 仍 open/draft，尚未合并 main。目标不再包含自动导航专项技术研究。
+
+## Active Next Step (pathseek-20261024-p4-minimal-13)
+维护者在 Mac 上只验证 Draft PR #8 的两项基础场景：标准 Open 对话框通过 ⌘⇧G 接收完整文件路径后能否定位/选中文件；Open/Save 对话框接收目录完整路径后能否进入目录。若完整文件路径无法直接选中，使用 Go to Containing Folder (Fallback) 手动选文件。助理根据反馈维护 Issue #7。自动活动窗口管理 P4.2 明确取消（Issue #9 closed/not_planned）。PR #8 保持 Draft，未获用户确认不合并。
