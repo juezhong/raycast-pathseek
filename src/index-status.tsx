@@ -37,7 +37,7 @@ export default function IndexStatus() {
         ? "# No Index\n\nRun **Rebuild Index** to generate your first persistent index."
         : state.status === "error"
           ? `# Index Error\n\n${state.message}\n\nCheck the index files, then use **Rebuild Index** to recover.`
-          : `# Index Status\n\n- **Indexed paths:** ${state.metadata.count.toLocaleString()}\n- **Last built:** ${new Date(state.metadata.createdAt).toLocaleString()}\n- **Index file:** \`${state.metadata.filename}\`\n- **Search roots:**\n${state.metadata.roots.map((root) => `  - \`${root}\``).join("\n")}\n\nSearches reuse this index. An index at least ${AUTO_REBUILD_DAYS} days old is refreshed on the next Search Files launch (not while Raycast is closed).\\n\\n- **Refresh due:** ${isIndexStale(state.metadata) ? "Yes" : "No"}`;
+          : `# Index Status\n\n- **Indexed paths:** ${state.metadata.count.toLocaleString()}\n- **Last built:** ${new Date(state.metadata.createdAt).toLocaleString()}\n- **Index file:** \`${state.metadata.filename}\`\n- **Search roots:**\n${state.metadata.roots.map((root) => `  - \`${root}\``).join("\n")}\n\nSearches reuse this index. An index at least ${AUTO_REBUILD_DAYS} days old is refreshed on the next Search Files launch (not while Raycast is closed).\n\n- **Refresh due:** ${isIndexStale(state.metadata) ? "Yes" : "No"}`;
 
   return (
     <Detail
