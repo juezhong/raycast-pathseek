@@ -1,7 +1,7 @@
 # Findings — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-pr3-merged-11
+- Checkpoint ID: pathseek-20261024-p4-assisted-12
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Evidence: [首轮 Code Review](../../docs/reviews/2026-10-24-initial-code-review.md) · [质量 Issue #4](https://github.com/juezhong/raycast-pathseek/issues/4) · [Draft PR #3](https://github.com/juezhong/raycast-pathseek/pull/3)
@@ -174,3 +174,18 @@ PR #3 核心代码已完成用户 Issue #6（11/11）验收及 macOS CI 的 npm 
 
 ## Active Next Step (pathseek-20261024-pr3-merged-11)
 PR #3 已合并进 main（squash commit 09d7a864257c88d9869aac545e90aea11c6b2558），用户可在原始仓库 git switch main && git pull --ff-only origin main，检查 git worktree list 后安全移除 ../raycast-pathseek-pr3。下一阶段启动 P4：设计 macOS 原应用 Open/Save 面板中的安全路径导航，不自动确认 Open/Save，先调研 Accessibility、标准面板与第三方面板兼容性；剩余 P2 在 Issue #4 持续跟踪。
+
+## 2026-10-24 — P4 开始：先构建安全的辅助文件对话框导航（pathseek-20261024-p4-assisted-12）
+
+- 用户确认 PR #3 合并完成、已经自行清理本地测试 worktree，要求继续 P4。
+- 已通过 Apple 与 Raycast 官方文档确认：macOS 标准 Open/Save 文件选择支持使用 ⌘⇧G 打开 Go to Folder；Raycast `Action.Paste` 将文本粘贴到 Raycast 之前聚焦的应用，并关闭 Raycast UI。参考：https://support.apple.com/zh-cn/102650 与 https://developers.raycast.com/api-reference/user-interface/actions
+- 为了**不猜测目标应用焦点、不破坏原 Open/Save 面板**，独立阶段 P4.1 实现用户先手动在原面板打开 Go to Folder，再通过 Raycast 搜索并用 Action.Paste 粘贴父目录；最后由用户手动确认 Go to Folder。
+- GitHub 独立分支 `feat/p4-assisted-open-save-navigation` + [Draft PR #8](https://github.com/juezhong/raycast-pathseek/pull/8)。新命令 `Search in Open/Save Dialog` 复用原 `SearchFilesView`、同一 fd-built 索引与 fzf；默认 Paste Containing Folder，辅助选项 Paste Selected Path（适用于目录结果）；不新增 Finder/AppleScript/Accessibility helper、不调用 fd。
+- `src/lib/dialog-navigation.ts` 单纯计算绝对路径及父目录，不遍历目录树；新增测试 `tests/dialog-navigation.test.mjs`。中英文 README、架构/开发文档及 [docs/open-save-dialog.md](https://github.com/juezhong/raycast-pathseek/blob/feat/p4-assisted-open-save-navigation/docs/open-save-dialog.md) 已提交。
+- [Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7) 为用户直观的 Mac P4.1 体验清单；[Issue #9](https://github.com/juezhong/raycast-pathseek/issues/9) 专门跟踪 P4.2 真正“一键识别目标 NSOpenPanel/NSSavePanel 并原位导航”的高级开发任务。
+- P4.2 必须可靠识别目标应用/面板并确认 AX 权限，目标不明确则安全退出。Apple 的 `AXIsProcessTrustedWithOptions` 可检测 Accessibility 许可，但**不自动保证能识别目标标准面板**；具体行为必须 macOS 实测。
+- 最新 PR #8 macOS GitHub Actions：`npm ci`、`npm test` **23/23 通过**、TypeScript、源码 ESLint、Raycast build 全部成功。Raycast Store lint 中作者用户名与 Prettier 仍报错且为非阻塞项，不能误记为发布通过。
+- **重要限制**：P4.1 目前只通过自动化测试/编译；实际 Raycast `Action.Paste` 是否可靠返回 TextEdit/Preview 的 Go to Folder 焦点尚未得到用户 Mac 实测，不能将 P4 记为完成。
+
+## Active Next Step (pathseek-20261024-p4-assisted-12)
+等待维护者在 Mac 上测试 Draft PR #8 的 P4.1 辅助导航：在原应用 Open/Save 对话框按 ⌘⇧G，使用 Search in Open/Save Dialog 搜索并按 Return 粘贴父目录，再在原对话框手动按 Return；从反馈判断是否可用并更新 Issue #7。P4.2 自动识别目标文件面板的 AX/原应用焦点研究在 Issue #9，未经验证不注入键盘或自动确认 Open/Save；PR #8 不擅自合并。
