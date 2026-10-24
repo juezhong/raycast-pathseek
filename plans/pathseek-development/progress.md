@@ -1,13 +1,13 @@
 # Progress — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-p4-minimal-13
+- Checkpoint ID: pathseek-20261024-p4-user-validated-14
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Branch: main
 - Plan Directory: plans/pathseek-development/
 - Write Mode: continuous_checkpoints
-- Current Phase: P4 / 最小文件选择与文件夹跳转，Mac GUI 待验收
+- Current Phase: P4 / 用户已实测文件与目录路径粘贴正常，PR #8 待合并确认
 - Storage: github_checkpointed（以三文件回读一致为准）
 
 ## 执行纪要
@@ -199,3 +199,14 @@ PR #3 已合并进 main（squash commit 09d7a864257c88d9869aac545e90aea11c6b2558
 
 ## Active Next Step (pathseek-20261024-p4-minimal-13)
 维护者在 Mac 上只验证 Draft PR #8 的两项基础场景：标准 Open 对话框通过 ⌘⇧G 接收完整文件路径后能否定位/选中文件；Open/Save 对话框接收目录完整路径后能否进入目录。若完整文件路径无法直接选中，使用 Go to Containing Folder (Fallback) 手动选文件。助理根据反馈维护 Issue #7。自动活动窗口管理 P4.2 明确取消（Issue #9 closed/not_planned）。PR #8 保持 Draft，未获用户确认不合并。
+
+### 2026-10-24 — P4.1 用户 Mac 确认路径传递工作流正常（pathseek-20261024-p4-user-validated-14）
+
+- 收到维护者的完整正常使用反馈：主搜索可打开文件/文件夹；Open/Save 面板先 ⌘⇧G，再通过 PathSeek 搜索并返回原窗口的快速跳转文本框粘贴路径，文件和目录均可查找。
+- 用户明确表示核心功能符合期待、不需要额外自动管理器，仅考虑未来实际使用后的小优化。
+- 读取并更新 [Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7)，直接证实的 4 个项目标记通过，3 个更细的步骤保留未验证；不会让用户再做底层/复杂测试。
+- 向 [PR #8](https://github.com/juezhong/raycast-pathseek/pull/8) 发布验收范围说明。PR CI completed/success，仍为 Draft，尚未合并 main，本轮没有修改运行代码。
+- 产品下一步不再是 P4.2 窗口识别，而是由用户决定是否合并当前已获核心体验确认的最小实现，然后根据具体痛点决定优化优先级。
+
+## Active Next Step (pathseek-20261024-p4-user-validated-14)
+用户确认 PR #8 的核心文件与目录搜索路径粘贴体验在 macOS 实机正常，已经达到其所需最小功能。暂不添加其他窗口自动化或未提出的优化需求；保留文件高亮选中/备用父目录等未逐项描述的细节为可选验证。向用户征求是否将 Draft PR #8 合并到 main；取得明确授权后确认 CI/mergeable 并合并。后续优化由用户提供具体体验反馈再按最小改动推进。
