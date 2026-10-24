@@ -7,8 +7,8 @@
 - Write Mode: continuous_checkpoints
 - Status: active / code-review-quality-gate
 - Current Phase: Q1 — Code Review / Developer Observability / Mac acceptance
-- Checkpoint ID: pathseek-20261024-debug-trace-05
-- Last Checkpoint: pathseek-20261024-debug-trace-05 (2026-10-24; verified after three-file readback)
+- Checkpoint ID: pathseek-20261024-fzf-only-06
+- Last Checkpoint: pathseek-20261024-fzf-only-06 (2026-10-24; after three-file readback)
 - Last Updated: 2026-10-24
 - Storage: github_checkpointed
 
@@ -17,7 +17,7 @@
 
 ## 需求与技术边界（当前版本）
 - **索引**：由 `fd` 构建，存入 Raycast `environment.supportPath`；默认不在每次搜索字符输入时重扫。首次显式 Rebuild，15 天后下一次进入 Search Files 按需刷新，允许手动重建。不得假称有常驻后台守护/保证按时刷新。
-- **搜索**：`fzf` 模糊匹配、JavaScript Regex 完整路径匹配；Regex 性能安全需要整改。File/Directory 筛选仍是待开发项。
+- **搜索**：统一由 `fzf` 的扩展搜索匹配路径（模糊、精确、前后缀、排除、OR），不再提供 JavaScript Regex 引擎。File/Directory 筛选仍待开发。
 - **结果**：Finder 原生文件图标，Open/Show in Finder/Open With/Copy Path/Quick Look；需要完善失效路径处理。
 - **索引正确性**：构建失败保留有效索引；新索引完整后原子提交；正式索引路径不会被并发清理误删；metadata/data 一致性与崩溃恢复是审查阻塞项。
 - **Dialog Bridge**：未来通过 macOS API/Accessibility 返回原应用 Open/Save 面板，不额外弹出 Finder；不得自动确认 Save/Open。
@@ -30,7 +30,7 @@
 | P0：GitHub/计划/许可证 | **已完成** | 三文件初始检查点与仓库已存在 |
 | P1：Fuzzy File Search 审查与 Raycast 工程 | **基本实现，部分验证** | 用户 Issue #1 已勾选安装、命令、部分索引测试；未有完整 lint/build 证据 |
 | P2：持久化索引与15天更新 | **已实现，需整改** | main 存在 UUID 删除读竞态；Draft PR #3 固定路径方向正确，但 CR-01 metadata 一致性尚未修复 |
-| P3：fzf / Regex / Finder Actions | **已实现，待测试与安全整改** | Issue #2 尚未勾选，Regex 可用性风险 CR-05 |
+| P3：fzf-only / Finder Actions | **已提交至 Draft PR #3，待新版 Mac 验收** | Issue #2 已有部分旧版勾选；Regex 已取消，改为 fzf 内建扩展搜索 |
 | Q1：初轮 Code Review 质量收口 | **审查完成，整改待开始** | [审查报告](../../docs/reviews/2026-10-24-initial-code-review.md) · [Issue #4](https://github.com/juezhong/raycast-pathseek/issues/4) |
 | P4：原 Open/Save 对话框跳转 | **未开始** | 等待 Q1 的 P0/P1 风险处理 |
 | P5：测试/文档/Store 发布 | **未开始** | 完整 CI 与macOS兼容性、商店提交 |
@@ -106,3 +106,17 @@
 
 ## Current Next Step (checkpoint pathseek-20261024-debug-trace-05)
 在 Mac 上从 Draft PR #3 独立工作目录加载扩展，验证 v1→v2 索引迁移、搜索与重建并发，以及开发者 fd/fzf 追踪的默认关闭/开启行为；到 Issue #5 和 PR #3 提交实测结果，再决定 Ready for Review / 合并。
+
+## 2026-10-24 当前生效决策：搜索仅使用 fzf（pathseek-20261024-fzf-only-06）
+
+- [x] 用户确认不需要单独正则搜索，保持 **Search Files 单一搜索框 + fzf 引擎**；不引入 JavaScript 正则匹配器。
+- [x] Draft PR #3 删除 `regex-search.ts` 与模式切换，fzf 显式启用 `--extended`；支持模糊、精确、后缀、排除、OR；移除旧 CR-05 Regex 风险项。
+- [x] 最新 PR #3 macOS GitHub Actions 开发期质量门槛返回 success（索引单元测试、类型检查、源码 ESLint、Raycast build）。
+- [x] 中英文 README 和技术说明、Issue #2 / #4 / #5 已同步范围变化。
+- [ ] 用户在 Mac 对**新 fzf-only PR3 版本**进行回归：同一搜索框、fzf 语法、查询不启动 fd、文件/目录图标、索引迁移与 fd/fzf Debug 记录。
+- [ ] 保留 15 天刷新 CR-03/04、临时文件/存在性 CR-07/08 等剩余质量问题，再决定 Draft PR #3 是否 Ready / 合并。
+- [ ] 正式 Raycast Store 用户名和全量 `ray lint` 上架校验仍按用户要求在发布前再处理。
+- 当前 repo main 尚未包含 fzf-only 改动；用户测试需要 PR #3 独立工作目录。
+
+## Latest Next Step (pathseek-20261024-fzf-only-06)
+请维护者继续在 Mac 上用 Draft PR #3 独立 worktree 验收单一 fzf 搜索（含 .pdf$、'report、!node_modules、OR）、fd/fzf 调用追踪和索引重建；根据 Issue #2 / #5 实测与剩余 Code Review 风险决定 PR #3 是否 Ready / 合并。
