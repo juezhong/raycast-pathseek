@@ -74,7 +74,7 @@ PathSeek 使用 Raycast 官方提供的 `environment.supportPath`，而不是存
 
 ### 搜索模式
 
-在 Search Files 右侧切换 **Fuzzy (fzf)** / **Regex (full path)**。正则示例：`\\.tsx?$` 匹配 `.ts` 和 `.tsx`，`src/.*/config` 匹配路径片段。正则只匹配完整路径字符串，不会搜索文件内容。
+在 Search Files 右侧切换 **Fuzzy (fzf)** / **Regex (full path)**。正则示例：`\.tsx?$` 匹配 `.ts` 和 `.tsx`，`src/.*/config` 匹配路径片段。正则只匹配完整路径字符串，不会搜索文件内容。
 
 ## 技术设计与开发文档
 
