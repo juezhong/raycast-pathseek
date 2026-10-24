@@ -13,6 +13,8 @@
 
 ## 安装与使用
 
+首次安装和依赖排查可参考 [安装指南（英文）](docs/first-time-setup.md)。
+
 需要 [Raycast](https://www.raycast.com/)、[fd](https://github.com/sharkdp/fd) 和 [fzf](https://github.com/junegunn/fzf)：
 
 ```bash

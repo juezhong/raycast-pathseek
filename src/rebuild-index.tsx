@@ -14,6 +14,12 @@ import {
   saveConfiguredIndexRoots,
 } from "./lib/index-roots";
 import { readIndex, rebuildIndex, type IndexMetadata } from "./lib/index-store";
+import {
+  getMissingBinary,
+  missingBinaryMessage,
+  HOMEBREW_INSTALL_COMMAND,
+  HOMEBREW_URL,
+} from "./lib/dependency-guide";
 
 type Mode = "loading" | "configure" | "ready" | "building";
 
@@ -58,7 +64,7 @@ function ChooseFolders({
         </ActionPanel>
       }
     >
-      <Form.Description text="Select one or more directories. PathSeek never scans until you explicitly choose to build an index. Change them later with Cmd+K in Build Index." />
+      <Form.Description text="Requires fd and fzf (Homebrew: brew install fd fzf). Select the folders to search. Only pressing Build Index runs a scan." />
       <Form.FilePicker
         id="folders"
         title="Index Folders"
@@ -158,6 +164,8 @@ export default function RebuildIndex() {
     );
   }
 
+  const missingBinary = getMissingBinary(error);
+
   const markdown =
     mode === "loading"
       ? "# Build Index\n\nReading saved folders. No scan will start automatically."
@@ -182,7 +190,13 @@ export default function RebuildIndex() {
               : "No index exists. Select folders and explicitly build your first index.",
             "",
             "Use **Cmd+K → Change Indexed Folders** to choose different directories. Saving a new selection does not automatically rebuild.",
-            ...(error ? ["", "## Last Error", error] : []),
+            ...(error
+              ? [
+                  "",
+                  "## Last Error",
+                  missingBinary ? missingBinaryMessage(missingBinary) : error,
+                ]
+              : []),
           ].join("\n");
 
   return (
@@ -202,6 +216,19 @@ export default function RebuildIndex() {
               icon={Icon.Folder}
               target={<ChangeFolders roots={roots} onSave={setRoots} />}
             />
+            {missingBinary && (
+              <>
+                <Action.CopyToClipboard
+                  title="Copy fd/fzf Install Command"
+                  icon={Icon.CopyClipboard}
+                  content={HOMEBREW_INSTALL_COMMAND}
+                />
+                <Action.OpenInBrowser
+                  title="How to Install Homebrew"
+                  url={HOMEBREW_URL}
+                />
+              </>
+            )}
             {current && (
               <Action.CopyToClipboard
                 title="Copy Index Summary"
