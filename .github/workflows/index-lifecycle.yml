@@ -26,6 +26,12 @@ jobs:
           node-version: "22"
       - name: Install npm dependencies
         run: npm install --no-audit --no-fund
+      - name: Export generated npm lockfile for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: pathseek-npm-lockfile
+          path: package-lock.json
+          retention-days: 7
       - name: Index format and atomic-publish tests
         run: npm test
       - name: TypeScript typecheck
