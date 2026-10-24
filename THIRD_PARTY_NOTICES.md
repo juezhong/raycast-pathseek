@@ -8,7 +8,7 @@
 
 PathSeek takes inspiration from Fuzzy File Search's full-path search interface, `fd`/`fzf` integration, and Finder actions. The persistent-index implementation in PathSeek is independently developed and does **not** copy the original command's per-launch reindexing workflow.
 
-The development icon at `assets/extension-icon.png` is temporarily reused from the upstream Fuzzy File Search extension under its MIT license. It must be replaced by an original PathSeek icon before Raycast Store submission.\n\nIf source code is migrated verbatim in subsequent phases, keep its relevant original copyright notices and license text here.
+The PathSeek icon is an original design. Its source is available at `assets/pathseek-icon.svg`, and the rendered icon is `assets/extension-icon.png`.\n\nIf source code is migrated verbatim in subsequent phases, keep its relevant original copyright notices and license text here.
 
 ## Command-line dependencies
 
@@ -17,7 +17,7 @@ The development icon at `assets/extension-icon.png` is temporarily reused from t
 
 The development version **does not download or bundle executables**. Install these trusted command-line tools separately, e.g. using Homebrew.
 
-### Upstream MIT license notice (icon)
+### Upstream MIT license notice (Fuzzy File Search)
 
 ```text
 MIT License
