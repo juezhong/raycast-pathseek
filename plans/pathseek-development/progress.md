@@ -1,7 +1,7 @@
 # Progress — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-manual-setup-08
+- Checkpoint ID: pathseek-20261024-issue6-acceptance-09
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Branch: main
@@ -138,3 +138,15 @@
 
 ## Active Next Step (pathseek-20261024-manual-setup-08)
 用户在 Mac 更新 Draft PR #3 后，简短验证首次无索引提示、目录选择、打开 Rebuild 时不自动执行 fd、⌘K 更改目录及显式 Rebuild；由助理根据聊天反馈维护简单 Issue #6。之后集中代码审查剩余索引稳定性问题，用户授权后再讨论合并 PR #3。
+
+### 2026-10-24 — Issue #6 的 11/11 项 Mac 交互验收正式通过（pathseek-20261024-issue6-acceptance-09）
+
+- 读取 Issue #6 最新内容与评论：所有 11 个用户可见交互项目全部勾选成功；用户在聊天确认本轮基本全部通过。
+- 已核验 PR #3 仍 open/draft、未合并 main，最近 GitHub Actions 完成成功（npm test、TypeScript、源码 ESLint、Raycast build），实机 GUI 验收与 CI 测试的证据分别记录。
+- 向 Issue #6 评论验收结果与范围，说明用户不需要做中断/断电/并发等技术性压力测试。
+- 更新开发者质量清单 Issue #4：CR-01 因自描述单文件索引设计落地标记完成；15 天刷新 CR-03/04 因需求取消判定不再适用；复杂测试由开发者/CI 负责。保留真实 fd 集成、可复现 lockfile、崩溃恢复与文档最终一致性等剩余项。
+- 本轮未修改 PR #3 代码、未把 PR 标记 Ready、未合并 main，也未要求用户重复已完成的 11 项 GUI 操作。
+- 下一步是开发者技术复审并处理合并阻塞；完成后向用户说明合并候选风险并征询是否合并。
+
+## Active Next Step (pathseek-20261024-issue6-acceptance-09)
+Issue #6 的 11/11 项用户可见 Mac 验收已完成，PR #3 最新 macOS CI 通过。下一步由助理完成技术 Code Review 剩余阻塞：重点核验 UUID→v2 升级及中断/并发安全、真实 fd 集成场景、可复现的 npm lockfile 与文档一致性；无需用户再做复杂测试。PR #3 仍 Draft，未经明确同意不合并 main。
