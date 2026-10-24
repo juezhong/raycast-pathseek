@@ -13,11 +13,11 @@
 | 工具 | 调用时机 | 触发原因（reason） | 调用方式 |
 | --- | --- | --- | --- |
 | fd | 显式 Rebuild Index | manual-rebuild | Node.js child_process.spawn，参数含 --absolute-path --print0、可选 --hidden / --follow / --exclude |
-| fd | 15 天到期后再次打开 Search Files | 15-day-refresh | 同上，依据用户搜索根目录构建索引 |
+
 | fzf | Search Files 输入非空查询、防抖后 | fuzzy-query | Node.js child_process.spawn，--extended --read0 --print0 --filter，数据来自持久化索引 |
 
 
-**输入搜索词本身不允许触发 fd。** 只有手动重建和 15 天按需刷新可以调用 fd。15 天按需刷新可能在打开搜索命令后启动，但不会每个键盘输入都启动。所有查询都通过 fzf。
+**输入搜索词本身不允许触发 fd。** 安装/启动、搜索、Index Status、首次配置和修改目录均不启动 fd；**只有明确按下 Build / Rebuild 动作才启动 fd**。所有查询都通过 fzf。
 
 ## 追踪格式
 
@@ -26,7 +26,7 @@
 - at：时间（ISO 8601）
 - tool：fd/fzf
 - phase：start/end
-- reason：manual-rebuild、15-day-refresh、fuzzy-query
+- reason：manual-rebuild、fuzzy-query
 - invocation：脱敏参数结构，不含真实扫描根目录和查询词
 - outcome：success/limit-reached/failure/cancelled
 - durationMs：毫秒
@@ -63,7 +63,7 @@
 
 - 关闭追踪：正常 Fuzzy 搜索，没有新的追踪文件写入
 - 开启后手动重建：出现 fd start/end 与结果数
-- 15 天未到期时连续搜索：不出现 fd start
+- 安装/首次打开 Search Files / Index Status / Rebuild Index（未提交构建）时：不会出现 fd start
 - Search Files 输入搜索词：出现 fzf start/end，能够看到耗时、结果数与退出状态
 - 模拟失败/取消：不泄露真实路径，索引及搜索功能不受诊断异常影响
 - 通过 Refresh Diagnostics 在已有 Debug Info 窗口查看新数据
