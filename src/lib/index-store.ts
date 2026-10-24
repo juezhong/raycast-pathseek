@@ -18,6 +18,8 @@ export type Preferences = {
   fzfBinary?: string;
 };
 
+export const ACTIVE_INDEX_FILENAME = "index.nul";
+
 export type IndexMetadata = {
   version: 1;
   filename: string;
@@ -75,7 +77,7 @@ export async function findBinary(name: "fd" | "fzf", explicit?: string): Promise
 
 export function indexFilePath(metadata: IndexMetadata): string {
   // 元数据只允许指向当前扩展的数据文件，避免读取任意外部路径。
-  if (!/^index-[a-f0-9-]+\.nul$/.test(metadata.filename)) {
+  if (metadata.filename !== ACTIVE_INDEX_FILENAME && !/^index-[a-f0-9-]+\.nul$/.test(metadata.filename)) {
     throw new Error("Invalid index filename");
   }
   return path.join(indexDirectory, metadata.filename);
@@ -177,16 +179,25 @@ export async function refreshExpiredIndex(metadata: IndexMetadata): Promise<Inde
  * Delete older index generations only AFTER a new file has been published.
  * Runs within the exclusive cross-process rebuild lock.
  */
-async function cleanupOldGenerations(current: IndexMetadata): Promise<void> {
+/**
+ * Legacy cleanup only. Current generations always use a stable index.nul
+ * pathname: an atomic rename replaces its content without leaving readers
+ * with stale generation-specific names. Legacy UUID files get a grace period
+ * because a search command may still hold an old metadata snapshot.
+ */
+async function cleanupLegacyGenerations(): Promise<void> {
+  const LEGACY_GRACE_MS = 24 * 60 * 60 * 1000;
   const published = await readIndex();
-  if (!published || published.filename !== current.filename) return;
+  if (!published || published.filename !== ACTIVE_INDEX_FILENAME) return;
 
-  const generations = (await readdir(indexDirectory)).filter((filename) => /^index-[a-f0-9-]+\.nul$/.test(filename));
-  // Never remove the active generation, even when it is the only one.
-  for (const filename of generations) {
-    if (filename !== current.filename) {
-      await rm(path.join(indexDirectory, filename), { force: true });
-    }
+  const entries = await readdir(indexDirectory);
+  for (const filename of entries) {
+    if (!/^index-[a-f0-9-]+\.nul$/.test(filename)) continue;
+    const filepath = path.join(indexDirectory, filename);
+    const fileInfo = await stat(filepath).catch(() => null);
+    if (!fileInfo || Date.now() - fileInfo.mtimeMs < LEGACY_GRACE_MS) continue;
+    // This does not touch index.nul, nor unrecognized files.
+    await rm(filepath, { force: true });
   }
 }
 
@@ -218,8 +229,8 @@ export async function rebuildIndex(options: { skipIfFresh?: boolean } = {}): Pro
 
     const fd = await findBinary("fd", prefs.fdBinary);
     const id = randomUUID();
-    const indexName = "index-" + id + ".nul";
-    const tempPath = path.join(indexDirectory, indexName + ".tmp");
+    const indexName = ACTIVE_INDEX_FILENAME;
+    const tempPath = path.join(indexDirectory, "index-" + id + ".nul.tmp");
     const finalPath = path.join(indexDirectory, indexName);
     const metadataTemp = path.join(indexDirectory, "index-" + id + ".json.tmp");
     const args = ["--absolute-path", "--print0"];
@@ -230,13 +241,13 @@ export async function rebuildIndex(options: { skipIfFresh?: boolean } = {}): Pro
     }
 
     let total = 0;
-    let metadataPublished = false;
     try {
       await writeFile(tempPath, "", { flag: "wx" });
       for (const root of roots) {
         total += await runFd(fd, [...args, ".", root], tempPath);
       }
 
+      // Atomic replacement: readers open a stable path and never chase a deleted UUID.
       await rename(tempPath, finalPath);
       const fileInfo = await stat(finalPath);
       if (!fileInfo.isFile()) throw new Error("Index is not a regular file");
@@ -250,11 +261,10 @@ export async function rebuildIndex(options: { skipIfFresh?: boolean } = {}): Pro
       };
       await writeFile(metadataTemp, JSON.stringify(metadata, null, 2), "utf8");
       await rename(metadataTemp, metadataPath);
-      metadataPublished = true;
 
       // Cleanup is best-effort; publish success does not depend on cleanup.
       try {
-        await cleanupOldGenerations(metadata);
+        await cleanupLegacyGenerations();
       } catch (error) {
         console.warn("Index cleanup deferred:", error);
       }
@@ -263,8 +273,8 @@ export async function rebuildIndex(options: { skipIfFresh?: boolean } = {}): Pro
       await Promise.all([
         rm(tempPath, { force: true }).catch(() => undefined),
         rm(metadataTemp, { force: true }).catch(() => undefined),
-        // Never delete an index already referenced by index.json.
-        ...(metadataPublished ? [] : [rm(finalPath, { force: true }).catch(() => undefined)]),
+        // Never delete index.nul: it may already be in use, even if metadata
+        // publication fails after the atomic replacement.
       ]);
       throw error;
     }
