@@ -11,9 +11,10 @@ export const LEGACY_GRACE_MS = 24 * 60 * 60 * 1000;
  */
 export async function publishIndex(tempPath: string, indexDirectory: string): Promise<void> {
   const activePath = path.join(indexDirectory, ACTIVE_INDEX_FILENAME);
+  const info = await stat(tempPath);
+  // Verify the complete staged data before touching the active file.
+  if (!info.isFile()) throw new Error("Staged index is not a regular file");
   await rename(tempPath, activePath);
-  const info = await stat(activePath);
-  if (!info.isFile()) throw new Error("Published index is not a regular file");
 }
 
 /**
