@@ -40,8 +40,8 @@ test("assisted dialog command uses Action.Paste and no UI automation or fd scan"
 
 test("dialog primary paste is exact selection; fallback paste uses parent folder", async () => {
   const view = await readFile(new URL("../src/search-files.tsx", import.meta.url), "utf8");
-  const exact = view.indexOf("content={getDialogNavigationPaths(filepath).selectedPath}");
-  const parent = view.indexOf("content={getDialogNavigationPaths(filepath).containingFolder}");
+  const exact = view.indexOf("getDialogNavigationPaths(filepath).selectedPath");
+  const parent = view.indexOf("getDialogNavigationPaths(filepath).containingFolder");
   assert.ok(exact >= 0 && parent >= 0 && exact < parent);
   assert.match(view, /Select File or Go to Folder/);
 });
