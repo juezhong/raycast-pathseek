@@ -9,7 +9,7 @@
 ## Features
 
 - **Persistent index with a 15-day refresh window** — First build manually via `Rebuild Index`. Once at least 15 days old, opening Search Files attempts a refresh, without a resident scheduler.
-- **Fuzzy or regex search** — `Search Files` provides fzf fuzzy matching and JavaScript regular expressions against full paths. Typing queries never invokes fd.
+- **One fzf search** — `Search Files` uses fzf extended matching against filenames and full paths. Supports fuzzy terms, exact terms, suffix/prefix matching, negation, and OR. Typing never invokes fd.
 - **Native Finder file icons and actions** — Folder icons and actual file-type icons; Open, Show in Finder, Open Containing Folder, Open With, Quick Look and Copy Absolute Path.
 - **Index Status** — See index metadata, open its actual support directory in Finder, and copy the full directory path.
 - **Debug Info** — Copy a privacy-safe diagnostics report with macOS, Raycast, Node.js and index-file consistency checks for GitHub Issues.
@@ -71,7 +71,7 @@ The index may contain private file names and paths; do not upload it to public G
 
 ### Search modes
 
-Choose **Fuzzy (fzf)** or **Regex (full path)** in the Search Files dropdown. Regex examples: `\.tsx?$` finds TypeScript extensions, and `src/.*/config` finds nested configuration paths. Regex matches **paths only, not file contents**.
+There is only **one Search Files mode**, powered by fzf. Its built-in extended-search syntax supports `report` (fuzzy), `'report` (exact substring), `.pdf$` (suffix), `!node_modules` (exclude), and `.ts$ | .tsx$` (OR). These are **fzf operators, not regular expressions**. Searches match indexed paths, not file contents. See the [fzf search syntax guide](https://junegunn.github.io/fzf/search-syntax/).
 
 ## Documentation
 
@@ -91,7 +91,7 @@ See [Developer Trace Guide (Chinese)](docs/developer-tracing.md) and [Issue #5 c
 
 ## Testing and feedback
 
-Use [Issue #1 — installation tests](https://github.com/juezhong/raycast-pathseek/issues/1) and [Issue #2 — 15-day refresh, regex and native icons](https://github.com/juezhong/raycast-pathseek/issues/2). Check off only behaviors you have actually verified and comment with reproducible steps and logs for failures.
+Use [Issue #1 — installation tests](https://github.com/juezhong/raycast-pathseek/issues/1) and [Issue #2 — 15-day refresh, fzf search and native icons](https://github.com/juezhong/raycast-pathseek/issues/2). Check off only behaviors you have actually verified and comment with reproducible steps and logs for failures.
 
 Build checks (require installed npm dependencies):
 
@@ -108,7 +108,7 @@ A `package-lock.json` file has not yet been generated and committed as part of a
 | --- | --- |
 | P1 — Upstream audit & scaffolding | Code submitted; Mac build verification pending |
 | P2 — 15-day refresh and safe index cleanup | Initial implementation; Mac verification pending |
-| P3 — Fuzzy / regex search and Finder native icons | Initial implementation; Mac verification pending |
+| P3 — Unified fzf search and Finder native icons | Initial implementation; Mac verification pending |
 | P4 — Open/Save Dialog Bridge | Not implemented |
 | P5 — Tests & Raycast Store submission | Not started |
 
