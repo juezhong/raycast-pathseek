@@ -1,0 +1,104 @@
+# PathSeek 本地开发、调试与测试
+
+> 本文针对当前 GitHub `main` 分支的开发版本；目前还缺少 macOS 用户的首轮实机反馈。
+
+## 1. 开发环境
+
+- macOS、Raycast 已安装且登录。
+- Node.js 22.14 或以上、npm 7 或以上。
+- Homebrew 安装的 `fd` 和 `fzf`：`brew install fd fzf`。
+- Git；建议用较小的测试目录，避免首次测试扫描整个主目录。
+
+Raycast 官方要求参考：[Getting Started](https://developers.raycast.com/basics/getting-started)。
+
+## 2. 获取和加载插件
+
+```bash
+git clone https://github.com/juezhong/raycast-pathseek.git
+cd raycast-pathseek
+npm install
+npm run dev
+```
+
+`npm run dev` 启动 Raycast 开发扩展，按 Raycast 搜索启动命令：
+
+1. **Index Status**：查看索引状态/复制目录，不触发扫描。
+2. **Rebuild Index**：手动触发 `fd` 扫描，第一次使用必须执行一次。
+3. **Search Files**：输入任意部分文件名、目录名或路径，搜索持久化索引。
+
+项目首次 `npm install` 会生成依赖锁文件。当前仓库尚未将实测产生的 `package-lock.json` 提交，正式发布前需加入并跑 CI。
+
+## 3. 设置搜索范围
+
+进入 Raycast → Extensions → PathSeek 偏好设置（菜单名称可能随 Raycast 版本变化）：
+
+| 参数 | 作用 | 示例 |
+| --- | --- | --- |
+| Search Roots | 分号或换行分隔多个绝对/用户目录 | `~/Projects;~/Downloads` |
+| Include Hidden Files | 重建时包含隐藏文件和目录 | 默认关闭 |
+| Follow Symbolic Links | 重建时进入软链接目录 | 默认关闭 |
+| Exclude Patterns | `fd --exclude`，多个模式以英文逗号分隔 | `.git,node_modules` |
+| fd Executable | 自动查找失败时填写 `fd` 绝对路径 | `/opt/homebrew/bin/fd` |
+| fzf Executable | 自动查找失败时填写 `fzf` 绝对路径 | `/opt/homebrew/bin/fzf` |
+
+**修改任何扫描参数后必须再次执行 Rebuild Index 才会生效。**
+
+## 4. 查看真实存储路径
+
+运行 **Index Status** → **Open Index Directory in Finder** 或 **Copy Index Directory Path**。
+
+路径来自 Raycast 的 `environment.supportPath`，不在 Git 仓库中，具体结构和只读检查方法见 [索引存储说明](index-storage.md)。
+
+## 5. 提交测试反馈
+
+测试任务：[Issue #1 — macOS/Raycast 安装与验收](https://github.com/juezhong/raycast-pathseek/issues/1)。
+
+请逐项勾选已通过项目；未通过的直接评论：
+
+```text
+macOS 版本：
+Raycast 版本：
+Node.js 版本：
+测试位置/功能：
+实际行为：
+预期行为：
+错误日志：
+复现步骤：
+```
+
+日志中如包含用户主目录名称、项目敏感名称、绝对路径和凭证，请先脱敏。**不要上传完整索引文件到公开 Issue。**
+
+## 6. 构建与排查
+
+```bash
+npm run lint
+npm run build
+```
+
+如出现模块或 API 类型错误，优先贴出完整第一条报错及堆栈；不要先随意升级全部依赖。
+
+常见故障定位：
+
+| 问题 | 检查点 |
+| --- | --- |
+| `fd` / `fzf` 无法找到 | `command -v fd`、`command -v fzf`；在偏好设置中配置绝对路径 |
+| 找不到搜索结果 | 先确认已构建索引，且指定目录/排除规则允许访问目标路径 |
+| 修改搜索范围后结果仍旧 | 手动运行 `Rebuild Index` |
+| 找不到数据存储位置 | `Index Status` 复制支持目录路径 |
+| 部分目录无法读取 | 检查 Raycast 的文件访问权限、磁盘挂载与权限错误 |
+| Finder 成功但 Open/Save 对话框未联动 | Dialog Bridge 尚未实现，属于后续阶段 |
+
+## 7. 当前限制和后续开发
+
+- **不自动刷新索引**；只有用户运行 Rebuild Index 时才遍历配置的目录。
+- 查询时不会运行 `fd`；`fzf` 按查询读取索引，可能发生内存/缓存/SSD 读取。
+- 索引文件内含绝对路径，按普通本地文件处理，而非 Raycast 加密数据库。
+- P4 对话框导航、跨应用兼容、自动下载依赖与正式发布工作尚未完成。
+- 本地试用不代表 Raycast Store 的发布验收已经通过。
+
+### 相关文档
+
+- [英文 README](../README.md) / [中文 README](../README.zh-CN.md)
+- [总体架构](architecture.md)
+- [索引文件格式](index-storage.md)
+- [开发计划](../plans/pathseek-development/task_plan.md)
