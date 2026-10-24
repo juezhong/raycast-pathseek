@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { beginCommandTrace } from "./command-trace";
 import { openIndexDataStream } from "./index-files";
 import { findBinary, getPreferences, indexFilePath, type IndexMetadata } from "./index-store";
 
@@ -17,8 +18,12 @@ export async function fuzzySearch(
 
   const binary = await findBinary("fzf", getPreferences().fzfBinary);
   const input = await openIndexDataStream(indexFilePath(index));
+  // Actual argv contains the search query; never write it to the trace.
+  const trace = await beginCommandTrace("fzf", "fuzzy-query", "fzf --read0 --print0 --filter <redacted>");
+  let exitCode: number | null | undefined;
 
-  return await new Promise<string[]>((resolve, reject) => {
+  try {
+    const output = await new Promise<string[]>((resolve, reject) => {
     const results: string[] = [];
     let pending = Buffer.alloc(0);
     let limited = false;
@@ -74,11 +79,18 @@ export async function fuzzySearch(
     });
 
     child.once("close", (code) => {
+      exitCode = code;
       if (signal?.aborted || limited || code === 0 || (code === 1 && !stderr)) {
         finish();
       } else {
         finish(new Error(`fzf failed (exit ${code}): ${stderr.trim()}`));
       }
     });
-  });
+    });
+    await trace?.finish(signal?.aborted ? "cancelled" : "success", output.length, exitCode);
+    return output;
+  } catch (error) {
+    await trace?.finish(signal?.aborted ? "cancelled" : "failure", undefined, exitCode, error);
+    throw error;
+  }
 }
