@@ -70,6 +70,27 @@ Node.js 版本：
 
 优先从 Raycast 执行 **Debug Info → Copy Sanitized Debug Info**，粘贴到 Issue 评论；如果还要贴原始日志，请注意其中可能包含用户主目录名称、项目敏感名称、绝对路径和凭证，必须先脱敏。**不要上传完整索引文件到公开 Issue。**
 
+## 开发者 fd / fzf 调用追踪
+
+开发版可在偏好设置中开启 **Developer: Trace fd/fzf Calls**（默认关闭）。开启后，通过 **Debug Info → Refresh Diagnostics** 查看最近 fd/fzf 子进程调用的时间、触发原因、参数形态、执行结果与耗时。
+
+**普通搜索不应调用 fd**；Fuzzy 模式由 fzf 查询现有索引；Regex 模式不调用 fzf。追踪只在显式开启时写入本地脱敏日志，详见 [开发者追踪说明](developer-tracing.md)。
+
+### 在独立工作目录测试未合并 PR #3
+
+以下命令不会改变原始 main 工作目录：
+
+```bash
+cd /path/to/raycast-pathseek
+git fetch origin
+git worktree add --detach ../raycast-pathseek-pr3 origin/fix/stable-index-file-atomic-swap
+cd ../raycast-pathseek-pr3
+npm install
+npm run dev
+```
+
+PR #3 仍为 Draft，运行此分支测试并不等于它已经合并。请先退出其他工作目录的开发服务，以免两份同名扩展混淆。验证后在 [Issue #5](https://github.com/juezhong/raycast-pathseek/issues/5) 或 [PR #3](https://github.com/juezhong/raycast-pathseek/pull/3) 留下记录。
+
 ## 6. 构建与排查
 
 ```bash
