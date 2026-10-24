@@ -1,4 +1,4 @@
-import { createReadStream } from "node:fs";
+import { openIndexDataStream } from "./index-files";
 import { indexFilePath, type IndexMetadata } from "./index-store";
 
 const MAX_RESULTS = 150;
@@ -18,7 +18,7 @@ export async function regexSearch(
 
   // Do not use the global flag: matching each path must be independent.
   const regex = new RegExp(query, "iu");
-  const stream = createReadStream(indexFilePath(index), { signal });
+  const stream = await openIndexDataStream(indexFilePath(index));
   const results: string[] = [];
   let pending = Buffer.alloc(0);
 
