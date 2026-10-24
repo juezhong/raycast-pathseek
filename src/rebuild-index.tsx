@@ -1,39 +1,171 @@
-import { Action, ActionPanel, Detail, Icon } from "@raycast/api";
+import { Action, ActionPanel, Detail, Form, Icon, showToast, Toast, useNavigation } from "@raycast/api";
 import { useEffect, useState } from "react";
-import { rebuildIndex, type IndexMetadata } from "./lib/index-store";
+import { getConfiguredIndexRoots, saveConfiguredIndexRoots } from "./lib/index-roots";
+import { readIndex, rebuildIndex, type IndexMetadata } from "./lib/index-store";
+
+type Mode = "loading" | "configure" | "ready" | "building";
+
+function ChooseFolders({
+  initialRoots,
+  actionTitle,
+  onSave,
+}: {
+  initialRoots: string[];
+  actionTitle: string;
+  onSave: (roots: string[]) => void | Promise<void>;
+}) {
+  const [saving, setSaving] = useState(false);
+
+  async function submit(values: { folders: string[] }) {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const roots = await saveConfiguredIndexRoots(values.folders);
+      await onSave(roots);
+    } catch (error) {
+      await showToast({ style: Toast.Style.Failure, title: "Could Not Save Folders", message: String(error) });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Form
+      isLoading={saving}
+      actions={
+        <ActionPanel>
+          <Action.SubmitForm title={actionTitle} icon={Icon.Folder} onSubmit={submit} />
+        </ActionPanel>
+      }
+    >
+      <Form.Description text="Select one or more directories. PathSeek never scans until you explicitly choose to build an index. Change them later with Cmd+K in Rebuild Index." />
+      <Form.FilePicker
+        id="folders"
+        title="Index Folders"
+        defaultValue={initialRoots}
+        allowMultipleSelection
+        canChooseDirectories
+        canChooseFiles={false}
+      />
+    </Form>
+  );
+}
+
+function ChangeFolders({ roots, onSave }: { roots: string[]; onSave: (paths: string[]) => void }) {
+  const { pop } = useNavigation();
+  return (
+    <ChooseFolders
+      initialRoots={roots}
+      actionTitle="Save Selected Folders"
+      onSave={(paths) => {
+        onSave(paths);
+        pop();
+      }}
+    />
+  );
+}
 
 export default function RebuildIndex() {
-  const [running, setRunning] = useState(true);
-  const [result, setResult] = useState<IndexMetadata>();
+  const [mode, setMode] = useState<Mode>("loading");
+  const [roots, setRoots] = useState<string[]>([]);
+  const [current, setCurrent] = useState<IndexMetadata | null>(null);
   const [error, setError] = useState<string>();
 
   useEffect(() => {
-    let active = true;
-    // Rebuild Index 是单独的显式命令；普通 Search Files 不会调用 fd。
-    rebuildIndex()
-      .then((metadata) => { if (active) setResult(metadata); })
-      .catch((failure: unknown) => { if (active) setError(String(failure)); })
-      .finally(() => { if (active) setRunning(false); });
-    return () => { active = false; };
+    let mounted = true;
+    async function initialize() {
+      try {
+        const metadata = await readIndex();
+        const configured = await getConfiguredIndexRoots(metadata?.roots);
+        if (!mounted) return;
+        setCurrent(metadata);
+        setRoots(configured);
+        setMode(configured.length ? "ready" : "configure");
+      } catch (failure) {
+        if (mounted) {
+          setError(String(failure));
+          setMode("configure");
+        }
+      }
+    }
+    void initialize();
+    return () => { mounted = false; };
   }, []);
 
-  const markdown = error
-    ? `# Rebuild Failed\n\n${error}\n\nThe previously published index remains available. Review your configured roots, exclusions, and the \`fd\` executable.`
-    : result
-      ? `# Index Rebuilt\n\n- **Paths:** ${result.count.toLocaleString()}\n- **Updated:** ${new Date(result.createdAt).toLocaleString()}\n- **Search Roots:**\n${result.roots.map((root) => `  - \`${root}\``).join("\n")}\n\nOpen **Search Files** to query this index. Rebuilding is manual only.`
-      : "# Building Index\n\nScanning configured directories with `fd`. The existing index stays available while the new index is built.\n\nFor very large directories this may take some time.";
+  async function buildIndex(selectedRoots: string[]) {
+    setError(undefined);
+    setMode("building");
+    try {
+      // ONLY this user-initiated action invokes fd.
+      const metadata = await rebuildIndex(selectedRoots);
+      setCurrent(metadata);
+      await showToast({
+        style: Toast.Style.Success,
+        title: "Index Built Successfully",
+        message: metadata.count.toLocaleString() + " paths indexed",
+      });
+    } catch (failure) {
+      setError(String(failure));
+      await showToast({ style: Toast.Style.Failure, title: "Index Build Failed", message: String(failure) });
+    } finally {
+      setMode("ready");
+    }
+  }
+
+  if (mode === "configure") {
+    return (
+      <ChooseFolders
+        initialRoots={roots}
+        actionTitle="Choose Folders and Build Index"
+        onSave={(chosen) => {
+          setRoots(chosen);
+          void buildIndex(chosen);
+        }}
+      />
+    );
+  }
+
+  const markdown =
+    mode === "loading"
+      ? "# Rebuild Index\n\nReading saved folders. No scan will start automatically."
+      : mode === "building"
+        ? "# Building Index\n\nRunning fd on your selected folders. The previous index stays available until the new one is complete."
+        : [
+            "# Rebuild Index",
+            "",
+            "**Indexing is manual only.** Opening this command, Search Files or Index Status never starts a scan.",
+            "",
+            "**Selected folders**",
+            roots.length ? roots.map((root) => "- " + root).join("\n") : "No folders selected.",
+            "",
+            current
+              ? "Last successful build: **" + new Date(current.createdAt).toLocaleString() +
+                "** · **" + current.count.toLocaleString() + "** indexed paths."
+              : "No index exists. Select folders and explicitly build your first index.",
+            "",
+            "Use **Cmd+K → Change Indexed Folders** to choose different directories. Saving a new selection does not automatically rebuild.",
+            ...(error ? ["", "## Last Error", error] : []),
+          ].join("\n");
 
   return (
     <Detail
-      isLoading={running}
+      isLoading={mode === "loading" || mode === "building"}
       markdown={markdown}
-      actions={
-        result ? (
-          <ActionPanel>
-            <Action.CopyToClipboard title="Copy Index Summary" content={JSON.stringify(result, null, 2)} icon={Icon.CopyClipboard} />
-          </ActionPanel>
-        ) : undefined
-      }
+      actions={mode === "ready" ? (
+        <ActionPanel>
+          <Action
+            title="Rebuild Index Now"
+            icon={Icon.ArrowClockwise}
+            onAction={() => void buildIndex(roots)}
+          />
+          <Action.Push
+            title="Change Indexed Folders"
+            icon={Icon.Folder}
+            target={<ChangeFolders roots={roots} onSave={setRoots} />}
+          />
+          {current && <Action.CopyToClipboard title="Copy Index Summary" content={JSON.stringify(current, null, 2)} icon={Icon.CopyClipboard} />}
+        </ActionPanel>
+      ) : undefined}
     />
   );
 }
