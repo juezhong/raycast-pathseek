@@ -124,4 +124,6 @@ A `package-lock.json` file has not yet been generated and committed as part of a
 
 Press **Cmd+Shift+G** in the original panel first, search with PathSeek, and press **Return** to paste the **full selected path**. Confirm Go to Folder in the original dialog. Standard Open dialogs may highlight a full file path, but this must be verified on the user's Mac and may vary by app. Use **Cmd+K → Go to Containing Folder (Fallback)** to navigate to the parent directory instead.
 
-There is **no automatic dialog detection, window manager, accessibility automation, background agent, or automatic Open/Save confirmation**. See [simple instructions](docs/open-save-dialog.md) and [Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7).
+There is **no automatic dialog detection, window manager, accessibility automation, background agent, or automatic Open/Save confirmation**. **Faster launch:** Assign **Search in Open/Save Dialog** its own global hotkey in Raycast Settings → Shortcuts (for example `Ctrl+Option+G`, if available). Then use `Cmd+Shift+G` in the original dialog followed by your PathSeek hotkey to search immediately, skipping Raycast Root Search. Do not override the system `Cmd+Shift+G` shortcut with the same Raycast hotkey, as doing so may prevent Go to Folder from appearing. No automatic window manager is needed.
+
+See [simple instructions](docs/open-save-dialog.md), [Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7) and [Issue #10: hotkey workflow](https://github.com/juezhong/raycast-pathseek/issues/10).
