@@ -106,6 +106,7 @@
     "dev": "ray develop",
     "build": "ray build",
     "lint": "ray lint",
-    "publish": "npx @raycast/api@latest publish"
+    "publish": "npx @raycast/api@latest publish",
+    "test": "node --experimental-strip-types --test tests/index-files.test.mjs"
   }
 }
