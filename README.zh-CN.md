@@ -87,6 +87,12 @@ PathSeek 使用 Raycast 官方提供的 `environment.supportPath`，而不是存
 | [开发计划与验收](plans/pathseek-development/task_plan.md) | 开发阶段、任务状态、交付与验收 |
 | [English README](README.md) | 英文使用说明 |
 
+### 开发者专用 fd/fzf 调用追踪
+
+在 Raycast 的 PathSeek 偏好设置里开启 **Developer: Trace fd/fzf Calls**（默认关闭），然后运行 **Rebuild Index** 或 Search Files 的 Fuzzy 模式；在 **Debug Info** 中查看调用时间、调用原因、参数结构、耗时、退出状态与匹配/索引条目数，并可复制脱敏报告。关闭后不会为正常搜索写入诊断日志。
+
+详见 [开发者命令追踪说明](docs/developer-tracing.md) 与 [Issue #5 追踪验收](https://github.com/juezhong/raycast-pathseek/issues/5)。
+
 ## 测试与问题反馈
 
 请使用 [Issue #1：初版安装与测试](https://github.com/juezhong/raycast-pathseek/issues/1) 与 [Issue #2：15 天更新、正则搜索及图标](https://github.com/juezhong/raycast-pathseek/issues/2)。
