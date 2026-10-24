@@ -80,7 +80,8 @@ export default function RebuildIndex() {
         if (!mounted) return;
         setCurrent(metadata);
         setRoots(configured);
-        setMode(configured.length ? "ready" : "configure");
+        // Missing index always gets the folder picker, even if a prior selection was saved.
+        setMode(metadata && configured.length ? "ready" : "configure");
       } catch (failure) {
         if (mounted) {
           setError(String(failure));
