@@ -1,50 +1,37 @@
-# P4：在原应用 Open/Save 文件对话框中导航
+# Open/Save 文件选择：快速定位文件或进入目录
 
-> 当前分支 `feat/p4-assisted-open-save-navigation`：**P4.1 辅助导航候选实现**，尚未合并 main，macOS GUI 尚未由维护者实测。终极目标 P4.2（一键判断并导航当前标准面板）尚未实现。
+**产品目标只保留两件事：** 在原来的 macOS Open 对话框里搜索并快速选中一个文件；或在 Open/Save 对话框里搜索并进入一个文件夹。不做 Listary 式活动窗口监控、自动弹出文件管理器、Accessibility helper 或后台服务。
 
-## P4.1 — 不依赖 Accessibility 的安全工作流
+本文件描述 Draft PR #8（尚未合并 main），界面行为仍需用户 Mac 验收。
 
-PathSeek 使用 Raycast 官方 `Action.Paste` 将目录路径发送给此前正在输入的应用。**不会触发新的 Finder 窗口，不会模拟快捷键，也不会触发 Open/Save 按钮。**
+## 操作步骤（尽量少的按键）
 
-在 TextEdit、Preview 或其他有标准 macOS 文件对话框的应用尝试：
+1. 先在需要选文件的**原应用 Open 对话框**里按 **⌘⇧G**，打开「前往文件夹」输入框。
+2. 呼出 Raycast → **Search in Open/Save Dialog**，搜索想要的文件或文件夹。
+3. 选中 PathSeek 结果后按 **Return**：将所选结果的**完整绝对路径**粘贴回原应用的输入框。
+4. 回到原应用手动按 **Return**。若输入的是文件夹，应进入该目录；若是文件，标准 macOS Open 对话框可能定位并选中该文件。此文件选择行为需在用户 macOS 15.1.1 上确认；不同应用可能不同。
+5. 手动检查结果，需要时才自行点击 **Open**、**Save**；PathSeek 不代替用户提交操作。
 
-1. 在**原应用**打开一个 **Open** 或 **Save As** 对话框。
-2. 在那个对话框按 **⌘⇧G**（Go to Folder / 前往文件夹），保持输入框处于焦点。
-3. 呼出 Raycast，执行新命令 **Search in Open/Save Dialog**。可以在 Raycast 设置里为它分配一个自己喜欢的热键。
-4. 输入搜索词并选定索引结果，按 **Return** 触发第一项 **Paste Containing Folder into Go to Folder**。
-5. Raycast 关闭并尝试把选中结果的**父文件夹路径**粘贴到原应用的 Go to Folder 输入框。由你手动按 **Return** 在原文件对话框里导航，然后选择要打开/保存的项目。
-6. 如果搜索到的结果本身是**文件夹**，可以用 **⌘K → Paste Selected Path (For Folder Results)**，将该文件夹的完整路径粘贴到原对话框，而不是父目录。
+如果完整文件路径在某个应用不适用，可按 **⌘K → Go to Containing Folder (Fallback)**，先进入该文件所在目录，再手动选文件。保存文件时通常也是进入目标文件夹，不自动填写或覆盖保存文件名。
 
-### 为什么默认粘贴父文件夹？
+## 技术实现保持简单
 
-持久化索引存储的是绝对路径，并没有把“文件或目录”类型作为必备字段。在所有查询结果上先同步 stat 会增加文件系统 I/O，违背普通搜索的性能目标。对已选**文件**，粘贴父文件夹可以定位到该文件所在位置；对已选**目录**，第二个动作可粘贴其本身。之后可考虑索引文件类型或按需状态检查。
+- 新增一个 `Search in Open/Save Dialog` 命令，复用原 Search Files 的已有持久索引和 fzf 模糊搜索。
+- Raycast `Action.Paste` 只粘贴文本，**默认完整路径**、备用父目录；无独立正则、无 `fd` 自动构建。
+- 不识别活动文件面板、不调用 AppleScript、Swift helper、Accessibility API、不发送模拟按键，不增加常驻进程。
+- 原有 Search Files 的 Finder/Open Actions 不变。
+- **必须在 ⌘⇧G 的输入框已经聚焦时启动 Raycast**。否则可能将文本粘贴到错误的输入区域；这一阶段不做自动焦点控制。
+- 只面向标准 macOS Open/Save 对话框及支持 Go to Folder 的应用；其他自定义面板不保证适用。也不承诺文件路径一定能在每种应用中被选中。
+- 只有用户手动 Rebuild Index 才扫描目录；旧索引中已删除的文件可能不能定位。
 
-### P4.1 明确的限制
+## 验收和范围
 
-- 必须**先由用户按 ⌘⇧G**，确保目标 Go to Folder 文本框已经存在且被聚焦；插件此阶段不会自动打开该框。
-- 粘贴目标是用户此前的前台输入位置；如果焦点不在 Go to Folder，文字可能被粘贴到其他输入框。操作前应确认焦点。
-- 粘贴路径**不代表导航已成功**；仍需用户手动在原对话框确认「前往文件夹」。
-- 不检测 NSOpenPanel / NSSavePanel 是否存在，也不能保证所有第三方应用的自定义对话框支持该快捷键。
-- PathSeek 不读取剪贴板历史、不用 AppleScript、不申请 Accessibility、无后台进程，不在搜索过程中执行 fd。
-- 如果索引中的路径已被移除，Go to Folder 可能无法找到对应文件夹；手动 Rebuild Index 可更新索引。
+- [Issue #7：只需简单 Mac 操作](https://github.com/juezhong/raycast-pathseek/issues/7)：一个文件的定位/选中、一个目录的进入、回到原应用以及不自动打开/保存。
+- [PR #8](https://github.com/juezhong/raycast-pathseek/pull/8)：代码及 CI；Draft 状态等待 Mac 实测，不会自动合并。
+- 原先的 P4.2「主动识别并自动操作当前文件面板」已按维护者要求**取消/不在产品范围内**，不会作为后续必需里程碑。
 
-## P4.2 — 正式的一键原位导航（下一阶段）
+## 参考
 
-完整 Listary 风格需要从 Raycast 中确定**用户原来的应用及活动文件面板**，而不是猜测当前焦点。后续将单独调查/验证：
-
-1. 应用切换时的原应用识别：Raycast 显示后，“当前最前应用”通常不再是打开面板的应用；不能随意把键盘事件送给 Finder 或最近使用的任意应用。
-2. macOS Accessibility 权限、AXUIElement 的目标窗口/控件状态和失效处理。权限应由用户自愿授予，失败时不产生键盘输入。
-3. 标准 NSOpenPanel/NSSavePanel 与自定义面板分别定义支持等级；不得把所有应用一概标记兼容。
-4. 仅在可信的已识别文件面板执行「前往文件夹」，绝不自动点击 **Open / Save / Replace**，也不覆盖用户选择。
-5. 制定可复现的 Mac 测试矩阵：至少一个 Open、一个 Save As；输入法、中文路径、多个窗口、权限拒绝、无文件面板、取消操作都需要验证。
-
-P4.2 不应该在未验证目标面板识别前简单用 AppleScript `System Events keystroke` 向任意活动窗口注入字符。
-
-## 官方依据
-
-- [Apple：macOS 快捷键，包括 ⌘⇧G 前往文件夹](https://support.apple.com/zh-cn/102650)
-- [Raycast：Action.Paste（关闭 Raycast 窗口并粘贴至之前的应用）](https://developers.raycast.com/api-reference/user-interface/actions)
-- [Apple：AXIsProcessTrustedWithOptions（后续 Accessibility 权限评估）](https://developer.apple.com/documentation/applicationservices/1459186-axisprocesstrustedwithoptions)
-- [Apple：NSSavePanel（标准保存面板）](https://developer.apple.com/documentation/AppKit/NSSavePanel)
-
-相关源码：`src/dialog-search.tsx`、`src/search-files.tsx`、`src/lib/dialog-navigation.ts`。
+- [Apple：macOS 前往文件夹](https://support.apple.com/en-euro/guide/mac-help/mchlp1236/mac)
+- [Raycast：Action.Paste](https://developers.raycast.com/api-reference/user-interface/actions)
+- [macOS 社区：Open 对话框可使用完整文件路径的经验](https://superuser.com/questions/1538458/is-it-possible-to-paste-the-file-path-into-open-file-dialog-in-macos/1538558)（非所有应用的官方保证）
