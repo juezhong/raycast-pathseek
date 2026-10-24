@@ -1,7 +1,7 @@
 # Findings — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-fzf-only-06
+- Checkpoint ID: pathseek-20261024-mac-log-limit-07
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Evidence: [首轮 Code Review](../../docs/reviews/2026-10-24-initial-code-review.md) · [质量 Issue #4](https://github.com/juezhong/raycast-pathseek/issues/4) · [Draft PR #3](https://github.com/juezhong/raycast-pathseek/pull/3)
@@ -104,3 +104,18 @@
 
 ## Latest Next Step (pathseek-20261024-fzf-only-06)
 请维护者继续在 Mac 上用 Draft PR #3 独立 worktree 验收单一 fzf 搜索（含 .pdf$、'report、!node_modules、OR）、fd/fzf 调用追踪和索引重建；根据 Issue #2 / #5 实测与剩余 Code Review 风险决定 PR #3 是否 Ready / 合并。
+
+## 2026-10-24 — 用户真实 Mac 诊断与严格 150 条结果上限（pathseek-20261024-mac-log-limit-07）
+
+- 用户直接在会话中提供 PathSeek 的**脱敏 Mac 实测日志**并确认本轮修改正确：macOS 15.1.1、arm64、Raycast 1.104.32、Raycast Node v22.23.4。
+- v2 embedded header，index.nul 文件存在，大小 716460 B；meta.count=7975，root directories=1，index generation files=1，最近重建 2026-10-24T09:46:14.143Z。
+- fzf extended fuzzy-query 样本通常 15–19 ms（部分 cancelled 约 8–16 ms），未发现本段普通查询期间额外 fd 调用。**该样本不等于全生命周期绝对不会启动 fd**，未测试 15 天过期。
+- 发现明确回归 bug：尽管 `MAX_RESULTS=150`，诊断记录仍出现 151、152、159 条；原因是达到上限 kill fzf 后，排队中的 stdout data 回调继续追加 `results`。
+- 修复仅提交 PR #3（未合并 main）：新增 `src/lib/fzf-output.ts` 将 NUL 流解析与严格上限抽为独立模块；`src/lib/fuzzy-search.ts` 对达到上限后的 stdout 块立即停止解析；正常主动 SIGTERM 改记 `limit-reached`（即便 exitCode=null），区别于 failure。
+- 新增 `tests/fzf-output.test.mjs` 四个回归测试，覆盖一次返回 159、分多批输入超过 150、UTF-8 文件名跨数据块、空项处理；npm test 改为运行 tests/*.test.mjs。
+- GitHub Actions 最新 PR #3 commit `f401e30bacefda2c7d57089d9f4289dba6607682` 已确认 completed/success，索引单测、fzf parser、TypeScript、源码 ESLint、Raycast build 均通过。Raycast Store 审核仍独立/非阻塞。
+- [Issue #2](https://github.com/juezhong/raycast-pathseek/issues/2) 现有 **10 项通过、10 项待验证**；[Issue #5](https://github.com/juezhong/raycast-pathseek/issues/5) **8 项通过、6 项待验证**，没有把极端异常和长周期测试擅自标为通过。用户提供的是脱敏日志，公开文档只记录安全的指标。
+- 仍需用户重测 `limit-reached, results=150`，不应宣称这轮新增修复已经在 Mac 上验证。PR #3 保持 Draft。
+
+## Active Next Step (pathseek-20261024-mac-log-limit-07)
+用户在 Mac 上更新 PR #3 独立 worktree，搜索一个能匹配超过 150 条路径的词，检查 Debug Info 最新记录为 limit-reached / results=150（不再有 151–159）；通过后对 Draft PR #3 进行最终 Code Review 与剩余 P1 风险评估，再征得用户明确同意后考虑合并 main。
