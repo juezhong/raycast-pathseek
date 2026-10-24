@@ -1,7 +1,7 @@
 # Progress — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-fzf-only-06
+- Checkpoint ID: pathseek-20261024-mac-log-limit-07
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Branch: main
@@ -110,3 +110,16 @@
 
 ## Latest Next Step (pathseek-20261024-fzf-only-06)
 请维护者继续在 Mac 上用 Draft PR #3 独立 worktree 验收单一 fzf 搜索（含 .pdf$、'report、!node_modules、OR）、fd/fzf 调用追踪和索引重建；根据 Issue #2 / #5 实测与剩余 Code Review 风险决定 PR #3 是否 Ready / 合并。
+
+### 2026-10-24 — Mac 实测通过、发现 fzf >150 截断问题并提交修复（pathseek-20261024-mac-log-limit-07）
+
+- 用户直接提供脱敏诊断日志：macOS 15.1.1 / arm64、Raycast 1.104.32、Raycast Node v22.23.4；v2 单文件 index.nul 存在，716460B，7975 条路径，单根目录、当前索引代数 1。
+- 用户确认功能正常；观察到 fzf 查询多数 15–19ms；搜索追踪窗口无 fd，快速输入出现正常 cancelled 记录。
+- 从用户日志发现明确 Bug：`MAX_RESULTS=150`，但结果出现 151、152、159，原因是停止进程后仍可能收到排队 stdout 数据块。
+- Draft PR #3 新增 `src/lib/fzf-output.ts` 实施严格上限并忽略延迟输出；`src/lib/command-trace.ts` 新增 `limit-reached` 标识正常主动终止，`exit=null` 不必表示失败；增加 4 个单元回归测试，npm test 包含全部测试。
+- 最新 GitHub Actions commit `f401e30bacefda2c7d57089d9f4289dba6607682` completed/success：索引测试、fzf parser、TypeScript、源码 ESLint 与 Raycast build。
+- 已更新 Issue #2 **10 项通过/10 项待验**、Issue #5 **8 项通过/6 项待验**，没有把 15 天到期、异常或模拟崩溃擅自标为通过；在 PR #3 记录实测和修复：https://github.com/juezhong/raycast-pathseek/pull/3#issuecomment-6382793618
+- 尚未由用户在 Mac 验证这次新增的严格截断修复；PR #3 保持 Draft，未合并 main；Raycast 作者与完整 Store lint 留到发布前处理。
+
+## Active Next Step (pathseek-20261024-mac-log-limit-07)
+用户在 Mac 上更新 PR #3 独立 worktree，搜索一个能匹配超过 150 条路径的词，检查 Debug Info 最新记录为 limit-reached / results=150（不再有 151–159）；通过后对 Draft PR #3 进行最终 Code Review 与剩余 P1 风险评估，再征得用户明确同意后考虑合并 main。
