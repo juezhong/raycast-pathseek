@@ -1,7 +1,7 @@
 # Findings — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-v010-stable-direct-paste-17
+- Checkpoint ID: pathseek-20261024-p5-release-audit-18
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Evidence: [首轮 Code Review](../../docs/reviews/2026-10-24-initial-code-review.md) · [质量 Issue #4](https://github.com/juezhong/raycast-pathseek/issues/4) · [Draft PR #3](https://github.com/juezhong/raycast-pathseek/pull/3)
@@ -257,3 +257,19 @@ Raycast 扩展官方 Manifest 不支持自动分配全局 Hotkey，也没有稳�
 
 ## Active Next Step (pathseek-20261024-v010-stable-direct-paste-17)
 已创建并核实不可变的 annotated Git Tag v0.1.0（target 9cf81375c059762f22c2d7973b25f302337a6155），记录用户 Mac 实测通过的 PathSeek 稳定开发基线，非 Raycast Store 正式发布。维护者确认原应用 Open/Save 对话框可以仅按已设置的 ⌘⇧F 启动 Search in Open/Save Dialog，然后搜索并 Return 粘贴路径，正确选中文件或进入目录，无需先按 ⌘⇧G；该键保留为不兼容应用的手动后备。Issue #7 目前 6/7 通过，仅父目录备用 Action 未报告使用；Issue #10 已更新单键实测。后续只跟随用户实际问题做必要的性能/交互优化；不做自动窗口管理或系统按键注入。
+
+## 2026-10-24 — 发布可行性复核：核心已完成，进入 P5 上架收尾（pathseek-20261024-p5-release-audit-18）
+
+- 用户询问是否核心开发已完成、是否只需 README/插件描述与文件清理就能发布。已核对 main、计划和 macOS CI；结论是 **P2/P3/P4 核心功能已满足既定 MVP 目标，进入 Raycast Store 发布准备**，但**不是仅调整文案就可立即上架**。
+- 三份规划文件在上一检查点 `pathseek-20261024-v010-stable-direct-paste-17` 已一致并可回读；本检查点更新阶段至 P5。v0.1.0 已带注释 Tag，供回退/对照；Raycast Store 还未正式发布。
+- 最近一次 main 相关成功 CI（commit `540cb5133b6ca8b7a86a5d43747b1129e8a59dcc`, run `40091452267`）记录 `npm test` **24/24 pass**、TypeScript、源码 ESLint（0 errors/2 warnings）、`ray build` 成功。但 `npm run lint` 通过 `continue-on-error` 非阻塞运行，实际**失败**：manifest `author: juezhong` 的 Raycast API 验证 404、多个 Prettier style errors。不能称完整上架校验通过。
+- `package.json` title 当前 `PathSeek – File Navigator`、description 仍主要说“manual index/fzf/Finder actions”，没有充分表达已经 Mac 验证的 Open/Save 选文件/目录场景；命令 `dialog-search` 推荐手动设置全局 `⌘⇧F`（Raycast 不能自动预设）。
+- 中英文 README 顶部仍有 **Early development / Dialog Bridge not implemented** 历史句子，和末尾正确的“P4 已合并并 Mac 验证”自相矛盾；正式商店用户必须看到统一的现行描述。
+- `assets/extension-icon.png` 仍为上游临时图标（README/THIRD_PARTY_NOTICES 有披露）。Raycast 官方要求 512×512 PNG、深浅主题可读，不能保留默认/临时图标；应换原创图标。
+- Raycast Store 官方规格：https://developers.raycast.com/basics/prepare-an-extension-for-store ：Raycast 有效账户 author、MIT、最新 API、含 npm package-lock、发布构建/全量 lint；截图最多 6 张、推荐至少 3 张（2000×1250 PNG），非简单情形推荐 README；CHANGELOG 可展示版本记录。当前缺少 `CHANGELOG.md` 与 `media/` 的 Store 截图。
+- `fd`、`fzf` 是用户本地执行的外部 binary，当前缺失时报错 `Cannot locate ... Run 'brew install fd fzf'...`，但 Store 官方建议**尽量减少手工下载安装**，使用 binary 时考虑来源及完整性核验；应核对新手引导清晰度/审核兼容性，不擅自新增联网下载或自动索引。来源：https://developers.raycast.com/basics/prepare-an-extension-for-store#binary-dependencies-and-additional-configuration
+- Raycast 官方上架方式：https://developers.raycast.com/basics/publish-an-extension ：在充分验证后执行 `npm run publish` 创建 Raycast 官方 `raycast/extensions` 审核 PR；通过审核并合并后才算正式发布。本仓库 v0.1.0 Tag **不等于 Store 发布**。
+- 已创建 [Issue #11](https://github.com/juezhong/raycast-pathseek/issues/11) 统一 P5 收尾清单。用户明确决定 Raycast Store author 身份延迟到实际发布步骤，因此现在**不索取**用户名、不猜测/虚构。旧 Issue #4 的强杀故障/类型筛选列为后续增强，不让用户跑高风险测试。
+
+## Active Next Step (pathseek-20261024-p5-release-audit-18)
+正式进入 P5 Raycast Store 发布准备，以 Issue #11 为单一收尾清单。先在独立分支整理中英 README 和 package.json 文案、替换上游临时图标、检查缺少 fd/fzf 时的首次安装引导；之后修复 Prettier 与 Raycast 全量 lint，制作不含隐私的截图/CHANGELOG 并跑全套 macOS 检查。按维护者决定，Raycast Store author 的实际账户身份留到**正式提交前**处理；未经用户明确授权不执行 npm run publish。不再为已完成的 P2/P3/P4 增加自动窗口管理或强制用户进行底层故障注入测试。
