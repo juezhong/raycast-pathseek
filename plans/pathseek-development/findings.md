@@ -1,8 +1,8 @@
 # Findings — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-review-02
-- Last Updated: 2026-10-24T08:45:49.982Z
+- Checkpoint ID: pathseek-20261024-pr3-v2-03
+- Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Evidence: [首轮 Code Review](../../docs/reviews/2026-10-24-initial-code-review.md) · [质量 Issue #4](https://github.com/juezhong/raycast-pathseek/issues/4) · [Draft PR #3](https://github.com/juezhong/raycast-pathseek/pull/3)
 
@@ -52,3 +52,19 @@
 
 ## Next Step
 在 Draft PR #3（fix/stable-index-file-atomic-swap）中修复 CR-01：为 index.nul 与 index.json 的分步发布设计可恢复提交协议，添加“数据发布成功而元数据发布失败”的故障注入测试；完善 npm run build/lint 的 CI 门槛，验证后再决定是否合并 PR。
+
+
+## 2026-10-24 — CR-01 质量门槛修复方案落地（Draft PR #3，pathseek-20261024-pr3-v2-03）
+
+- 发现原双文件协议（先 index.nul，再 index.json）存在数据与元信息分步提交导致的崩溃一致性缺陷；现在 PR #3 已改用**v2 单文件封装**。
+- 格式为 8 字节 `PSIDX002` + 4 字节小端 JSON 长度 + UTF-8 元数据 JSON（version/createdAt/count/roots）+ NUL 分隔的绝对路径。
+- `src/lib/index-files.ts` 把封装文件在临时位置构建并校验路径数量、末尾 NUL 和字节数，随后一次 `rename` 替换 `index.nul`；新读者使用 `openIndexDataStream()` 从**同一个已打开的句柄**解析头部和读取路径，避免重建更改头部长度导致偏移错用。
+- `src/lib/index-store.ts` 优先读取 v2；没有 v2 时兼容旧 `index.json + index-UUID.nul`。旧 UUID 文件允许至少 24 小时迁移宽限。v2 不再需要单独提交 index.json。
+- Debug Info、Index Status、中英文 README、`docs/index-storage.md` 已在 PR 分支配合更新；`main` 尚未合并这些实现。
+- GitHub Actions **确证**：`npm install` 成功；`npm test` **7/7 通过**；`npx tsc --noEmit` 通过。完整 `ray lint` 未通过、`ray build` 未执行，不能宣称 PR 就绪。
+- lint 阻塞：Raycast 官方接口找不到 manifest 作者 `juezhong`（该值是 GitHub 用户名，未证明是 Raycast 账号）；代码需经 Prettier 格式化。Raycast 作者名需要用户确认，不能猜测。
+- 自描述索引消除了索引与元数据双文件原子性问题；本轮尚未完成真实 fd 集成、UI 生命周期、极端崩溃/断电的持久化测试，`CR-03/04/05/07/08` 仍待处理。
+- 详细进展：[PR #3 的实现与 CI 说明](https://github.com/juezhong/raycast-pathseek/pull/3#issuecomment-6382347272)。
+
+## Next Step
+确认正确的 Raycast 账户用户名（当前 package.json author=juezhong 被官方校验返回 404），据此修正 PR #3 的 manifest；随后修复 Prettier 格式并重新运行 macOS CI 的 lint/build。
