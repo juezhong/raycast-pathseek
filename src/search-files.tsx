@@ -1,4 +1,11 @@
-import { Action, ActionPanel, Icon, LaunchType, List, launchCommand } from "@raycast/api";
+import {
+  Action,
+  ActionPanel,
+  Icon,
+  LaunchType,
+  List,
+  launchCommand,
+} from "@raycast/api";
 import { useEffect, useState } from "react";
 import os from "node:os";
 import path from "node:path";
@@ -6,7 +13,11 @@ import { fuzzySearch } from "./lib/fuzzy-search";
 import { readIndex, type IndexMetadata } from "./lib/index-store";
 import { getDialogNavigationPaths } from "./lib/dialog-navigation";
 
-export function SearchFilesView({ dialogMode = false }: { dialogMode?: boolean }) {
+export function SearchFilesView({
+  dialogMode = false,
+}: {
+  dialogMode?: boolean;
+}) {
   const [index, setIndex] = useState<IndexMetadata | null>();
   const [loadError, setLoadError] = useState<string>();
   const [query, setQuery] = useState("");
@@ -25,7 +36,9 @@ export function SearchFilesView({ dialogMode = false }: { dialogMode?: boolean }
           setIndex(null);
         }
       });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -73,16 +86,24 @@ export function SearchFilesView({ dialogMode = false }: { dialogMode?: boolean }
   const emptyDescription = loadError
     ? loadError
     : !index
-      ? "No index yet. Choose your folders in Rebuild Index to begin. Nothing is indexed automatically."
+      ? "No index yet. Choose your folders in Build Index to begin. Nothing is indexed automatically."
       : !query.trim()
-        ? "Indexed " + index.count.toLocaleString() + " paths on " + new Date(index.createdAt).toLocaleString() + "."
+        ? "Indexed " +
+          index.count.toLocaleString() +
+          " paths on " +
+          new Date(index.createdAt).toLocaleString() +
+          "."
         : "Try a different pattern or rebuild the index to include new files.";
 
   return (
     <List
       isLoading={index === undefined || isSearching}
       filtering={false}
-      searchBarPlaceholder={dialogMode ? "Search files or folders to locate in the Open/Save dialog" : "Search with fzf: filename, path, .pdf$, !node_modules…"} 
+      searchBarPlaceholder={
+        dialogMode
+          ? "Search files or folders to locate in the Open/Save dialog"
+          : "Search with fzf: filename, path, .pdf$, !node_modules…"
+      }
       onSearchTextChange={setQuery}
     >
       <List.EmptyView
@@ -95,12 +116,22 @@ export function SearchFilesView({ dialogMode = false }: { dialogMode?: boolean }
               <Action
                 title="Choose Folders and Build Index"
                 icon={Icon.Folder}
-                onAction={() => launchCommand({ name: "rebuild-index", type: LaunchType.UserInitiated })}
+                onAction={() =>
+                  launchCommand({
+                    name: "rebuild-index",
+                    type: LaunchType.UserInitiated,
+                  })
+                }
               />
               <Action
                 title="View Index Status"
                 icon={Icon.Info}
-                onAction={() => launchCommand({ name: "index-status", type: LaunchType.UserInitiated })}
+                onAction={() =>
+                  launchCommand({
+                    name: "index-status",
+                    type: LaunchType.UserInitiated,
+                  })
+                }
               />
             </ActionPanel>
           ) : undefined
@@ -129,17 +160,31 @@ export function SearchFilesView({ dialogMode = false }: { dialogMode?: boolean }
                     <Action.Paste
                       title="Go to Containing Folder (Fallback)"
                       icon={Icon.Folder}
-                      content={getDialogNavigationPaths(filepath).containingFolder}
+                      content={
+                        getDialogNavigationPaths(filepath).containingFolder
+                      }
                     />
                   </ActionPanel.Section>
                 )}
                 <ActionPanel.Section title="Other File Actions">
-                <Action.Open title="Open" target={filepath} />
-                <Action.ShowInFinder title="Show in Finder" path={filepath} />
-                <Action.Open title="Open Containing Folder" target={path.dirname(filepath)} />
-                <Action.OpenWith path={filepath} shortcut={{ modifiers: ["cmd"], key: "o" }} />
-                <Action.CopyToClipboard title="Copy Absolute Path" content={filepath} shortcut={{ modifiers: ["cmd"], key: "c" }} />
-                <Action.ToggleQuickLook shortcut={{ modifiers: ["cmd"], key: "y" }} />
+                  <Action.Open title="Open" target={filepath} />
+                  <Action.ShowInFinder title="Show in Finder" path={filepath} />
+                  <Action.Open
+                    title="Open Containing Folder"
+                    target={path.dirname(filepath)}
+                  />
+                  <Action.OpenWith
+                    path={filepath}
+                    shortcut={{ modifiers: ["cmd"], key: "o" }}
+                  />
+                  <Action.CopyToClipboard
+                    title="Copy Absolute Path"
+                    content={filepath}
+                    shortcut={{ modifiers: ["cmd"], key: "c" }}
+                  />
+                  <Action.ToggleQuickLook
+                    shortcut={{ modifiers: ["cmd"], key: "y" }}
+                  />
                 </ActionPanel.Section>
               </ActionPanel>
             }

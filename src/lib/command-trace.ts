@@ -12,7 +12,8 @@ import { performance } from "node:perf_hooks";
  * paths, configured roots, exclusion patterns or stderr messages.
  */
 export type CommandTraceTool = "fd" | "fzf";
-export type CommandTraceOutcome = "success" | "limit-reached" | "failure" | "cancelled";
+export type CommandTraceOutcome =
+  "success" | "limit-reached" | "failure" | "cancelled";
 export type CommandTraceRecord = {
   id: string;
   at: string;
@@ -29,7 +30,10 @@ export type CommandTraceRecord = {
 
 type TracePreferences = { enableCommandTracing?: boolean };
 const TRACE_FILE = path.join(environment.supportPath, "command-trace.jsonl");
-const PREVIOUS_FILE = path.join(environment.supportPath, "command-trace.previous.jsonl");
+const PREVIOUS_FILE = path.join(
+  environment.supportPath,
+  "command-trace.previous.jsonl",
+);
 const MAX_LOG_BYTES = 256 * 1024;
 const MAX_VIEW_EVENTS = 50;
 
@@ -39,7 +43,9 @@ export function commandTracingEnabled(): boolean {
 
 function sanitizedCode(error: unknown): string {
   const code = (error as NodeJS.ErrnoException | undefined)?.code;
-  return typeof code === "string" && /^[A-Z0-9_-]{1,32}$/.test(code) ? code : "UNKNOWN";
+  return typeof code === "string" && /^[A-Z0-9_-]{1,32}$/.test(code)
+    ? code
+    : "UNKNOWN";
 }
 
 async function writeRecord(record: CommandTraceRecord): Promise<void> {
@@ -64,12 +70,24 @@ export async function beginCommandTrace(
   reason: CommandTraceRecord["reason"],
   invocation: string,
 ): Promise<{
-  finish(outcome: CommandTraceOutcome, resultCount?: number, exitCode?: number | null, error?: unknown): Promise<void>;
+  finish(
+    outcome: CommandTraceOutcome,
+    resultCount?: number,
+    exitCode?: number | null,
+    error?: unknown,
+  ): Promise<void>;
 } | null> {
   if (!commandTracingEnabled()) return null;
   const id = randomUUID();
   const start = performance.now();
-  await writeRecord({ id, at: new Date().toISOString(), tool, reason, invocation, phase: "start" });
+  await writeRecord({
+    id,
+    at: new Date().toISOString(),
+    tool,
+    reason,
+    invocation,
+    phase: "start",
+  });
   return {
     async finish(outcome, resultCount, exitCode, error) {
       await writeRecord({
@@ -121,19 +139,40 @@ export async function readCommandTrace(): Promise<CommandTraceRecord[]> {
 }
 
 export function summarizeCommandTrace(records: CommandTraceRecord[]): string {
-  if (!records.length) return "No fd/fzf calls recorded in this tracing session.";
+  if (!records.length)
+    return "No fd/fzf calls recorded in this tracing session.";
   const tick = String.fromCharCode(96);
   const output = records.map((event) => {
-    const detail = event.phase === "start"
-      ? "started"
-      : [
-          event.outcome ?? "finished",
-          event.durationMs === undefined ? "" : event.durationMs + "ms",
-          event.resultCount === undefined ? "" : "results=" + event.resultCount,
-          event.exitCode === undefined ? "" : "exit=" + String(event.exitCode),
-          event.errorCode ? "error=" + event.errorCode : "",
-        ].filter(Boolean).join(", ");
-    return "- " + event.at + " | " + tick + event.tool + tick + " | " + event.reason + " | " + event.invocation + " | " + detail;
+    const detail =
+      event.phase === "start"
+        ? "started"
+        : [
+            event.outcome ?? "finished",
+            event.durationMs === undefined ? "" : event.durationMs + "ms",
+            event.resultCount === undefined
+              ? ""
+              : "results=" + event.resultCount,
+            event.exitCode === undefined
+              ? ""
+              : "exit=" + String(event.exitCode),
+            event.errorCode ? "error=" + event.errorCode : "",
+          ]
+            .filter(Boolean)
+            .join(", ");
+    return (
+      "- " +
+      event.at +
+      " | " +
+      tick +
+      event.tool +
+      tick +
+      " | " +
+      event.reason +
+      " | " +
+      event.invocation +
+      " | " +
+      detail
+    );
   });
   return output.reverse().join("\n");
 }

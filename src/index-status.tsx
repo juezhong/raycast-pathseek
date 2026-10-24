@@ -1,7 +1,19 @@
-import { Action, ActionPanel, Detail, environment, Icon, launchCommand, LaunchType } from "@raycast/api";
+import {
+  Action,
+  ActionPanel,
+  Detail,
+  environment,
+  Icon,
+  launchCommand,
+  LaunchType,
+} from "@raycast/api";
 import { useEffect, useState } from "react";
 import path from "node:path";
-import { indexFilePath, readIndex, type IndexMetadata } from "./lib/index-store";
+import {
+  indexFilePath,
+  readIndex,
+  type IndexMetadata,
+} from "./lib/index-store";
 
 type IndexState =
   | { status: "loading" }
@@ -17,7 +29,9 @@ export default function IndexStatus() {
     readIndex()
       .then((metadata) => {
         if (!active) return;
-        setState(metadata ? { status: "ready", metadata } : { status: "empty" });
+        setState(
+          metadata ? { status: "ready", metadata } : { status: "empty" },
+        );
       })
       .catch((error: unknown) => {
         if (active) setState({ status: "error", message: String(error) });
@@ -28,16 +42,19 @@ export default function IndexStatus() {
   }, []);
 
   const directory = environment.supportPath;
-  const activeFile = state.status === "ready" ? indexFilePath(state.metadata) : path.join(directory, "index.nul");
+  const activeFile =
+    state.status === "ready"
+      ? indexFilePath(state.metadata)
+      : path.join(directory, "index.nul");
 
   const markdown =
     state.status === "loading"
       ? "# Index Status\n\nReading the saved index metadata…"
       : state.status === "empty"
-        ? "# No Index Yet\n\nPathSeek has not indexed anything. Nothing will be scanned automatically.\n\nChoose your folders through **Rebuild Index**, then explicitly build your first index."
+        ? "# No Index Yet\n\nPathSeek has not indexed anything. Nothing will be scanned automatically.\n\nChoose your folders through **Build Index**, then explicitly build your first index."
         : state.status === "error"
-          ? `# Index Error\n\n${state.message}\n\nCheck the index files, then use **Rebuild Index** to recover.`
-          : `# Index Status\n\n- **Indexed paths:** ${state.metadata.count.toLocaleString()}\n- **Last built:** ${new Date(state.metadata.createdAt).toLocaleString()}\n- **Index file:** \`${state.metadata.filename}\`\n- **Format:** ${state.metadata.version === 2 ? "v2 self-describing" : "v1 legacy"}\n- **Search roots:**\n${state.metadata.roots.map((root) => `  - \`${root}\``).join("\n")}\n\nThis index is reused until you manually run Rebuild Index. **No automatic refresh or background scanning.**`;
+          ? `# Index Error\n\n${state.message}\n\nCheck the index files, then use **Build Index** to recover.`
+          : `# Index Status\n\n- **Indexed paths:** ${state.metadata.count.toLocaleString()}\n- **Last built:** ${new Date(state.metadata.createdAt).toLocaleString()}\n- **Index file:** \`${state.metadata.filename}\`\n- **Format:** ${state.metadata.version === 2 ? "v2 self-describing" : "v1 legacy"}\n- **Search roots:**\n${state.metadata.roots.map((root) => `  - \`${root}\``).join("\n")}\n\nThis index is reused until you manually run Build Index. **No automatic refresh or background scanning.**`;
 
   return (
     <Detail
@@ -46,15 +63,36 @@ export default function IndexStatus() {
       actions={
         <ActionPanel>
           <Action
-            title={state.status === "empty" ? "Choose Folders and Build Index" : "Open Rebuild Index"}
+            title={
+              state.status === "empty"
+                ? "Choose Folders and Build Index"
+                : "Open Build Index"
+            }
             icon={Icon.Folder}
-            onAction={() => launchCommand({ name: "rebuild-index", type: LaunchType.UserInitiated })}
+            onAction={() =>
+              launchCommand({
+                name: "rebuild-index",
+                type: LaunchType.UserInitiated,
+              })
+            }
           />
-          <Action.Open title="Open Index Directory in Finder" target={directory} />
-          <Action.CopyToClipboard title="Copy Index Directory Path" content={directory} />
-          <Action.CopyToClipboard title="Copy Active Index File Path" content={activeFile} />
+          <Action.Open
+            title="Open Index Directory in Finder"
+            target={directory}
+          />
+          <Action.CopyToClipboard
+            title="Copy Index Directory Path"
+            content={directory}
+          />
+          <Action.CopyToClipboard
+            title="Copy Active Index File Path"
+            content={activeFile}
+          />
           {state.status === "ready" && (
-            <Action.CopyToClipboard title="Copy Index Details" content={JSON.stringify(state.metadata, null, 2)} />
+            <Action.CopyToClipboard
+              title="Copy Index Details"
+              content={JSON.stringify(state.metadata, null, 2)}
+            />
           )}
         </ActionPanel>
       }

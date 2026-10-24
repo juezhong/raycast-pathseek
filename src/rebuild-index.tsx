@@ -1,6 +1,18 @@
-import { Action, ActionPanel, Detail, Form, Icon, showToast, Toast, useNavigation } from "@raycast/api";
+import {
+  Action,
+  ActionPanel,
+  Detail,
+  Form,
+  Icon,
+  showToast,
+  Toast,
+  useNavigation,
+} from "@raycast/api";
 import { useEffect, useState } from "react";
-import { getConfiguredIndexRoots, saveConfiguredIndexRoots } from "./lib/index-roots";
+import {
+  getConfiguredIndexRoots,
+  saveConfiguredIndexRoots,
+} from "./lib/index-roots";
 import { readIndex, rebuildIndex, type IndexMetadata } from "./lib/index-store";
 
 type Mode = "loading" | "configure" | "ready" | "building";
@@ -23,7 +35,11 @@ function ChooseFolders({
       const roots = await saveConfiguredIndexRoots(values.folders);
       await onSave(roots);
     } catch (error) {
-      await showToast({ style: Toast.Style.Failure, title: "Could Not Save Folders", message: String(error) });
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Could Not Save Folders",
+        message: String(error),
+      });
     } finally {
       setSaving(false);
     }
@@ -34,11 +50,15 @@ function ChooseFolders({
       isLoading={saving}
       actions={
         <ActionPanel>
-          <Action.SubmitForm title={actionTitle} icon={Icon.Folder} onSubmit={submit} />
+          <Action.SubmitForm
+            title={actionTitle}
+            icon={Icon.Folder}
+            onSubmit={submit}
+          />
         </ActionPanel>
       }
     >
-      <Form.Description text="Select one or more directories. PathSeek never scans until you explicitly choose to build an index. Change them later with Cmd+K in Rebuild Index." />
+      <Form.Description text="Select one or more directories. PathSeek never scans until you explicitly choose to build an index. Change them later with Cmd+K in Build Index." />
       <Form.FilePicker
         id="folders"
         title="Index Folders"
@@ -51,7 +71,13 @@ function ChooseFolders({
   );
 }
 
-function ChangeFolders({ roots, onSave }: { roots: string[]; onSave: (paths: string[]) => void }) {
+function ChangeFolders({
+  roots,
+  onSave,
+}: {
+  roots: string[];
+  onSave: (paths: string[]) => void;
+}) {
   const { pop } = useNavigation();
   return (
     <ChooseFolders
@@ -90,7 +116,9 @@ export default function RebuildIndex() {
       }
     }
     void initialize();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   async function buildIndex(selectedRoots: string[]) {
@@ -107,7 +135,11 @@ export default function RebuildIndex() {
       });
     } catch (failure) {
       setError(String(failure));
-      await showToast({ style: Toast.Style.Failure, title: "Index Build Failed", message: String(failure) });
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Index Build Failed",
+        message: String(failure),
+      });
     } finally {
       setMode("ready");
     }
@@ -128,20 +160,25 @@ export default function RebuildIndex() {
 
   const markdown =
     mode === "loading"
-      ? "# Rebuild Index\n\nReading saved folders. No scan will start automatically."
+      ? "# Build Index\n\nReading saved folders. No scan will start automatically."
       : mode === "building"
         ? "# Building Index\n\nRunning fd on your selected folders. The previous index stays available until the new one is complete."
         : [
-            "# Rebuild Index",
+            "# Build Index",
             "",
             "**Indexing is manual only.** Opening this command, Search Files or Index Status never starts a scan.",
             "",
             "**Selected folders**",
-            roots.length ? roots.map((root) => "- " + root).join("\n") : "No folders selected.",
+            roots.length
+              ? roots.map((root) => "- " + root).join("\n")
+              : "No folders selected.",
             "",
             current
-              ? "Last successful build: **" + new Date(current.createdAt).toLocaleString() +
-                "** · **" + current.count.toLocaleString() + "** indexed paths."
+              ? "Last successful build: **" +
+                new Date(current.createdAt).toLocaleString() +
+                "** · **" +
+                current.count.toLocaleString() +
+                "** indexed paths."
               : "No index exists. Select folders and explicitly build your first index.",
             "",
             "Use **Cmd+K → Change Indexed Folders** to choose different directories. Saving a new selection does not automatically rebuild.",
@@ -152,21 +189,29 @@ export default function RebuildIndex() {
     <Detail
       isLoading={mode === "loading" || mode === "building"}
       markdown={markdown}
-      actions={mode === "ready" ? (
-        <ActionPanel>
-          <Action
-            title="Rebuild Index Now"
-            icon={Icon.ArrowClockwise}
-            onAction={() => void buildIndex(roots)}
-          />
-          <Action.Push
-            title="Change Indexed Folders"
-            icon={Icon.Folder}
-            target={<ChangeFolders roots={roots} onSave={setRoots} />}
-          />
-          {current && <Action.CopyToClipboard title="Copy Index Summary" content={JSON.stringify(current, null, 2)} icon={Icon.CopyClipboard} />}
-        </ActionPanel>
-      ) : undefined}
+      actions={
+        mode === "ready" ? (
+          <ActionPanel>
+            <Action
+              title="Rebuild Index Now"
+              icon={Icon.ArrowClockwise}
+              onAction={() => void buildIndex(roots)}
+            />
+            <Action.Push
+              title="Change Indexed Folders"
+              icon={Icon.Folder}
+              target={<ChangeFolders roots={roots} onSave={setRoots} />}
+            />
+            {current && (
+              <Action.CopyToClipboard
+                title="Copy Index Summary"
+                content={JSON.stringify(current, null, 2)}
+                icon={Icon.CopyClipboard}
+              />
+            )}
+          </ActionPanel>
+        ) : undefined
+      }
     />
   );
 }

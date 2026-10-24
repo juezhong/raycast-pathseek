@@ -6,16 +6,22 @@ import os from "node:os";
 const ROOTS_KEY = "configured-index-roots-v1";
 
 export function normalizeIndexRoots(folders: string[]): string[] {
-  return [...new Set(
-    folders
-      .map((folder) => folder.trim())
-      .filter(Boolean)
-      .map((folder) =>
-        path.resolve(
-          folder === "~" ? os.homedir() : folder.startsWith("~/") ? path.join(os.homedir(), folder.slice(2)) : folder,
+  return [
+    ...new Set(
+      folders
+        .map((folder) => folder.trim())
+        .filter(Boolean)
+        .map((folder) =>
+          path.resolve(
+            folder === "~"
+              ? os.homedir()
+              : folder.startsWith("~/")
+                ? path.join(os.homedir(), folder.slice(2))
+                : folder,
+          ),
         ),
-      ),
-  )];
+    ),
+  ];
 }
 
 /**
@@ -23,12 +29,17 @@ export function normalizeIndexRoots(folders: string[]): string[] {
  * A saved selection wins; old pre-setup indexes remain backward compatible
  * using their embedded roots until users explicitly change folders.
  */
-export async function getConfiguredIndexRoots(previousRoots: string[] = []): Promise<string[]> {
+export async function getConfiguredIndexRoots(
+  previousRoots: string[] = [],
+): Promise<string[]> {
   const stored = await LocalStorage.getItem<string>(ROOTS_KEY);
   if (stored !== undefined) {
     try {
       const parsed: unknown = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.every((entry) => typeof entry === "string")) {
+      if (
+        Array.isArray(parsed) &&
+        parsed.every((entry) => typeof entry === "string")
+      ) {
         return normalizeIndexRoots(parsed);
       }
     } catch {
@@ -40,7 +51,9 @@ export async function getConfiguredIndexRoots(previousRoots: string[] = []): Pro
 }
 
 /** Persist only an explicit folder selection, never start an index build. */
-export async function saveConfiguredIndexRoots(folders: string[]): Promise<string[]> {
+export async function saveConfiguredIndexRoots(
+  folders: string[],
+): Promise<string[]> {
   const roots = normalizeIndexRoots(folders);
   if (!roots.length) throw new Error("Choose at least one folder to index.");
   for (const root of roots) {

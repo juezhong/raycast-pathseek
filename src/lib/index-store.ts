@@ -10,7 +10,15 @@ import { Transform } from "node:stream";
 import lockfile from "proper-lockfile";
 import { beginCommandTrace } from "./command-trace";
 import { getConfiguredIndexRoots, normalizeIndexRoots } from "./index-roots";
-import { ACTIVE_INDEX_FILENAME, cleanupLegacyIndexes, cleanupStaleBuildTemps, prepareIndex, publishIndex, readIndexHeader, type SavedIndexMetadata } from "./index-files";
+import {
+  ACTIVE_INDEX_FILENAME,
+  cleanupLegacyIndexes,
+  cleanupStaleBuildTemps,
+  prepareIndex,
+  publishIndex,
+  readIndexHeader,
+  type SavedIndexMetadata,
+} from "./index-files";
 
 export type Preferences = {
   includeHidden: boolean;
@@ -30,12 +38,25 @@ export function getPreferences(): Preferences {
 }
 
 export function resolveRoot(value: string): string {
-  const expanded = value === "~" ? os.homedir() : value.startsWith("~/") ? path.join(os.homedir(), value.slice(2)) : value;
+  const expanded =
+    value === "~"
+      ? os.homedir()
+      : value.startsWith("~/")
+        ? path.join(os.homedir(), value.slice(2))
+        : value;
   return path.resolve(expanded);
 }
 
 export function parseRoots(raw: string): string[] {
-  return [...new Set(raw.split(/[;\r\n]+/).map((p) => p.trim()).filter(Boolean).map(resolveRoot))];
+  return [
+    ...new Set(
+      raw
+        .split(/[;\r\n]+/)
+        .map((p) => p.trim())
+        .filter(Boolean)
+        .map(resolveRoot),
+    ),
+  ];
 }
 
 async function isExecutable(file: string): Promise<boolean> {
@@ -47,7 +68,10 @@ async function isExecutable(file: string): Promise<boolean> {
   }
 }
 
-export async function findBinary(name: "fd" | "fzf", explicit?: string): Promise<string> {
+export async function findBinary(
+  name: "fd" | "fzf",
+  explicit?: string,
+): Promise<string> {
   if (explicit?.trim()) {
     const file = resolveRoot(explicit.trim());
     if (await isExecutable(file)) return file;
@@ -66,12 +90,17 @@ export async function findBinary(name: "fd" | "fzf", explicit?: string): Promise
     if (await isExecutable(file)) return file;
   }
 
-  throw new Error(`Cannot locate ${name}. Run 'brew install fd fzf', or set its absolute path in PathSeek preferences.`);
+  throw new Error(
+    `Cannot locate ${name}. Run 'brew install fd fzf', or set its absolute path in PathSeek preferences.`,
+  );
 }
 
 export function indexFilePath(metadata: IndexMetadata): string {
   // 元数据只允许指向当前扩展的数据文件，避免读取任意外部路径。
-  if (metadata.filename !== ACTIVE_INDEX_FILENAME && !/^index-[a-f0-9-]+\.nul$/.test(metadata.filename)) {
+  if (
+    metadata.filename !== ACTIVE_INDEX_FILENAME &&
+    !/^index-[a-f0-9-]+\.nul$/.test(metadata.filename)
+  ) {
     throw new Error("Invalid index filename");
   }
   return path.join(indexDirectory, metadata.filename);
@@ -82,7 +111,9 @@ export async function readIndex(): Promise<IndexMetadata | null> {
   // It is always authoritative when present, even if a legacy index.json
   // remains from a previous plugin version.
   try {
-    return await readIndexHeader(path.join(indexDirectory, ACTIVE_INDEX_FILENAME));
+    return await readIndexHeader(
+      path.join(indexDirectory, ACTIVE_INDEX_FILENAME),
+    );
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
@@ -98,12 +129,18 @@ export async function readIndex(): Promise<IndexMetadata | null> {
   }
   const data: unknown = JSON.parse(text);
   if (
-    !data || typeof data !== "object" ||
-    !("version" in data) || data.version !== 1 ||
-    !("filename" in data) || typeof data.filename !== "string" ||
-    !("count" in data) || typeof data.count !== "number" ||
-    !("roots" in data) || !Array.isArray(data.roots) ||
-    !("createdAt" in data) || typeof data.createdAt !== "string"
+    !data ||
+    typeof data !== "object" ||
+    !("version" in data) ||
+    data.version !== 1 ||
+    !("filename" in data) ||
+    typeof data.filename !== "string" ||
+    !("count" in data) ||
+    typeof data.count !== "number" ||
+    !("roots" in data) ||
+    !Array.isArray(data.roots) ||
+    !("createdAt" in data) ||
+    typeof data.createdAt !== "string"
   ) {
     throw new Error("Invalid legacy index metadata; rebuild the index");
   }
@@ -119,10 +156,15 @@ async function runFd(
   reason: "manual-rebuild",
 ): Promise<number> {
   // Show effective flags without exposing directory names or exclude patterns.
-  const flags = args.filter((arg) => ["--absolute-path", "--print0", "--hidden", "--follow"].includes(arg));
+  const flags = args.filter((arg) =>
+    ["--absolute-path", "--print0", "--hidden", "--follow"].includes(arg),
+  );
   const excludeCount = args.filter((arg) => arg === "--exclude").length;
-  const invocation = "fd " + flags.join(" ") +
-    (excludeCount ? " --exclude <redacted> (x" + excludeCount + ")" : "") + " . <root>";
+  const invocation =
+    "fd " +
+    flags.join(" ") +
+    (excludeCount ? " --exclude <redacted> (x" + excludeCount + ")" : "") +
+    " . <root>";
   const trace = await beginCommandTrace("fd", reason, invocation);
   const child = spawn(fdPath, args, { stdio: ["ignore", "pipe", "pipe"] });
   let exitCode: number | null | undefined;
@@ -144,12 +186,22 @@ async function runFd(
     child.once("close", (code) => {
       exitCode = code;
       if (code === 0) resolve();
-      else reject(new Error(`fd failed (exit ${code}): ${chunks.join("").trim()}`));
+      else
+        reject(
+          new Error(`fd failed (exit ${code}): ${chunks.join("").trim()}`),
+        );
     });
   });
 
   try {
-    await Promise.all([pipeline(child.stdout, meter, createWriteStream(outputPath, { flags: "a" })), completed]);
+    await Promise.all([
+      pipeline(
+        child.stdout,
+        meter,
+        createWriteStream(outputPath, { flags: "a" }),
+      ),
+      completed,
+    ]);
     await trace?.finish("success", count, exitCode);
     return count;
   } catch (error) {
@@ -164,7 +216,9 @@ async function runFd(
  * Launching Search Files, opening Index Status and launching Raycast never
  * invokes this function.
  */
-export async function rebuildIndex(selectedRoots?: string[]): Promise<IndexMetadata> {
+export async function rebuildIndex(
+  selectedRoots?: string[],
+): Promise<IndexMetadata> {
   await mkdir(indexDirectory, { recursive: true });
   // Heartbeat prevents simultaneous rebuilds. Abandoned locks expire.
   const release = await lockfile.lock(indexDirectory, {
@@ -187,7 +241,10 @@ export async function rebuildIndex(selectedRoots?: string[]): Promise<IndexMetad
     const roots = selectedRoots
       ? normalizeIndexRoots(selectedRoots)
       : await getConfiguredIndexRoots(previous?.roots);
-    if (!roots.length) throw new Error("Choose folders in Rebuild Index before building your first index.");
+    if (!roots.length)
+      throw new Error(
+        "Choose folders in Rebuild Index before building your first index.",
+      );
 
     for (const root of roots) {
       const info = await stat(root);
@@ -201,7 +258,10 @@ export async function rebuildIndex(selectedRoots?: string[]): Promise<IndexMetad
     const args = ["--absolute-path", "--print0"];
     if (prefs.includeHidden) args.push("--hidden");
     if (prefs.followSymlinks) args.push("--follow");
-    for (const pattern of (prefs.excludePatterns || "").split(",").map((x) => x.trim()).filter(Boolean)) {
+    for (const pattern of (prefs.excludePatterns || "")
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean)) {
       args.push("--exclude", pattern);
     }
 
@@ -209,7 +269,12 @@ export async function rebuildIndex(selectedRoots?: string[]): Promise<IndexMetad
     try {
       await writeFile(rawTemp, "", { flag: "wx" });
       for (const root of roots) {
-        total += await runFd(fd, [...args, ".", root], rawTemp, "manual-rebuild");
+        total += await runFd(
+          fd,
+          [...args, ".", root],
+          rawTemp,
+          "manual-rebuild",
+        );
       }
 
       const metadata: IndexMetadata = {

@@ -25,11 +25,17 @@ export type SavedIndexMetadata = {
 
 function validateMetadata(raw: unknown): SavedIndexMetadata {
   if (
-    !raw || typeof raw !== "object" ||
-    !("version" in raw) || raw.version !== 2 ||
-    !("count" in raw) || !Number.isSafeInteger(raw.count) || (raw.count as number) < 0 ||
-    !("createdAt" in raw) || typeof raw.createdAt !== "string" ||
-    !("roots" in raw) || !Array.isArray(raw.roots) ||
+    !raw ||
+    typeof raw !== "object" ||
+    !("version" in raw) ||
+    raw.version !== 2 ||
+    !("count" in raw) ||
+    !Number.isSafeInteger(raw.count) ||
+    (raw.count as number) < 0 ||
+    !("createdAt" in raw) ||
+    typeof raw.createdAt !== "string" ||
+    !("roots" in raw) ||
+    !Array.isArray(raw.roots) ||
     !raw.roots.every((root: unknown) => typeof root === "string")
   ) {
     throw new Error("Invalid PathSeek index header; rebuild the index");
@@ -63,7 +69,8 @@ export async function prepareIndex(
     roots: metadata.roots,
   };
   const json = Buffer.from(JSON.stringify(rawMetadata), "utf8");
-  if (json.length > MAX_HEADER_BYTES) throw new Error("Index metadata exceeds header size limit");
+  if (json.length > MAX_HEADER_BYTES)
+    throw new Error("Index metadata exceeds header size limit");
   const prefix = Buffer.alloc(PREFIX_SIZE);
   MAGIC.copy(prefix);
   prefix.writeUInt32LE(json.length, MAGIC.length);
@@ -77,16 +84,28 @@ export async function prepareIndex(
       callback(null, chunk);
     },
   });
-  await pipeline(createReadStream(rawPathsFile), counter, createWriteStream(stagedPath, { flags: "a" }));
+  await pipeline(
+    createReadStream(rawPathsFile),
+    counter,
+    createWriteStream(stagedPath, { flags: "a" }),
+  );
   if (seenPaths !== metadata.count || (seenPaths > 0 && lastByte !== 0)) {
-    throw new Error("Invalid index paths: wrong NUL separator count or trailing byte");
+    throw new Error(
+      "Invalid index paths: wrong NUL separator count or trailing byte",
+    );
   }
   const parsed = await readIndexHeader(stagedPath);
-  if (parsed.count !== metadata.count || parsed.roots.length !== metadata.roots.length) {
+  if (
+    parsed.count !== metadata.count ||
+    parsed.roots.length !== metadata.roots.length
+  ) {
     throw new Error("Index metadata verification failed");
   }
   const info = await stat(stagedPath);
-  if (info.size !== (await stat(rawPathsFile)).size + PREFIX_SIZE + json.length) {
+  if (
+    info.size !==
+    (await stat(rawPathsFile)).size + PREFIX_SIZE + json.length
+  ) {
     throw new Error("Index payload copy incomplete");
   }
   return parsed;
@@ -95,21 +114,30 @@ export async function prepareIndex(
 async function readHeader(handle: FileHandle): Promise<SavedIndexMetadata> {
   const prefix = Buffer.alloc(PREFIX_SIZE);
   const first = await handle.read(prefix, 0, PREFIX_SIZE, 0);
-  if (first.bytesRead !== PREFIX_SIZE || !prefix.subarray(0, MAGIC.length).equals(MAGIC)) {
+  if (
+    first.bytesRead !== PREFIX_SIZE ||
+    !prefix.subarray(0, MAGIC.length).equals(MAGIC)
+  ) {
     throw new Error("Unsupported index format; run Rebuild Index");
   }
   const length = prefix.readUInt32LE(MAGIC.length);
-  if (!length || length > MAX_HEADER_BYTES) throw new Error("Invalid index header length");
+  if (!length || length > MAX_HEADER_BYTES)
+    throw new Error("Invalid index header length");
   const info = await handle.stat();
-  if (PREFIX_SIZE + length > info.size) throw new Error("Incomplete index header");
+  if (PREFIX_SIZE + length > info.size)
+    throw new Error("Incomplete index header");
   const json = Buffer.alloc(length);
   const result = await handle.read(json, 0, length, PREFIX_SIZE);
   if (result.bytesRead !== length) throw new Error("Incomplete index metadata");
-  const metadata = validateMetadata(JSON.parse(json.toString("utf8")) as unknown);
+  const metadata = validateMetadata(
+    JSON.parse(json.toString("utf8")) as unknown,
+  );
   return { ...metadata, dataOffset: PREFIX_SIZE + length };
 }
 
-export async function readIndexHeader(indexPath: string): Promise<SavedIndexMetadata> {
+export async function readIndexHeader(
+  indexPath: string,
+): Promise<SavedIndexMetadata> {
   const handle = await open(indexPath, "r");
   try {
     return await readHeader(handle);
@@ -124,7 +152,9 @@ export async function readIndexHeader(indexPath: string): Promise<SavedIndexMeta
  * Using the offset from THIS open descriptor avoids accidentally applying
  * the previous generation's offset to the new generation.
  */
-export async function openIndexDataStream(indexPath: string): Promise<ReadStream> {
+export async function openIndexDataStream(
+  indexPath: string,
+): Promise<ReadStream> {
   const handle = await open(indexPath, "r");
   try {
     let offset = 0;
@@ -141,7 +171,10 @@ export async function openIndexDataStream(indexPath: string): Promise<ReadStream
 }
 
 /** Atomically replace the fixed active file after preparing a complete index. */
-export async function publishIndex(tempPath: string, indexDirectory: string): Promise<void> {
+export async function publishIndex(
+  tempPath: string,
+  indexDirectory: string,
+): Promise<void> {
   const activePath = path.join(indexDirectory, ACTIVE_INDEX_FILENAME);
   const info = await stat(tempPath);
   if (!info.isFile()) throw new Error("Staged index is not a regular file");
@@ -172,7 +205,6 @@ export async function cleanupLegacyIndexes(
   }
   return removed;
 }
-
 
 /**
  * Clean up abandoned build artifacts only while holding the exclusive rebuild
