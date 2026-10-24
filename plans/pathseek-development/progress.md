@@ -1,7 +1,7 @@
 # Progress — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-debug-trace-05
+- Checkpoint ID: pathseek-20261024-fzf-only-06
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Branch: main
@@ -95,3 +95,18 @@
 
 ## Current Next Step (checkpoint pathseek-20261024-debug-trace-05)
 在 Mac 上从 Draft PR #3 独立工作目录加载扩展，验证 v1→v2 索引迁移、搜索与重建并发，以及开发者 fd/fzf 追踪的默认关闭/开启行为；到 Issue #5 和 PR #3 提交实测结果，再决定 Ready for Review / 合并。
+
+### 2026-10-24 — 删除独立 Regex，统一 fzf 查询（pathseek-20261024-fzf-only-06）
+
+- 根据用户 Mac 初步可用反馈和明确范围变更，PR #3 分支更新 `src/search-files.tsx`，删除正则切换与 `regexSearch()` 调用；删除 `src/lib/regex-search.ts`。
+- `src/lib/fuzzy-search.ts` 显式增加 `--extended`，保留 `--read0 --print0 --filter`，并调整 fd/fzf 脱敏追踪中的调用示意。
+- 更新中英文 README、`docs/architecture.md`、`docs/development.md`、`docs/index-storage.md`、`docs/developer-tracing.md`。
+- [Issue #2](https://github.com/juezhong/raycast-pathseek/issues/2) 原 Regex 清单换为单一 fzf 语法验收。保留原 Fuzzy 功能已通过的历史测试证据，另外一个已撤销的“切换模式”勾选以历史说明保留，没有作为新功能验收；已勾选图标/索引测试未修改。
+- [Issue #4](https://github.com/juezhong/raycast-pathseek/issues/4) CR-05 记录为**因取消功能而不再适用**；Issue #5 的 Regex 条目改为全部查询使用 fzf。
+- PR #3 已评论同步变更：https://github.com/juezhong/raycast-pathseek/pull/3#issuecomment-6382676209
+- GitHub Actions 最新 `PathSeek quality gates` 状态 completed/success（npm test/tsc/源码 ESLint/build）；Raycast Store 发布校验仍不能称为通过。
+- **未执行**：在用户 Mac 上对本次 fzf-only 代码做新一轮 GUI 验证；PR #3 仍 Draft、未合并 `main`；不会要求用户现在提供 Raycast 作者用户名。
+- 本轮结束触发 Planning with Files continuous_checkpoint，按 findings→progress→task_plan 三文件顺序写入并回读核对。
+
+## Latest Next Step (pathseek-20261024-fzf-only-06)
+请维护者继续在 Mac 上用 Draft PR #3 独立 worktree 验收单一 fzf 搜索（含 .pdf$、'report、!node_modules、OR）、fd/fzf 调用追踪和索引重建；根据 Issue #2 / #5 实测与剩余 Code Review 风险决定 PR #3 是否 Ready / 合并。
