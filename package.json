@@ -74,8 +74,14 @@
     {
       "name": "dialog-search",
       "title": "Search in Open/Save Dialog",
-      "description": "Paste a found folder into an existing macOS Open/Save Go to Folder field; no automatic confirmation.",
-      "mode": "view"
+      "description": "Find files and folders in Open/Save dialogs; paste the full path. Suggested global hotkey: Cmd+Shift+F (assign once in Raycast).",
+      "mode": "view",
+      "keywords": [
+        "file dialog",
+        "file picker",
+        "open save",
+        "Cmd Shift F"
+      ]
     },
     {
       "name": "rebuild-index",
