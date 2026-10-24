@@ -47,7 +47,7 @@ PathSeek 是一款面向 macOS 的 Raycast Extension，目标对齐 Windows List
 
 | 模块 | 位置 | 当前实现 |
 | --- | --- | --- |
-| 插件清单与设置 | [`package.json`](../package.json) | 命令注册、Search Roots、Hidden、Symlinks、排除规则、fd/fzf 路径 |
+| 插件清单与设置 | [`package.json`](../package.json) | 命令注册、手动选择目录、Hidden、Symlinks、排除规则、fd/fzf 路径 |
 | 索引管理器 | [`src/lib/index-store.ts`](../src/lib/index-store.ts) | `readIndex()`、`rebuildIndex()`、`findBinary()` |
 | 搜索引擎 | [`src/lib/fuzzy-search.ts`](../src/lib/fuzzy-search.ts) | 对已发布索引执行 `fzf --filter`，限制结果条数 |
 | 文件搜索界面 | [`src/search-files.tsx`](../src/search-files.tsx) | 查询、防抖、结果展示、Finder Actions |
@@ -58,7 +58,7 @@ PathSeek 是一款面向 macOS 的 Raycast Extension，目标对齐 Windows List
 
 ## 4. 控制流与数据流
 
-**建索引：** 用户执行 Rebuild Index 或索引满 15 天后进入 Search Files → 获取跨进程锁 → 校验配置 → `fd` 扫描 → 新 `.nul` 临时文件 → 新正式文件 → 原子切换 `index.json` → 重新读取验证新索引 → 清理旧 `.nul`。错误/中断时保留已发布的当前索引。
+**建索引：** 首次 Rebuild Index 打开目录选择器 → 用户明确提交 Build（或已有配置时点击 Rebuild Index Now）→ 取得写入锁 → `fd` 扫描选定文件夹 → 验证/封装自描述 v2 临时文件 → 一次原子 rename 替换 `index.nul`。打开 Search Files/Index Status 或仅更换目录绝不调用 fd；旧索引始终保留到新索引发布成功。
 
 **搜索：** 用户执行 Search Files → 读取已有索引 → 统一调用 `fzf --extended --read0 --print0 --filter` 按文件名及路径匹配 → 最多展示 150 条 → Finder 原生图标 → 文件操作。支持 fzf 的模糊、精确、前后缀、排除、OR 语法，无独立 Regex 引擎。查询时不执行 `fd`。
 
@@ -74,7 +74,7 @@ PathSeek 是一款面向 macOS 的 Raycast Extension，目标对齐 Windows List
 - 多根目录重叠可能重复索引同一路径；后续要优化。
 - 当前搜索在 query 变化时重新启动 `fzf`，有 CPU 与索引读取成本；先实测后优化。
 - 文件对话框导航必须区分 Finder 本身与标准 NSOpenPanel/NSSavePanel，自定义面板应单独做兼容测试。
-- **15 天按需刷新（已实现初版）**：没有常驻监听和后台调度；过期索引只在下一次打开 Search Files 时尝试更新，失败重试间隔 24 小时。
+- **严格手动构建（当前决策）**：安装、启动、查询、读取状态、修改根目录都不触发 `fd`；仅用户明确执行构建或重建动作才运行。无 15 天刷新、无定时器、无后台扫描。
 - **目前不实现**常驻 FSEvents、后台定时器、自动确认 Open/Save 或自动覆盖文件。
 
 ## 6. 开源与发布
