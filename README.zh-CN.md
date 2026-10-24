@@ -130,4 +130,6 @@ npm run build
 
 在原应用先按 **⌘⇧G** 打开「前往文件夹」，呼出 PathSeek 搜索文件/目录，按 **Return** 粘贴**完整路径**，回原应用按 Return 查看定位结果。对文件，标准 Open 对话框可能直接选中目标文件；具体行为待你的 Mac 实测。备用动作 **⌘K → Go to Containing Folder (Fallback)** 则只进入文件所在目录。
 
-不会自动弹出文件管理器、识别/控制活动窗口或确认 Open/Save。**不做更复杂的“自动导航”方案**。详见 [简明操作说明](docs/open-save-dialog.md) 与 [Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7)。
+不会自动弹出文件管理器、识别/控制活动窗口或确认 Open/Save。**不做更复杂的“自动导航”方案**。**更快的方法：** 在 Raycast Settings → Shortcuts 给 **Search in Open/Save Dialog** 单独设置全局热键（例如 `⌃⌥G`）。之后原 Open/Save 窗口先按 `⌘⇧G`，紧接着按 PathSeek 热键，就能直接开始搜索，不用再从 Raycast 根搜索里找命令。不要把插件也绑定到系统原有的 `⌘⇧G`，否则可能抢占原生「前往文件夹」动作。无需自动窗口管理器。
+
+详见 [简明操作说明](docs/open-save-dialog.md)、[Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7) 与 [Issue #10 快捷键体验优化](https://github.com/juezhong/raycast-pathseek/issues/10)。
