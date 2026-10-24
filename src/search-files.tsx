@@ -1,9 +1,9 @@
-import { Action, ActionPanel, Icon, List, showToast, Toast } from "@raycast/api";
-import { useEffect, useRef, useState } from "react";
+import { Action, ActionPanel, Icon, LaunchType, List, launchCommand } from "@raycast/api";
+import { useEffect, useState } from "react";
 import os from "node:os";
 import path from "node:path";
 import { fuzzySearch } from "./lib/fuzzy-search";
-import { isIndexStale, readIndex, refreshExpiredIndex, type IndexMetadata } from "./lib/index-store";
+import { readIndex, type IndexMetadata } from "./lib/index-store";
 
 export default function SearchFiles() {
   const [index, setIndex] = useState<IndexMetadata | null>();
@@ -11,7 +11,6 @@ export default function SearchFiles() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<string[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const autoRefreshAttempted = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -27,34 +26,6 @@ export default function SearchFiles() {
       });
     return () => { active = false; };
   }, []);
-
-  // Only consider refresh ONCE when Search Files is opened, not per keystroke.
-  // The existing index remains searchable while a new generation is built.
-  useEffect(() => {
-    if (!index || autoRefreshAttempted.current || !isIndexStale(index)) return;
-    autoRefreshAttempted.current = true;
-    let active = true;
-
-    refreshExpiredIndex(index)
-      .then((newIndex) => {
-        if (active && newIndex) {
-          setIndex(newIndex);
-          void showToast({ style: Toast.Style.Success, title: "15-day index refresh completed" });
-        }
-      })
-      .catch((error: unknown) => {
-        if (active) {
-          console.warn("Automatic index refresh failed:", error);
-          void showToast({
-            style: Toast.Style.Failure,
-            title: "Automatic index refresh failed",
-            message: "The previous index is still available. Try Rebuild Index manually.",
-          });
-        }
-      });
-
-    return () => { active = false; };
-  }, [index]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -101,7 +72,7 @@ export default function SearchFiles() {
   const emptyDescription = loadError
     ? loadError
     : !index
-      ? "Run Rebuild Index in Raycast to create the first local index."
+      ? "No index yet. Choose your folders in Rebuild Index to begin. Nothing is indexed automatically."
       : !query.trim()
         ? "Indexed " + index.count.toLocaleString() + " paths on " + new Date(index.createdAt).toLocaleString() + "."
         : "Try a different pattern or rebuild the index to include new files.";
@@ -113,7 +84,27 @@ export default function SearchFiles() {
       searchBarPlaceholder="Search with fzf: filename, path, .pdf$, !node_modules…" 
       onSearchTextChange={setQuery}
     >
-      <List.EmptyView title={emptyTitle} description={emptyDescription} icon={Icon.MagnifyingGlass} />
+      <List.EmptyView
+        title={emptyTitle}
+        description={emptyDescription}
+        icon={Icon.MagnifyingGlass}
+        actions={
+          !index && index !== undefined ? (
+            <ActionPanel>
+              <Action
+                title="Choose Folders and Build Index"
+                icon={Icon.Folder}
+                onAction={() => launchCommand({ name: "rebuild-index", type: LaunchType.UserInitiated })}
+              />
+              <Action
+                title="View Index Status"
+                icon={Icon.Info}
+                onAction={() => launchCommand({ name: "index-status", type: LaunchType.UserInitiated })}
+              />
+            </ActionPanel>
+          ) : undefined
+        }
+      />
       {results.map((filepath) => {
         const display = filepath.startsWith(os.homedir() + path.sep)
           ? "~" + filepath.slice(os.homedir().length)
