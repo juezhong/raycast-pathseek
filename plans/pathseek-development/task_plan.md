@@ -6,9 +6,9 @@
 - Plan Directory: plans/pathseek-development/
 - Write Mode: continuous_checkpoints
 - Status: active / code-review-quality-gate
-- Current Phase: Q1 — GUI accepted, remaining technical Code Review
-- Checkpoint ID: pathseek-20261024-issue6-acceptance-09
-- Last Checkpoint: pathseek-20261024-issue6-acceptance-09 (2026-10-24; 3-file verification)
+- Current Phase: Q1 — PR3 pre-merge quality review complete, awaiting merge authorization
+- Checkpoint ID: pathseek-20261024-pr3-premerge-10
+- Last Checkpoint: pathseek-20261024-pr3-premerge-10 (2026-10-24; verified across three files)
 - Last Updated: 2026-10-24
 - Storage: github_checkpointed
 
@@ -162,3 +162,18 @@
 
 ## Active Next Step (pathseek-20261024-issue6-acceptance-09)
 Issue #6 的 11/11 项用户可见 Mac 验收已完成，PR #3 最新 macOS CI 通过。下一步由助理完成技术 Code Review 剩余阻塞：重点核验 UUID→v2 升级及中断/并发安全、真实 fd 集成场景、可复现的 npm lockfile 与文档一致性；无需用户再做复杂测试。PR #3 仍 Draft，未经明确同意不合并 main。
+
+## 2026-10-24 — PR #3 具备合并讨论条件（pathseek-20261024-pr3-premerge-10）
+
+- [x] 用户完成 Issue #6 **11/11** 项 Mac GUI 验收。
+- [x] v2 单文件索引、单一 fzf、纯手动 fd 构建、首次目录选择及 ⌘K 更换目录完成当前阶段目标。
+- [x] 提交 `package-lock.json`，CI 使用 `npm ci` 可复现安装，不再使用 CI 自行推送依赖的临时工作流权限。
+- [x] 真实 fd NUL 路径集成、异常扫描不覆盖已有索引、独占写锁/读取快照、旧临时文件清理自动测试纳入 macOS CI。
+- [x] 最新开发期 macOS CI：**18/18 单元/集成测试、TypeScript、源码 ESLint、Raycast build 全部通过**。
+- [x] 形成 [PR3 合并前技术复审报告](https://github.com/juezhong/raycast-pathseek/blob/fix/stable-index-file-atomic-swap/docs/reviews/2026-10-24-pr3-premerge-review.md)；Issue #4 同步质量门槛。
+- [ ] **等待维护者明确同意后**：PR #3 从 Draft 转 Ready、再次确认 CI/合并状态，合并到 main。不自动操作。
+- [ ] P4：第三方应用原有 NSOpenPanel/NSSavePanel 中的路径导航，不自动点确认、不弹出额外 Finder；应先明确 macOS 权限/Accessibility 与可行性再实现。
+- [ ] 后续 P2：Debug Info 中遗留临时文件数量、已删除路径 UX、文件/目录筛选和极端故障注入；Raycast Store 作者/Prettier 发布检查仍留待正式上架前。
+
+## Active Next Step (pathseek-20261024-pr3-premerge-10)
+PR #3 核心代码已完成用户 Issue #6（11/11）验收及 macOS CI 的 npm ci、18/18 tests、TypeScript、源码 ESLint 与 Raycast build；合并前技术复审已出。下一步请维护者确认是否授权将 Draft PR #3 合并到 main；如确认，先转 Ready/核验 CI 并合并，再开始 P4 原应用 Open/Save 对话框导航的设计与最小原型。Store 账号/发布格式待正式上架前处理。
