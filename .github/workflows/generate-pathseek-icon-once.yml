@@ -1,0 +1,36 @@
+name: Generate PathSeek icon PNG (one-time)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/generate-pathseek-icon-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  render-icon:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Render original SVG to 512x512 Raycast PNG
+        run: |
+          python3 -m pip install --quiet --break-system-packages cairosvg pillow
+          python3 - <<'PY'
+          import cairosvg
+          from PIL import Image
+          cairosvg.svg2png(url='assets/pathseek-icon.svg', write_to='assets/extension-icon.png', output_width=512, output_height=512)
+          im=Image.open('assets/extension-icon.png').convert('RGBA')
+          assert im.size==(512,512)
+          im.quantize(colors=32, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.NONE).save('assets/extension-icon.png', optimize=True)
+          PY
+      - name: Commit rendered icon only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/extension-icon.png
+          git commit -m "design: replace upstream placeholder with original 512px PathSeek icon"
+          git push origin HEAD:main
