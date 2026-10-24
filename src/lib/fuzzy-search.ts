@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { createReadStream } from "node:fs";
+import { openIndexDataStream } from "./index-files";
 import { findBinary, getPreferences, indexFilePath, type IndexMetadata } from "./index-store";
 
 const MAX_RESULTS = 150;
@@ -16,7 +16,7 @@ export async function fuzzySearch(
   if (signal?.aborted) return [];
 
   const binary = await findBinary("fzf", getPreferences().fzfBinary);
-  const input = createReadStream(indexFilePath(index));
+  const input = await openIndexDataStream(indexFilePath(index));
 
   return await new Promise<string[]>((resolve, reject) => {
     const results: string[] = [];
