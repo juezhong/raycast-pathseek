@@ -71,6 +71,8 @@ The index may contain private file names and paths; do not upload it to public G
 
 ### Search modes
 
+Search results are strictly capped at **150**. Developer tracing reports a deliberate early fzf stop as `limit-reached` (exit code may be `null`), which is not an error.
+
 There is only **one Search Files mode**, powered by fzf. Its built-in extended-search syntax supports `report` (fuzzy), `'report` (exact substring), `.pdf$` (suffix), `!node_modules` (exclude), and `.ts$ | .tsx$` (OR). These are **fzf operators, not regular expressions**. Searches match indexed paths, not file contents. See the [fzf search syntax guide](https://junegunn.github.io/fzf/search-syntax/).
 
 ## Documentation
