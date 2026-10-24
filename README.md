@@ -118,8 +118,10 @@ A `package-lock.json` file has not yet been generated and committed as part of a
 
 [MIT License](LICENSE). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for upstream attribution. The current development icon is temporarily reused from the MIT-licensed Fuzzy File Search upstream extension; it must be replaced before publishing.
 
-## Assisted Open/Save dialog navigation (P4.1 · development)
+## Quick file selection and folder navigation in Open/Save dialogs (development)
 
-The **Search in Open/Save Dialog** command can paste a search result's **containing folder** into the native macOS Go to Folder field. In the original application's Open/Save panel press **Cmd+Shift+G** first, invoke the Raycast command, choose a result, press **Return** to paste the folder, and then confirm Go to Folder in the original dialog yourself. For indexed folder results, choose **Paste Selected Path (For Folder Results)** from the Action Panel.
+**Search in Open/Save Dialog** focuses on two workflows: quickly selecting an indexed file in the original application's **Open** dialog, or navigating to an indexed folder in its **Open/Save** dialog.
 
-**This is an assisted flow, not automatic panel detection/navigation.** It never presses Open/Save, opens a new Finder window or starts an index build. See [Open/Save workflow and limitations](docs/open-save-dialog.md) and [Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7).
+Press **Cmd+Shift+G** in the original panel first, search with PathSeek, and press **Return** to paste the **full selected path**. Confirm Go to Folder in the original dialog. Standard Open dialogs may highlight a full file path, but this must be verified on the user's Mac and may vary by app. Use **Cmd+K → Go to Containing Folder (Fallback)** to navigate to the parent directory instead.
+
+There is **no automatic dialog detection, window manager, accessibility automation, background agent, or automatic Open/Save confirmation**. See [simple instructions](docs/open-save-dialog.md) and [Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7).
