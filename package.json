@@ -61,6 +61,15 @@
       "description": "Optional absolute path. Default: find fzf in Homebrew or PATH.",
       "type": "textfield",
       "required": false
+    },
+    {
+      "name": "enableCommandTracing",
+      "title": "Developer: Trace fd/fzf Calls",
+      "description": "Record sanitized command calls, reasons, exit states and durations locally. Off by default.",
+      "type": "checkbox",
+      "label": "Enable developer execution trace",
+      "default": false,
+      "required": false
     }
   ],
   "commands": [
