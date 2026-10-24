@@ -6,9 +6,9 @@
 - Plan Directory: plans/pathseek-development/
 - Write Mode: continuous_checkpoints
 - Status: active / code-review-quality-gate
-- Current Phase: P4 merged — user preferred Cmd-Shift-F setup documented and manifest updated
-- Checkpoint ID: pathseek-20261024-cmdshiftf-16
-- Last Checkpoint: pathseek-20261024-cmdshiftf-16 (2026-10-24; verified three-file readback)
+- Current Phase: v0.1.0 tagged stable; direct CmdShiftF Open/Save workflow user-verified
+- Checkpoint ID: pathseek-20261024-v010-stable-direct-paste-17
+- Last Checkpoint: pathseek-20261024-v010-stable-direct-paste-17 (2026-10-24; three-file readback verified)
 - Last Updated: 2026-10-24
 - Storage: github_checkpointed
 
@@ -257,3 +257,18 @@ PR #3 已合并进 main（squash commit 09d7a864257c88d9869aac545e90aea11c6b2558
 
 ## Active Next Step (pathseek-20261024-cmdshiftf-16)
 Raycast 扩展官方 Manifest 不支持自动分配全局 Hotkey，也没有稳定的可编程设置 API。已在 main 的 dialog-search 命令元数据、README 中英及 docs/open-save-dialog.md 中推荐用户指定的 ⌘⇧F，用户只需在 Raycast 的 Configure Command → Set Hotkey 手动设置一次；不修改私有数据库、不安装后台按键监听。用户已确认完整路径提交后原 Open 对话框高亮选中文件（Issue #7 5/7 通过）。下一步是让用户直接使用已合并 main 版本、如愿只设置一次 ⌘⇧F；不要求重复已有成功测试，按实际使用情况继续最小优化。
+
+## 2026-10-24 — v0.1.0 稳定里程碑，单键定位已获 Mac 实测（pathseek-20261024-v010-stable-direct-paste-17）
+
+- [x] 用户复测 main 的核心搜索、文件与目录导航可用，且已自行清理测试 worktree。
+- [x] 已创建 annotated Git Tag **[v0.1.0](https://github.com/juezhong/raycast-pathseek/tree/v0.1.0)**，目标 SHA `9cf81375c059762f22c2d7973b25f302337a6155`；已通过 GitHub API 回读 Tag 对象与目标提交。
+- [x] 临时打标签 GitHub Actions 已成功运行后删除；不留下持续的写权限和自动改动 Tag 逻辑。
+- [x] 用户实测可直接使用 `⌘⇧F` 唤起 PathSeek，在原 Open/Save 中正确选中文件或进入目录，**当前支持环境下无需先按 `⌘⇧G`**。
+- [x] 确认代码仅通过 `Action.Paste` 传递绝对路径，无额外 Finder/AX/AppleScript 自动控制；`⌘⇧G` 保留用于其他不支持直接粘贴路径的应用。
+- [x] [Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7) 更新为 6/7 用户验收，[Issue #10](https://github.com/juezhong/raycast-pathseek/issues/10) 更新全局热键的用户实测状态。
+- [x] main 的 docs/open-save-dialog.md 与 README 中英文已更新稳定版 Tag、最短快捷键路径以及 README 旧阶段/lockfile 状态。
+- [ ] 后续根据用户实际遇到的问题进行小而可测的改进；不要主动引入自动窗口管理、后台扫描、全局按键劫持或未经要求的架构复杂性。
+- [ ] Raycast Store 上架仍需处理作者 Raycast 账户、图标、Prettier 与完整提交校验；Tag 不是商店发布状态。
+
+## Active Next Step (pathseek-20261024-v010-stable-direct-paste-17)
+已创建并核实不可变的 annotated Git Tag v0.1.0（target 9cf81375c059762f22c2d7973b25f302337a6155），记录用户 Mac 实测通过的 PathSeek 稳定开发基线，非 Raycast Store 正式发布。维护者确认原应用 Open/Save 对话框可以仅按已设置的 ⌘⇧F 启动 Search in Open/Save Dialog，然后搜索并 Return 粘贴路径，正确选中文件或进入目录，无需先按 ⌘⇧G；该键保留为不兼容应用的手动后备。Issue #7 目前 6/7 通过，仅父目录备用 Action 未报告使用；Issue #10 已更新单键实测。后续只跟随用户实际问题做必要的性能/交互优化；不做自动窗口管理或系统按键注入。
