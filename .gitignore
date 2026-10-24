@@ -8,3 +8,6 @@ index-*.nul
 index.json
 coverage/
 dist/
+# Raycast generated files
+raycast-env.d.ts
+.build/
