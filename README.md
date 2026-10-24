@@ -83,6 +83,12 @@ Choose **Fuzzy (fzf)** or **Regex (full path)** in the Search Files dropdown. Re
 | [Development Plan (中文)](plans/pathseek-development/task_plan.md) | Phases, acceptance criteria and next step |
 | [中文 README](README.zh-CN.md) | Complete Chinese user guide |
 
+### Opt-in developer execution trace
+
+PathSeek has a disabled-by-default **Developer: Trace fd/fzf Calls** preference. With it enabled, **Debug Info** shows sanitized fd/fzf subprocess start/end records, invocation flags, trigger reasons (manual rebuild, 15-day refresh, fuzzy query), durations, results and exit codes. Search terms and personal paths are never persisted in this trace. Turning it off prevents trace disk writes during ordinary use.
+
+See [Developer Trace Guide (Chinese)](docs/developer-tracing.md) and [Issue #5 checklist](https://github.com/juezhong/raycast-pathseek/issues/5).
+
 ## Testing and feedback
 
 Use [Issue #1 — installation tests](https://github.com/juezhong/raycast-pathseek/issues/1) and [Issue #2 — 15-day refresh, regex and native icons](https://github.com/juezhong/raycast-pathseek/issues/2). Check off only behaviors you have actually verified and comment with reproducible steps and logs for failures.
