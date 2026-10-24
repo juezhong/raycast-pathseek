@@ -1,7 +1,7 @@
 # Findings — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-cmdshiftf-16
+- Checkpoint ID: pathseek-20261024-v010-stable-direct-paste-17
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Evidence: [首轮 Code Review](../../docs/reviews/2026-10-24-initial-code-review.md) · [质量 Issue #4](https://github.com/juezhong/raycast-pathseek/issues/4) · [Draft PR #3](https://github.com/juezhong/raycast-pathseek/pull/3)
@@ -242,3 +242,18 @@ PR #3 已合并进 main（squash commit 09d7a864257c88d9869aac545e90aea11c6b2558
 
 ## Active Next Step (pathseek-20261024-cmdshiftf-16)
 Raycast 扩展官方 Manifest 不支持自动分配全局 Hotkey，也没有稳定的可编程设置 API。已在 main 的 dialog-search 命令元数据、README 中英及 docs/open-save-dialog.md 中推荐用户指定的 ⌘⇧F，用户只需在 Raycast 的 Configure Command → Set Hotkey 手动设置一次；不修改私有数据库、不安装后台按键监听。用户已确认完整路径提交后原 Open 对话框高亮选中文件（Issue #7 5/7 通过）。下一步是让用户直接使用已合并 main 版本、如愿只设置一次 ⌘⇧F；不要求重复已有成功测试，按实际使用情况继续最小优化。
+
+## 2026-10-24 — v0.1.0 稳定开发版 Tag 与单键 Open/Save 实测（pathseek-20261024-v010-stable-direct-paste-17）
+
+- 用户完成本地 worktree 清理、从 main 启动最新版并再次测试通过，明确要求给最新稳定状态打 Git Tag。
+- GitHub `main` 的测试通过：`PathSeek quality gates` 在 `540cb5133b6ca8b7a86a5d43747b1129e8a59dcc` completed/success（此前 PR #8 开发 CI 通过 23 个测试）。当前也无其他 Tag。
+- 已使用**仅一次** GitHub Actions 发布任务，创建并核对 annotated Git Tag [v0.1.0](https://github.com/juezhong/raycast-pathseek/tree/v0.1.0)：`refs/tags/v0.1.0` 是 annotated tag object `09e87536108a699bbe88921395bf9da1226521a1`，**明确指向 main 稳定开发快照 commit** `9cf81375c059762f22c2d7973b25f302337a6155`。任务已成功并且临时有写权限的 workflow 随后被删除，不留下自动移动 Tag 的动作。此 Tag 是稳定开发版本，不代表 Raycast Store 已上架或发布 lint 通过。
+- 用户发现意外的更短工作流：在原应用文件选择窗口**无需先打开 CmdShiftG 的 Go to Folder**，直接使用此前已在 Raycast 设置好的 `⌘⇧F` → PathSeek Search in Open/Save Dialog → 搜索文件或文件夹 → Return 粘贴完整路径，原文件选择窗口就会定位/高亮选中正确文件或跳到正确目录。**这是用户真实 Mac 观察、已验证**。
+- GitHub main 的 `src/search-files.tsx` 只使用 `Action.Paste` 且路径来自 `src/lib/dialog-navigation.ts`；没有代码调用 AppleScript、Accessibility API、模拟 `⌘⇧G` 或打开 Finder。因此因果解释是 **Raycast Action.Paste 与原应用 macOS 文件面板的粘贴处理协作**，其内部是否自动打开某个输入框并不由现有代码证明，不能误称“PathSeek 自动控制了窗口”或“一切 Finder 统一支持”。
+- 官方依据：Raycast `Action.Paste` 会把文本粘贴回前台应用（https://developers.raycast.com/api-reference/user-interface/actions）；Apple `NSOpenPanel` 是 macOS 标准文件选择面板（https://developer.apple.com/documentation/appkit/nsopenpanel），不必是独立 Finder 应用。部分系统/自定义面板可能要求先 ⌘⇧G，当前无法保证所有应用统一行为。
+- [Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7) 已更新至 **6/7 勾选**：文件定位、目录导航、直接快捷键粘贴均实测确认，仅备用父目录 Action 未专门测试。
+- [Issue #10](https://github.com/juezhong/raycast-pathseek/issues/10) 已勾选维护者设置全局 `⌘⇧F` 并直接唤起、实测单键流程与中英文说明。原先“必须先 ⌘⇧G”的描述已修正为**在用户当前 Mac 上非必需，只做兼容后备**。
+- 已更新主分支 docs/open-save-dialog.md 与 README 中英：推荐 ⌘⇧F 的单键短流程，注明设备/应用兼容差异；修正 README 旧的“无 package-lock / P4 未实现”状态。
+
+## Active Next Step (pathseek-20261024-v010-stable-direct-paste-17)
+已创建并核实不可变的 annotated Git Tag v0.1.0（target 9cf81375c059762f22c2d7973b25f302337a6155），记录用户 Mac 实测通过的 PathSeek 稳定开发基线，非 Raycast Store 正式发布。维护者确认原应用 Open/Save 对话框可以仅按已设置的 ⌘⇧F 启动 Search in Open/Save Dialog，然后搜索并 Return 粘贴路径，正确选中文件或进入目录，无需先按 ⌘⇧G；该键保留为不兼容应用的手动后备。Issue #7 目前 6/7 通过，仅父目录备用 Action 未报告使用；Issue #10 已更新单键实测。后续只跟随用户实际问题做必要的性能/交互优化；不做自动窗口管理或系统按键注入。
