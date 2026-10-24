@@ -58,9 +58,9 @@ PathSeek 是一款面向 macOS 的 Raycast Extension，目标对齐 Windows List
 
 ## 4. 控制流与数据流
 
-**建索引：** 用户执行 Rebuild Index → 获取偏好设置 → 校验搜索根目录 → `fd` 扫描输出 NUL 分隔路径 → 临时文件 → 正式文件 → 更新 `index.json`。为避免并发清理竞态，当前代码暂不自动删除旧版索引；未来增加单独的安全清理操作。
+**建索引：** 用户执行 Rebuild Index 或索引满 15 天后进入 Search Files → 获取跨进程锁 → 校验配置 → `fd` 扫描 → 新 `.nul` 临时文件 → 新正式文件 → 原子切换 `index.json` → 重新读取验证新索引 → 清理旧 `.nul`。错误/中断时保留已发布的当前索引。
 
-**搜索：** 用户执行 Search Files → 读取元数据和索引文件 → `fzf` 过滤已有路径 → 最多展示 150 条 → 通过 Raycast Action 打开或定位文件。
+**搜索：** 用户执行 Search Files → 读取元数据和索引文件 → 模式选择（`fzf` 模糊或 JavaScript 正则流式扫描路径）→ 最多展示 150 条 → 显示 Finder 原生图标 → 打开或定位。查询时不执行 `fd`。
 
 **查看索引：** 用户执行 Index Status → `readIndex()` → 展示统计、时间、搜索目录，提供打开/复制 `environment.supportPath` 动作；这条路径不运行 `fd`。
 
@@ -74,7 +74,8 @@ PathSeek 是一款面向 macOS 的 Raycast Extension，目标对齐 Windows List
 - 多根目录重叠可能重复索引同一路径；后续要优化。
 - 当前搜索在 query 变化时重新启动 `fzf`，有 CPU 与索引读取成本；先实测后优化。
 - 文件对话框导航必须区分 Finder 本身与标准 NSOpenPanel/NSSavePanel，自定义面板应单独做兼容测试。
-- **目前不实现**自动刷新、常驻监听、定时重建、自动确认 Open/Save 或自动覆盖文件。
+- **15 天按需刷新（已实现初版）**：没有常驻监听和后台调度；过期索引只在下一次打开 Search Files 时尝试更新，失败重试间隔 24 小时。
+- **目前不实现**常驻 FSEvents、后台定时器、自动确认 Open/Save 或自动覆盖文件。
 
 ## 6. 开源与发布
 
