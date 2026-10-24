@@ -2,7 +2,7 @@
 
 **产品目标只保留两件事：** 在原来的 macOS Open 对话框里搜索并快速选中一个文件；或在 Open/Save 对话框里搜索并进入一个文件夹。不做 Listary 式活动窗口监控、自动弹出文件管理器、Accessibility helper 或后台服务。
 
-本文件描述 Draft PR #8（尚未合并 main），界面行为仍需用户 Mac 验收。
+此功能已通过维护者 Mac 核心路径粘贴实测，并随 [PR #8](https://github.com/juezhong/raycast-pathseek/pull/8) 合并到 main。文件最终高亮、父目录备用动作等细节参见 Issue #7。
 
 ## 操作步骤（尽量少的按键）
 
@@ -13,6 +13,19 @@
 5. 手动检查结果，需要时才自行点击 **Open**、**Save**；PathSeek 不代替用户提交操作。
 
 如果完整文件路径在某个应用不适用，可按 **⌘K → Go to Containing Folder (Fallback)**，先进入该文件所在目录，再手动选文件。保存文件时通常也是进入目标文件夹，不自动填写或覆盖保存文件名。
+
+## 更快捷的唤起方式：只需设置一次 Hotkey
+
+使用 Raycast 官方的全局命令快捷键，无需再打开 Raycast 根搜索、输入插件名字：
+
+1. 打开 Raycast **Settings → Shortcuts**，找到 PathSeek 的 **Search in Open/Save Dialog**，选择 **Record Hotkey**。建议试用 `⌃⌥G`（若与本机软件冲突，换一个未占用的组合）。
+2. 在原应用的 Open/Save 文件对话框按 **⌘⇧G** 打开 Go to Folder。
+3. 紧接着按刚设的 PathSeek Hotkey，直接进入搜索；找到结果后按 **Return** 粘贴。
+4. 在原对话框自行确认目录导航或文件选择，不自动点击 Open/Save。
+
+**不要直接把 Raycast 命令绑定到系统的 ⌘⇧G**：同一个组合被 Raycast 拦截时，macOS 原有的 Go to Folder 不一定还能触发。公开的 Raycast 扩展 API 也没有让扩展窗口精确贴近其他应用小窗口的简单定位接口，不为此增加窗口控制依赖。
+
+体验优化跟踪：[Issue #10](https://github.com/juezhong/raycast-pathseek/issues/10)；现有基本流程已可用，未来若有实际摩擦再做最小改进。
 
 ## 技术实现保持简单
 
