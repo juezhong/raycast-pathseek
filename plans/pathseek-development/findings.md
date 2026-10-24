@@ -1,7 +1,7 @@
 # Findings — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-p4-merged-hotkey-15
+- Checkpoint ID: pathseek-20261024-cmdshiftf-16
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Evidence: [首轮 Code Review](../../docs/reviews/2026-10-24-initial-code-review.md) · [质量 Issue #4](https://github.com/juezhong/raycast-pathseek/issues/4) · [Draft PR #3](https://github.com/juezhong/raycast-pathseek/pull/3)
@@ -229,3 +229,16 @@ PR #3 已合并进 main（squash commit 09d7a864257c88d9869aac545e90aea11c6b2558
 
 ## Active Next Step (pathseek-20261024-p4-merged-hotkey-15)
 用户已授权 PR #8 合并，GitHub 返回 merged=true，main squash commit 47ea3c2a8781e111a58abf4a4d400b7a03b2eb38。优先由用户在 Raycast Settings → Shortcuts 为 Search in Open/Save Dialog 设置未冲突的独立全局热键（例如 ⌃⌥G），形成原对话框 ⌘⇧G → 热键直接搜索 → Return 粘贴的短流程，并描述真实体验；根据反馈决定 Issue #10 是否有必要进一步探索可选一键衔接/窗口位置。Issue #7 三项未单独验证的文件高亮、目录最终进入、父目录备用动作不阻碍主功能。不得劫持系统 CmdShiftG、增加自动窗口管理或私自变更用户 Mac 快捷键。
+
+## 2026-10-24 — ⌘⇧F 自动注册不可用，已直接更新官方支持的命令元数据（pathseek-20261024-cmdshiftf-16）
+
+- 用户明确要求 **Command+Shift+F / ⌘⇧F** 自动注册 PathSeek Open/Save 专用快捷键，不希望再重复前面已完成的功能测试，而希望推进实际更新。
+- 查询 Raycast 官方 [Manifest](https://developers.raycast.com/information/manifest) 与 [Command Aliases & Hotkeys](https://manual.raycast.com/command-aliases-and-hotkeys)：扩展命令 Manifest **没有**默认全局 Hotkey 字段/注册 SDK，Raycast 的个人 Hotkey 在其 UI 中配置；此功能的官方 [Feature Request #348](https://github.com/raycast/extensions/issues/348) 已关闭为 not planned。不能通过 `Action` 的局部 `shortcut` 冒充系统全局启动快捷键，也不能写私有数据库。
+- 已**直接提交 main** `package.json`：`dialog-search` 命令描述清楚说明“粘贴文件/目录完整路径”和“建议 Cmd+Shift+F（需在 Raycast 中自行设定一次）”，增加 `file dialog`、`file picker`、`open save`、`Cmd Shift F` 搜索关键词；**没有添加不支持的 hotkey 字段**。
+- 已更新 `docs/open-save-dialog.md` 与 README 中文/英文，说明在 Raycast 根搜索选中命令后使用 **⌘K → Configure Command → Set Hotkey** 录入 `⌘⇧F`，或 Settings → Shortcuts → Record Hotkey；快捷键可能与其他应用的 Find in Files 冲突，具体由用户在自己 Mac 选择。
+- [Issue #10](https://github.com/juezhong/raycast-pathseek/issues/10) 更新官方限制与已完成的可支持修改，仍保留由用户自行设一次快捷键的体验验证，不擅自打勾。
+- 用户明确确认：将完整绝对文件路径粘贴给原生 Open 对话框并在界面确认后，**目标文件会被高亮选中**。已更新 [Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7)，目前 **5/7 通过**，未验证的文件夹最终进入与备用父目录动作不擅自勾选。
+- 当前没有后台窗口管理/自动按键注入/无授权修改系统键盘设置，原 P4 最小路径粘贴逻辑不变。
+
+## Active Next Step (pathseek-20261024-cmdshiftf-16)
+Raycast 扩展官方 Manifest 不支持自动分配全局 Hotkey，也没有稳定的可编程设置 API。已在 main 的 dialog-search 命令元数据、README 中英及 docs/open-save-dialog.md 中推荐用户指定的 ⌘⇧F，用户只需在 Raycast 的 Configure Command → Set Hotkey 手动设置一次；不修改私有数据库、不安装后台按键监听。用户已确认完整路径提交后原 Open 对话框高亮选中文件（Issue #7 5/7 通过）。下一步是让用户直接使用已合并 main 版本、如愿只设置一次 ⌘⇧F；不要求重复已有成功测试，按实际使用情况继续最小优化。
