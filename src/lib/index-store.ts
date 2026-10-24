@@ -2,13 +2,13 @@ import { environment, getPreferenceValues } from "@raycast/api";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { createWriteStream, constants } from "node:fs";
-import { access, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Transform } from "node:stream";
 import lockfile from "proper-lockfile";
-import { ACTIVE_INDEX_FILENAME, cleanupLegacyIndexes, publishIndex } from "./index-files";
+import { ACTIVE_INDEX_FILENAME, cleanupLegacyIndexes, prepareIndex, publishIndex, readIndexHeader, type SavedIndexMetadata } from "./index-files";
 
 export type Preferences = {
   searchRoots: string;
@@ -19,13 +19,7 @@ export type Preferences = {
   fzfBinary?: string;
 };
 
-export type IndexMetadata = {
-  version: 1;
-  filename: string;
-  createdAt: string;
-  count: number;
-  roots: string[];
-};
+export type IndexMetadata = SavedIndexMetadata;
 
 const indexDirectory = environment.supportPath;
 const metadataPath = path.join(indexDirectory, "index.json");
@@ -83,6 +77,17 @@ export function indexFilePath(metadata: IndexMetadata): string {
 }
 
 export async function readIndex(): Promise<IndexMetadata | null> {
+  // Version 2 is a single self-describing, atomically replaced file.
+  // It is always authoritative when present, even if a legacy index.json
+  // remains from a previous plugin version.
+  try {
+    return await readIndexHeader(path.join(indexDirectory, ACTIVE_INDEX_FILENAME));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+
+  // Backward compatibility with pre-v2 UUID + index.json format. Old
+  // generations are left alone until a successful v2 rebuild/migration.
   let text: string;
   try {
     text = await readFile(metadataPath, "utf8");
@@ -90,23 +95,20 @@ export async function readIndex(): Promise<IndexMetadata | null> {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw error;
   }
-
   const data: unknown = JSON.parse(text);
   if (
-    !data ||
-    typeof data !== "object" ||
+    !data || typeof data !== "object" ||
     !("version" in data) || data.version !== 1 ||
     !("filename" in data) || typeof data.filename !== "string" ||
     !("count" in data) || typeof data.count !== "number" ||
     !("roots" in data) || !Array.isArray(data.roots) ||
     !("createdAt" in data) || typeof data.createdAt !== "string"
   ) {
-    throw new Error("Invalid index metadata. Rebuild the index.");
+    throw new Error("Invalid legacy index metadata; rebuild the index");
   }
-
   const metadata = data as IndexMetadata;
   await access(indexFilePath(metadata));
-  return metadata;
+  return { ...metadata, dataOffset: 0 };
 }
 
 async function runFd(fdPath: string, args: string[], outputPath: string): Promise<number> {
@@ -206,9 +208,8 @@ export async function rebuildIndex(options: { skipIfFresh?: boolean } = {}): Pro
 
     const fd = await findBinary("fd", prefs.fdBinary);
     const id = randomUUID();
-    const indexName = ACTIVE_INDEX_FILENAME;
-    const tempPath = path.join(indexDirectory, "index-" + id + ".nul.tmp");
-    const metadataTemp = path.join(indexDirectory, "index-" + id + ".json.tmp");
+    const rawTemp = path.join(indexDirectory, "index-" + id + ".paths.tmp");
+    const stagedTemp = path.join(indexDirectory, "index-" + id + ".nul.tmp");
     const args = ["--absolute-path", "--print0"];
     if (prefs.includeHidden) args.push("--hidden");
     if (prefs.followSymlinks) args.push("--follow");
@@ -218,39 +219,36 @@ export async function rebuildIndex(options: { skipIfFresh?: boolean } = {}): Pro
 
     let total = 0;
     try {
-      await writeFile(tempPath, "", { flag: "wx" });
+      await writeFile(rawTemp, "", { flag: "wx" });
       for (const root of roots) {
-        total += await runFd(fd, [...args, ".", root], tempPath);
+        total += await runFd(fd, [...args, ".", root], rawTemp);
       }
 
       const metadata: IndexMetadata = {
-        version: 1,
-        filename: indexName,
+        version: 2,
+        filename: ACTIVE_INDEX_FILENAME,
         createdAt: new Date().toISOString(),
         count: total,
         roots,
       };
-      // Stage metadata first, then publish the complete data through one
-      // atomic rename, followed by a second metadata rename.
-      await writeFile(metadataTemp, JSON.stringify(metadata, null, 2), "utf8");
-      await publishIndex(tempPath, indexDirectory);
-      await rename(metadataTemp, metadataPath);
 
-      // Cleanup is best-effort; publish success does not depend on cleanup.
+      // Write metadata and NUL paths into ONE staged file. A single rename
+      // makes both available together. No index.json second-phase commit.
+      const stagedMetadata = await prepareIndex(rawTemp, stagedTemp, metadata);
+      await publishIndex(stagedTemp, indexDirectory);
+
+      // Cleanup failures must not turn a published index into a failed build.
       try {
         await cleanupLegacyIndexes(indexDirectory);
       } catch (error) {
-        console.warn("Index cleanup deferred:", error);
+        console.warn("Legacy index cleanup deferred:", error);
       }
-      return metadata;
-    } catch (error) {
+      return stagedMetadata;
+    } finally {
       await Promise.all([
-        rm(tempPath, { force: true }).catch(() => undefined),
-        rm(metadataTemp, { force: true }).catch(() => undefined),
-        // Never delete index.nul: it may already be in use, even if metadata
-        // publication fails after the atomic replacement.
+        rm(rawTemp, { force: true }).catch(() => undefined),
+        rm(stagedTemp, { force: true }).catch(() => undefined),
       ]);
-      throw error;
     }
   } finally {
     await release();
