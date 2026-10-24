@@ -1,13 +1,13 @@
 # Progress — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-cmdshiftf-16
+- Checkpoint ID: pathseek-20261024-v010-stable-direct-paste-17
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Branch: main
 - Plan Directory: plans/pathseek-development/
 - Write Mode: continuous_checkpoints
-- Current Phase: P4 / 核心路径粘贴已合并、推荐 ⌘⇧F 已写入主分支，用户首次绑定待完成
+- Current Phase: v0.1.0 已打稳定 Tag；⌘⇧F 直接文件选择/目录跳转通过 Mac 复测
 - Storage: github_checkpointed（以三文件回读一致为准）
 
 ## 执行纪要
@@ -233,3 +233,15 @@ PR #3 已合并进 main（squash commit 09d7a864257c88d9869aac545e90aea11c6b2558
 
 ## Active Next Step (pathseek-20261024-cmdshiftf-16)
 Raycast 扩展官方 Manifest 不支持自动分配全局 Hotkey，也没有稳定的可编程设置 API。已在 main 的 dialog-search 命令元数据、README 中英及 docs/open-save-dialog.md 中推荐用户指定的 ⌘⇧F，用户只需在 Raycast 的 Configure Command → Set Hotkey 手动设置一次；不修改私有数据库、不安装后台按键监听。用户已确认完整路径提交后原 Open 对话框高亮选中文件（Issue #7 5/7 通过）。下一步是让用户直接使用已合并 main 版本、如愿只设置一次 ⌘⇧F；不要求重复已有成功测试，按实际使用情况继续最小优化。
+
+### 2026-10-24 — 确认 v0.1.0 标签并收敛到最短 Open/Save 流程（pathseek-20261024-v010-stable-direct-paste-17）
+
+- 用户确认 main 开发版、清理和复测完成，要求创建稳定版 Git Tag；检查 GitHub `main`、历史 CI 和现有 tags，确认没有旧 tag 且开发 CI 正常。
+- 在 GitHub 中临时创建明确标定 SHA 的一次性 Actions 工作流，用官方 git tag/push 创建 annotated `v0.1.0`。从 GitHub git/refs/tags 及 git/tags API 回读，确认 tag object 指向 `9cf81375c059762f22c2d7973b25f302337a6155`，Workflow completed/success。之后通过受权限控制的文件删除工具清理临时 workflow，避免保留有 `contents: write` 的自动打标签任务。
+- 用户报告可直接 `⌘⇧F` → PathSeek 搜索 → Return，在原生 Open/Save 窗口定位文件/跳转目录，不需要 `⌘⇧G`，明显比最初设计更顺畅。查看现有源码与 Raycast Action.Paste 文档，未找到任何由插件自动模拟系统快捷键/操纵对话框的实现。
+- 将 [Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7) 目录跳转项目勾选，从 5/7 更新为 6/7，仅未测试备用父目录；将 [Issue #10](https://github.com/juezhong/raycast-pathseek/issues/10) 中自定义 `⌘⇧F` 热键和单键使用标为用户已实际完成。
+- 更新 `docs/open-save-dialog.md`、`README.zh-CN.md`、`README.md` 的操作建议、稳定版 Tag 链接和 CI/功能阶段状态，确保不再宣称必须先使用 `⌘⇧G`。没有改变运行时代码或 fd 索引规则。
+- 后续仍然不做自动窗口管理、Accessibility 或保活后台进程。开发 Tag 不等同 Raycast Store 发布审核通过；Store 作者与格式仍需要正式发布前补齐。
+
+## Active Next Step (pathseek-20261024-v010-stable-direct-paste-17)
+已创建并核实不可变的 annotated Git Tag v0.1.0（target 9cf81375c059762f22c2d7973b25f302337a6155），记录用户 Mac 实测通过的 PathSeek 稳定开发基线，非 Raycast Store 正式发布。维护者确认原应用 Open/Save 对话框可以仅按已设置的 ⌘⇧F 启动 Search in Open/Save Dialog，然后搜索并 Return 粘贴路径，正确选中文件或进入目录，无需先按 ⌘⇧G；该键保留为不兼容应用的手动后备。Issue #7 目前 6/7 通过，仅父目录备用 Action 未报告使用；Issue #10 已更新单键实测。后续只跟随用户实际问题做必要的性能/交互优化；不做自动窗口管理或系统按键注入。
