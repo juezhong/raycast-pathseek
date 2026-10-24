@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { getDialogNavigationPaths } from "../src/lib/dialog-navigation.ts";
 
-test("file results paste containing folder by default", () => {
+test("file results provide full path for selection and parent fallback", () => {
   assert.deepEqual(getDialogNavigationPaths("/Users/test/Projects/report.pdf"), {
     containingFolder: "/Users/test/Projects",
     selectedPath: "/Users/test/Projects/report.pdf",
@@ -36,4 +36,12 @@ test("assisted dialog command uses Action.Paste and no UI automation or fd scan"
   assert.match(searchView, /Assisted Open\/Save Navigation/);
   assert.doesNotMatch(dialogCommand, /\bspawn\s*\(|\brebuildIndex\s*\(|\bosascript\b/);
   assert.doesNotMatch(searchView, /\bspawn\s*\(|\brebuildIndex\s*\(|\bosascript\b/);
+});
+
+test("dialog primary paste is exact selection; fallback paste uses parent folder", async () => {
+  const view = await readFile(new URL("../src/search-files.tsx", import.meta.url), "utf8");
+  const exact = view.indexOf("content={getDialogNavigationPaths(filepath).selectedPath}");
+  const parent = view.indexOf("content={getDialogNavigationPaths(filepath).containingFolder}");
+  assert.ok(exact >= 0 && parent >= 0 && exact < parent);
+  assert.match(view, /Select File or Go to Folder/);
 });
