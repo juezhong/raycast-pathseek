@@ -127,8 +127,8 @@ npm run build
 - [索引文件格式](index-storage.md)
 - [开发计划](../plans/pathseek-development/task_plan.md)
 
-## P4.1：测试原应用中的 Go to Folder 路径粘贴
+## P4：只验证选中文件与进入目录
 
-从未合并的 PR 分支开发时，先在其他应用打开标准 Open/Save 对话框并按 ⌘⇧G，再使用 Raycast 的 **Search in Open/Save Dialog** 命令。第一项 Action.Paste 会把父目录粘贴到之前聚焦的输入框，返回原应用手动按 Return 完成导航。不要在未打开 Go to Folder 输入框时触发粘贴，否则可能把绝对路径插入错误控件。
+在 TextEdit 等标准 macOS Open 对话框先按 ⌘⇧G，然后执行 **Search in Open/Save Dialog**。搜索一个文件，按 Return 把完整绝对路径粘贴回原对话框，手动确认 Go to Folder，观察能否直接定位/选中目标文件。再用文件夹结果尝试进入目录。若文件路径不被该对话框接受，可使用 ⌘K → **Go to Containing Folder (Fallback)**。
 
-完整说明：[docs/open-save-dialog.md](open-save-dialog.md)。Mac 体验任务：[Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7)。此阶段没有 AppleScript/Accessibility 自动控制，也不会自动提交 Open/Save。开发期 CI 测试只验证逻辑和 API 构建，用户 Mac 行为仍须手动验收。
+此阶段仅做上述体验，不开发活动文件面板自动管理、Accessibility 或自动点击 Open/Save。完整说明：[open-save-dialog.md](open-save-dialog.md)，简单实测：[Issue #7](https://github.com/juezhong/raycast-pathseek/issues/7)。
