@@ -38,5 +38,6 @@ test("Rebuild Index starts only on explicit form submit or Action", async () => 
   assert.match(code, /title="Change Indexed Folders"/);
   assert.match(code, /title="Rebuild Index Now"/);
   assert.match(code, /onAction=\{\(\) => void buildIndex\(roots\)\}/);
-  assert.doesNotMatch(code, /useEffect\(\(\) => \{[\s\S]*?\brebuildIndex\s*\(/);
+  const initialization = code.slice(0, code.indexOf("async function buildIndex("));
+  assert.doesNotMatch(initialization, /\brebuildIndex\s*\(/);
 });
