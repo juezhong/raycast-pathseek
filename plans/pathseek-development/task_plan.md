@@ -7,9 +7,9 @@
 - Write Mode: manual_save
 - Status: active / code-review-quality-gate
 - Current Phase: Q1 — 首轮 Code Review 质量收口，暂停进入 P4
-- Checkpoint ID: pathseek-20261024-review-02
-- Last Checkpoint: pathseek-20261024-review-02 (2026-10-24T08:45:49.982Z; 三文件全部写入后已读回核验)
-- Last Updated: 2026-10-24T08:45:49.982Z
+- Checkpoint ID: pathseek-20261024-pr3-v2-03
+- Last Checkpoint: pathseek-20261024-pr3-v2-03 (2026-10-24; after three-file verification)
+- Last Updated: 2026-10-24
 - Storage: github_checkpointed
 
 ## Goal
@@ -69,3 +69,17 @@
 
 ## Next Step
 在 Draft PR #3（fix/stable-index-file-atomic-swap）中修复 CR-01：为 index.nul 与 index.json 的分步发布设计可恢复提交协议，添加“数据发布成功而元数据发布失败”的故障注入测试；完善 npm run build/lint 的 CI 门槛，验证后再决定是否合并 PR。
+
+
+## 检查点更新 — 2026-10-24（pathseek-20261024-pr3-v2-03）
+
+- **P0 CR-01：PR #3 自描述索引 v2 初步实现已提交；仍未验收完成**。单文件索引消除了原本 index.nul / index.json 两次提交不一致，已通过 7/7 helper 测试与 TypeScript 检查；需 CI lint/build 和 macOS GUI 测试。
+- **P1 CR-06：质量门槛已补充 CI**（npm install/test/tsc/lint/build），但 lint 目前失败，build 尚未执行，不能合并。
+- **已知阻塞**：manifest 作者 `juezhong` 未能通过 Raycast 用户名查验；另外多个源码需要 Prettier 格式化。用户需确认 Raycast 账户用户名。
+- **未改变的后续任务**：15 天刷新生命周期和重试标记 CR-03/04、Regex 阻塞风险 CR-05、临时文件/目录筛选 CR-07/08，以及 P4 Open/Save Dialog Bridge。
+- **分支状态**：[PR #3](https://github.com/juezhong/raycast-pathseek/pull/3) 仍为 Draft；此时不能简单告知用户 `git pull main` 即可测试新格式。
+- **验证依据**：[PR3 实施说明](https://github.com/juezhong/raycast-pathseek/pull/3#issuecomment-6382347272)；macOS GitHub Actions；[Code Review Issue #4](https://github.com/juezhong/raycast-pathseek/issues/4)。
+- **下次保存规则**：完成 lint/build、Mac 实机验收、PR 合并或其他阶段转变后，仍应对三个文件做一致性检查点；但仓库当前 `Write Mode: manual_save`，没有持续后台自动写入授权。
+
+## Next Step
+确认正确的 Raycast 账户用户名（当前 package.json author=juezhong 被官方校验返回 404），据此修正 PR #3 的 manifest；随后修复 Prettier 格式并重新运行 macOS CI 的 lint/build。
