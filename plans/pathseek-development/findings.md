@@ -1,7 +1,7 @@
 # Findings — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-manual-setup-08
+- Checkpoint ID: pathseek-20261024-issue6-acceptance-09
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Evidence: [首轮 Code Review](../../docs/reviews/2026-10-24-initial-code-review.md) · [质量 Issue #4](https://github.com/juezhong/raycast-pathseek/issues/4) · [Draft PR #3](https://github.com/juezhong/raycast-pathseek/pull/3)
@@ -135,3 +135,16 @@
 
 ## Active Next Step (pathseek-20261024-manual-setup-08)
 用户在 Mac 更新 Draft PR #3 后，简短验证首次无索引提示、目录选择、打开 Rebuild 时不自动执行 fd、⌘K 更改目录及显式 Rebuild；由助理根据聊天反馈维护简单 Issue #6。之后集中代码审查剩余索引稳定性问题，用户授权后再讨论合并 PR #3。
+
+## 2026-10-24 — 用户完成 Issue #6 全部 11 项 Mac 交互验收（pathseek-20261024-issue6-acceptance-09）
+
+- 已实际读取 GitHub [Issue #6](https://github.com/juezhong/raycast-pathseek/issues/6) 完整状态：**11/11 勾选、0 未勾选**，没有新 Issue 评论；用户在对话中主动说明已基本全部通过。
+- 验收覆盖：首次无索引的 Search Files/Index Status 引导、首次 Rebuild Index 目录多选、仅用户确认后调用 fd、重新打开 Rebuild 不自动索引、⌘K Change Indexed Folders、更改配置不触发 fd、手动 Rebuild 后状态及搜索结果更新、Finder 图标、Debug Info 的 fzf/fd 调用记录。
+- **边界**：勾选仅代表用户可见的 GUI 使用体验已被 Mac 验证；不应把底层断电、两个进程同时写索引、模拟 fd 异常、日志轮换等视为已由用户测试。
+- [Draft PR #3](https://github.com/juezhong/raycast-pathseek/pull/3) 最近核对仍 `open/draft`，`merged=false`，head `6a23ecc54786dacc1170aa5db408a16ac3c0bfa3`，其 macOS GitHub Actions 为 completed/success（单元测试、tsc、源码 ESLint、Raycast build）。
+- 已同步 [Issue #4](https://github.com/juezhong/raycast-pathseek/issues/4)：CR-01 单文件自描述 v2 原子发布**实现与已有单元测试完成**（不包含断电模拟），CR-03/04 的 15 天自动刷新已取消，Planning with Files checkpoint 恢复；保留 fd 集成/中断/并发测试与 lockfile 等工程整改。
+- 已在 Issue #6 添加验收结论评论，保留用户实际勾选原样。Issue #1/#2/#5 的其他历史勾选不因本次全部自动改为通过。
+- **当前产品规则**：只有显式点击 Build/Rebuild 调用 fd，绝不自动构建或更新索引；唯一查询引擎为 fzf，开发者 tracing 默认关闭；正式 Raycast Store 作者身份待发布前补齐。
+
+## Active Next Step (pathseek-20261024-issue6-acceptance-09)
+Issue #6 的 11/11 项用户可见 Mac 验收已完成，PR #3 最新 macOS CI 通过。下一步由助理完成技术 Code Review 剩余阻塞：重点核验 UUID→v2 升级及中断/并发安全、真实 fd 集成场景、可复现的 npm lockfile 与文档一致性；无需用户再做复杂测试。PR #3 仍 Draft，未经明确同意不合并 main。
