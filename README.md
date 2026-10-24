@@ -13,6 +13,8 @@
 
 ## Install and use
 
+For step-by-step first-time setup and troubleshooting, see the [setup guide](docs/first-time-setup.md).
+
 Requires [Raycast](https://www.raycast.com/), [fd](https://github.com/sharkdp/fd), and [fzf](https://github.com/junegunn/fzf):
 
 ```bash
