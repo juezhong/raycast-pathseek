@@ -1,8 +1,8 @@
 # Progress — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-review-02
-- Last Updated: 2026-10-24T08:45:49.982Z
+- Checkpoint ID: pathseek-20261024-pr3-v2-03
+- Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Branch: main
 - Plan Directory: plans/pathseek-development/
@@ -54,3 +54,21 @@
 
 ## Next Action
 在 Draft PR #3（fix/stable-index-file-atomic-swap）中修复 CR-01：为 index.nul 与 index.json 的分步发布设计可恢复提交协议，添加“数据发布成功而元数据发布失败”的故障注入测试；完善 npm run build/lint 的 CI 门槛，验证后再决定是否合并 PR。
+
+
+### 2026-10-24 — 单文件索引 v2、升级兼容与 CI 校验（pathseek-20261024-pr3-v2-03）
+
+- 代码仅更新 Draft PR #3 的 `fix/stable-index-file-atomic-swap` 分支，`main` 未合并。
+- `src/lib/index-files.ts`：新增 v2 元数据头部、NUL 文件路径封装及流式同句柄读取，原子重命名发布。
+- `src/lib/index-store.ts`：新建索引输出自描述 v2，旧版 v1 索引保持兼容读取。
+- `src/lib/fuzzy-search.ts`、`src/lib/regex-search.ts`：用打开句柄后解析的 v2 偏移读取完整路径数据，避免新旧生成代偏移混用。
+- `src/debug-info.tsx`、`src/index-status.tsx`、中英文 README、索引技术文档同步到 v2。
+- `tests/index-files.test.mjs`：7 个原子发布、读者快照、失败保留、v1兼容、历史清理单元测试。
+- `.github/workflows/index-lifecycle.yml`：改为安装依赖、测试、`tsc --noEmit`、Raycast lint/build。
+- **真实 CI**：macOS runner `npm install` 成功、`npm test` 7/7 通过、`tsc --noEmit` 成功；lint 失败（Raycast manifest 作者 j​uezhong 用户校验 404，及 Prettier 格式），build 被跳过。
+- 新增 PR 评论记录本轮结果和用户需确认的账户用户名：https://github.com/juezhong/raycast-pathseek/pull/3#issuecomment-6382347272
+- 当前未做：Mac 本地 GUI 验证、完整 lint/build 成功、package-lock.json 锁文件提交、PR 合并；这些应保持待办。
+- 流程状态：`manual_save`；本轮按用户要求推进工程后在关键节点主动执行一次手动计划保存，并不表示存在自动 Hook 或持续后台保存。
+
+## Next Action
+确认正确的 Raycast 账户用户名（当前 package.json author=juezhong 被官方校验返回 404），据此修正 PR #3 的 manifest；随后修复 Prettier 格式并重新运行 macOS CI 的 lint/build。
