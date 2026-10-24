@@ -6,6 +6,7 @@ import test from "node:test";
 import {
   ACTIVE_INDEX_FILENAME,
   cleanupLegacyIndexes,
+  cleanupStaleBuildTemps,
   openIndexDataStream,
   prepareIndex,
   publishIndex,
@@ -124,5 +125,35 @@ test("legacy cleanup fails closed without a valid new v2 file", async () => {
     await writeFile(old, "old\0");
     await assert.rejects(cleanupLegacyIndexes(dir));
     assert.equal(await readFile(old, "utf8"), "old\0");
+  });
+});
+
+
+test("stale-temp maintenance removes only old recognized build artifacts", async () => {
+  await withDirectory(async (dir) => {
+    const active = path.join(dir, ACTIVE_INDEX_FILENAME);
+    const first = await stage(dir, "first");
+    await publishIndex(first.staged, dir);
+
+    const oldPaths = path.join(dir, "index-11111111-1111-4111-8111-111111111111.paths.tmp");
+    const oldStaged = path.join(dir, "index-22222222-2222-4222-8222-222222222222.nul.tmp");
+    const young = path.join(dir, "index-33333333-3333-4333-8333-333333333333.paths.tmp");
+    const unrelated = path.join(dir, "user-notes.tmp");
+    await writeFile(oldPaths, "orphaned");
+    await writeFile(oldStaged, "orphaned");
+    await writeFile(young, "current-build");
+    await writeFile(unrelated, "do not touch");
+    const past = new Date(Date.now() - 3 * 24 * 3600_000);
+    await utimes(oldPaths, past, past);
+    await utimes(oldStaged, past, past);
+    await utimes(unrelated, past, past);
+
+    assert.equal(await cleanupStaleBuildTemps(dir), 2);
+    assert.deepEqual(
+      (await readdir(dir)).filter((name) => name.endsWith(".tmp")).sort(),
+      ["index-33333333-3333-4333-8333-333333333333.paths.tmp", "user-notes.tmp"],
+    );
+    assert.equal((await readIndexHeader(active)).version, 2);
+    assert.equal(await cleanupStaleBuildTemps(dir), 0);
   });
 });
