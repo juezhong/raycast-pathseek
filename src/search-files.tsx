@@ -12,6 +12,12 @@ import path from "node:path";
 import { fuzzySearch } from "./lib/fuzzy-search";
 import { readIndex, type IndexMetadata } from "./lib/index-store";
 import { getDialogNavigationPaths } from "./lib/dialog-navigation";
+import {
+  getMissingBinary,
+  missingBinaryMessage,
+  HOMEBREW_INSTALL_COMMAND,
+  HOMEBREW_URL,
+} from "./lib/dependency-guide";
 
 export function SearchFilesView({
   dialogMode = false,
@@ -73,7 +79,11 @@ export function SearchFilesView({
     };
   }, [index, query]);
 
-  const emptyTitle = loadError
+  const missingBinary = getMissingBinary(loadError);
+
+  const emptyTitle = missingBinary
+    ? "Missing Required Tool"
+    : loadError
     ? "Search Error"
     : index === undefined
       ? "Loading Index"
@@ -83,10 +93,12 @@ export function SearchFilesView({
           ? "Type to Search"
           : "No Matching Files";
 
-  const emptyDescription = loadError
-    ? loadError
+  const emptyDescription = missingBinary
+    ? missingBinaryMessage(missingBinary)
+    : loadError
+      ? loadError
     : !index
-      ? "No index yet. Choose your folders in Build Index to begin. Nothing is indexed automatically."
+      ? "No index yet. First install fd and fzf (brew install fd fzf), then choose folders in Build Index. Nothing is indexed automatically."
       : !query.trim()
         ? "Indexed " +
           index.count.toLocaleString() +
@@ -111,28 +123,41 @@ export function SearchFilesView({
         description={emptyDescription}
         icon={Icon.MagnifyingGlass}
         actions={
-          !index && index !== undefined ? (
+          index !== undefined && (!index || missingBinary) ? (
             <ActionPanel>
-              <Action
-                title="Choose Folders and Build Index"
-                icon={Icon.Folder}
-                onAction={() =>
-                  launchCommand({
-                    name: "rebuild-index",
-                    type: LaunchType.UserInitiated,
-                  })
-                }
+              {!index && (
+                <Action
+                  title="Choose Folders and Build Index"
+                  icon={Icon.Folder}
+                  onAction={() =>
+                    launchCommand({
+                      name: "rebuild-index",
+                      type: LaunchType.UserInitiated,
+                    })
+                  }
+                />
+              )}
+              <Action.CopyToClipboard
+                title="Copy fd/fzf Install Command"
+                icon={Icon.CopyClipboard}
+                content={HOMEBREW_INSTALL_COMMAND}
               />
-              <Action
-                title="View Index Status"
-                icon={Icon.Info}
-                onAction={() =>
-                  launchCommand({
-                    name: "index-status",
-                    type: LaunchType.UserInitiated,
-                  })
-                }
+              <Action.OpenInBrowser
+                title="How to Install Homebrew"
+                url={HOMEBREW_URL}
               />
+              {!index && (
+                <Action
+                  title="View Index Status"
+                  icon={Icon.Info}
+                  onAction={() =>
+                    launchCommand({
+                      name: "index-status",
+                      type: LaunchType.UserInitiated,
+                    })
+                  }
+                />
+              )}
             </ActionPanel>
           ) : undefined
         }
