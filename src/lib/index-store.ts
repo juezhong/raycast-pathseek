@@ -1,7 +1,7 @@
 import { environment, getPreferenceValues } from "@raycast/api";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { createReadStream, createWriteStream, constants } from "node:fs";
+import { createWriteStream, constants } from "node:fs";
 import { access, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
