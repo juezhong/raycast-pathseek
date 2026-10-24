@@ -1,7 +1,7 @@
 # Progress — PathSeek
 
 - Plan ID: pathseek-development
-- Checkpoint ID: pathseek-20261024-mac-log-limit-07
+- Checkpoint ID: pathseek-20261024-manual-setup-08
 - Last Updated: 2026-10-24
 - Repository: juezhong/raycast-pathseek
 - Branch: main
@@ -123,3 +123,18 @@
 
 ## Active Next Step (pathseek-20261024-mac-log-limit-07)
 用户在 Mac 上更新 PR #3 独立 worktree，搜索一个能匹配超过 150 条路径的词，检查 Debug Info 最新记录为 limit-reached / results=150（不再有 151–159）；通过后对 Draft PR #3 进行最终 Code Review 与剩余 P1 风险评估，再征得用户明确同意后考虑合并 main。
+
+### 2026-10-24 — 实现严格手动索引、目录选择与简化验收（pathseek-20261024-manual-setup-08）
+
+- 用户明确报告 fzf 150 条上限修复已在本机通过。随后提出：插件安装后绝对不索引、任何时间不自动刷新、首次建索引时提示选目录、Rebuild Index ⌘K 可重新选目录、Issue 由助理负责技术判断。
+- PR #3 新增 src/lib/index-roots.ts，通过 Raycast LocalStorage 存放显式选择的目录，升级兼容读取 metadata.roots。
+- 删除 Search Files 的过期自动重建 Effect，删除 index-store 的 15 天更新和失败重试入口，删除 manifest 默认 searchRoots 设置，避免首次默认扫描 home。
+- Rebuild Index 打开仅读取状态，首次引导 Form.FilePicker 选择目录，手动提交后才 fd；再次打开可通过 ⌘K Change Indexed Folders、Rebuild Index Now。
+- Index Status / Search Files 空索引提示增加操作入口；中英文 README 与 index/development/architecture/trace 说明对应调整。
+- 新增 tests/manual-index-contract.test.mjs 用于阻挡误恢复自动扫描（静态守卫）；macOS GitHub Actions CI 已 confirmed success（Node tests、tsc、ESLint、Raycast build）。
+- 创建 [Issue #6](https://github.com/juezhong/raycast-pathseek/issues/6) 友好操作清单；旧 #2/#4/#5 已添加对用户免测复杂项的说明，既有勾选记录保留。
+- [PR #3 评论](https://github.com/juezhong/raycast-pathseek/pull/3#issuecomment-6382966413) 已记录本轮代码与 CI 状态。
+- 仍待 Mac **实际**点击首次目录选择/⌘K 动作验证；PR 保持 Draft，未合并 main；用户不需当前提供 Raycast Store 用户名。
+
+## Active Next Step (pathseek-20261024-manual-setup-08)
+用户在 Mac 更新 Draft PR #3 后，简短验证首次无索引提示、目录选择、打开 Rebuild 时不自动执行 fd、⌘K 更改目录及显式 Rebuild；由助理根据聊天反馈维护简单 Issue #6。之后集中代码审查剩余索引稳定性问题，用户授权后再讨论合并 PR #3。
