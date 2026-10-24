@@ -170,3 +170,31 @@ Search Files
 | [`src/rebuild-index.tsx`](../src/rebuild-index.tsx) | 手动重建界面 |
 | [`src/index-status.tsx`](../src/index-status.tsx) | 索引状态和打开实际支持目录 |
 | [`src/debug-info.tsx`](../src/debug-info.tsx) | 自动收集脱敏的系统与索引诊断信息 |
+
+
+## 10. 索引文件生命周期复核（固定路径方案）
+
+**本节描述 `fix/stable-index-file-atomic-swap` 开发分支，待 PR 合并后才会进入 `main`。**
+
+此前每次重建都会创建 `index-<UUID>.nul`，将文件名写入 `index.json` 并删除旧文件。即使重建过程使用跨进程锁，读者也可能在删除前取得旧文件名、删除后才打开文件，从而触发 `ENOENT`。因此，仅增加写入锁无法根除读写竞态。
+
+新方案：
+
+```text
+<environment.supportPath>/
+├── index.json               # 文件名固定为 index.nul 的元数据
+├── index.nul                # 唯一的当前有效索引，稳定路径
+├── index-<UUID>.nul.tmp     # 构建中的临时数据，构建后原子替换
+└── index-<UUID>.nul         # 仅升级时可能遗留的旧版 UUID 索引
+```
+
+- `fd` 写入独立临时文件。扫描失败时不替换 `index.nul`。
+- 临时数据完成后，在同一目录上 `rename(temp, index.nul)`，原子替换当前索引文件。新搜索始终打开固定的 `index.nul`，不会追逐已经被删除的 UUID 路径。
+- 已经打开旧文件描述符的搜索进程可以读取旧文件，即使路径已原子替换；搜索开始时打开的路径则指向新文件。
+- `index.json` 中 `filename` 仍保留兼容字段，新构建统一填写 `index.nul`。老版本元数据允许继续读 `index-UUID.nul`，直到首次新版本重建。
+- 为兼容升级期间仍持有旧元数据的搜索窗口，旧的 UUID 文件至少保留 24 小时缓冲期；后续重建时可清理达到缓冲期限的遗留文件。**这不是新索引的第二份副本**。在首次迁移后短期内可能看到两个文件，后续正常重建应只产生一个正式 `index.nul`。
+- 写入锁仍保留：它使 `index.nul` 与 `index.json` 的提交顺序不被两个重建进程交错，并避免重复扫描；它不是解决读者路径失效的主要机制。
+- `index.json` 和数据文件是分别原子替换的两个文件，并非整体单事务。极端崩溃可能使元数据时间/数量与最新索引数据短暂不一致，但不会因为旧 UUID 文件被删除而导致新方案的索引路径失效。
+
+回归测试：`npm test`（Node 22 内置测试运行器），代码见 [tests/index-files.test.mjs](../tests/index-files.test.mjs)。当前没有 macOS 实机验证结果。
+
