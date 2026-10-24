@@ -3,16 +3,12 @@ import { useEffect, useRef, useState } from "react";
 import os from "node:os";
 import path from "node:path";
 import { fuzzySearch } from "./lib/fuzzy-search";
-import { regexSearch } from "./lib/regex-search";
 import { isIndexStale, readIndex, refreshExpiredIndex, type IndexMetadata } from "./lib/index-store";
-
-type SearchMode = "fuzzy" | "regex";
 
 export default function SearchFiles() {
   const [index, setIndex] = useState<IndexMetadata | null>();
   const [loadError, setLoadError] = useState<string>();
   const [query, setQuery] = useState("");
-  const [mode, setMode] = useState<SearchMode>("fuzzy");
   const [results, setResults] = useState<string[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const autoRefreshAttempted = useRef(false);
@@ -74,8 +70,7 @@ export default function SearchFiles() {
     setIsSearching(true);
 
     const timer = setTimeout(() => {
-      const search = mode === "regex" ? regexSearch : fuzzySearch;
-      search(index, query, controller.signal)
+      fuzzySearch(index, query, controller.signal)
         .then((paths) => {
           if (!controller.signal.aborted) setResults(paths);
         })
@@ -91,10 +86,10 @@ export default function SearchFiles() {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [index, query, mode]);
+  }, [index, query]);
 
   const emptyTitle = loadError
-    ? (mode === "regex" ? "Invalid Regex or Search Error" : "Search Error")
+    ? "Search Error"
     : index === undefined
       ? "Loading Index"
       : !index
@@ -115,15 +110,7 @@ export default function SearchFiles() {
     <List
       isLoading={index === undefined || isSearching}
       filtering={false}
-      searchBarPlaceholder={
-        mode === "regex" ? "Regex on full path (e.g. \\.ts$ or src/.*/config)" : "Fuzzy search by filename or path"
-      }
-      searchBarAccessory={
-        <List.Dropdown tooltip="Search Mode" value={mode} onChange={(value) => setMode(value as SearchMode)}>
-          <List.Dropdown.Item title="Fuzzy (fzf)" value="fuzzy" />
-          <List.Dropdown.Item title="Regex (full path)" value="regex" />
-        </List.Dropdown>
-      }
+      searchBarPlaceholder="Search with fzf: filename, path, .pdf$, !node_modules…" 
       onSearchTextChange={setQuery}
     >
       <List.EmptyView title={emptyTitle} description={emptyDescription} icon={Icon.MagnifyingGlass} />
