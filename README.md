@@ -8,7 +8,7 @@
 
 ## Features
 
-- **Persistent index with a 15-day refresh window** — First build manually via `Rebuild Index`. Once at least 15 days old, opening Search Files attempts a refresh, without a resident scheduler.
+- **Strictly manual indexing** — Nothing is indexed on install or when opening Search Files. Choose folders on your first Rebuild Index; only an explicit Build / Rebuild action runs fd. Index remains reusable until you manually rebuild.
 - **One fzf search** — `Search Files` uses fzf extended matching against filenames and full paths. Supports fuzzy terms, exact terms, suffix/prefix matching, negation, and OR. Typing never invokes fd.
 - **Native Finder file icons and actions** — Folder icons and actual file-type icons; Open, Show in Finder, Open Containing Folder, Open With, Quick Look and Copy Absolute Path.
 - **Index Status** — See index metadata, open its actual support directory in Finder, and copy the full directory path.
@@ -35,17 +35,17 @@ npm run dev
 `npm run dev` imports the local extension into Raycast and starts development mode. From Raycast, run:
 
 1. **Index Status** — inspect the current index and find the exact on-disk storage location (without scanning).
-2. **Rebuild Index** — manually create the index. **Before the first run**, set `Search Roots` to a small directory (e.g. `~/Projects`) rather than indexing your entire home directory.
+2. **Rebuild Index** — on first use, choose one or more folders with Raycast's directory picker, then explicitly select **Choose Folders and Build Index**. On later visits, use **Cmd+K → Change Indexed Folders** or **Rebuild Index Now**.
 3. **Search Files** — type a filename, folder name or part of a path; select a result and use its actions.
 4. **Debug Info** — if a test fails, copy the sanitized report into [Issue #1](https://github.com/juezhong/raycast-pathseek/issues/1).
 
-An index 15 days old is refreshed when Search Files is next opened, not by a background daemon. Failed auto-refresh attempts are throttled for 24 hours. Manually rebuild whenever newer files are needed.
+**No automatic indexing, ever.** Install, extension startup, Search Files and Index Status never run fd. A stale or missing index stays unchanged until you manually select Rebuild Index. Saving different folders does not scan or replace an existing index.
 
 ### Preferences
 
 | Preference | Meaning | Example |
 | --- | --- | --- |
-| Search Roots | Directories separated by semicolons or line breaks; `~` expands to your home | `~/Projects;~/Downloads` |
+| Indexed Folders | Choose one or more folders from **Rebuild Index**. The selection is stored locally with Raycast LocalStorage. | Finder-style folder picker |
 | Include Hidden Files | Whether `fd` includes hidden entries when rebuilding | Off by default |
 | Follow Symbolic Links | Whether `fd` follows directory symlinks | Off by default |
 | Exclude Patterns | Comma-separated `fd --exclude` globs | `.git,node_modules` |
@@ -87,13 +87,13 @@ There is only **one Search Files mode**, powered by fzf. Its built-in extended-s
 
 ### Opt-in developer execution trace
 
-PathSeek has a disabled-by-default **Developer: Trace fd/fzf Calls** preference. With it enabled, **Debug Info** shows sanitized fd/fzf subprocess start/end records, invocation flags, trigger reasons (manual rebuild, 15-day refresh, fuzzy query), durations, results and exit codes. Search terms and personal paths are never persisted in this trace. Turning it off prevents trace disk writes during ordinary use.
+PathSeek has a disabled-by-default **Developer: Trace fd/fzf Calls** preference. With it enabled, **Debug Info** shows sanitized fd/fzf subprocess start/end records, invocation flags, trigger reasons (manual rebuild, fuzzy query), durations, results and exit codes. Search terms and personal paths are never persisted in this trace. Turning it off prevents trace disk writes during ordinary use.
 
 See [Developer Trace Guide (Chinese)](docs/developer-tracing.md) and [Issue #5 checklist](https://github.com/juezhong/raycast-pathseek/issues/5).
 
 ## Testing and feedback
 
-Use [Issue #1 — installation tests](https://github.com/juezhong/raycast-pathseek/issues/1) and [Issue #2 — 15-day refresh, fzf search and native icons](https://github.com/juezhong/raycast-pathseek/issues/2). Check off only behaviors you have actually verified and comment with reproducible steps and logs for failures.
+Use [Issue #1 — installation tests](https://github.com/juezhong/raycast-pathseek/issues/1) and [Issue #2 — manual index, fzf search and native icons](https://github.com/juezhong/raycast-pathseek/issues/2). Check off only behaviors you have actually verified and comment with reproducible steps and logs for failures.
 
 Build checks (require installed npm dependencies):
 
@@ -109,7 +109,7 @@ A `package-lock.json` file has not yet been generated and committed as part of a
 | Phase | Status |
 | --- | --- |
 | P1 — Upstream audit & scaffolding | Code submitted; Mac build verification pending |
-| P2 — 15-day refresh and safe index cleanup | Initial implementation; Mac verification pending |
+| P2 — explicit manual index, setup picker and safe index publishing | PR implementation; Mac verification pending |
 | P3 — Unified fzf search and Finder native icons | Initial implementation; Mac verification pending |
 | P4 — Open/Save Dialog Bridge | Not implemented |
 | P5 — Tests & Raycast Store submission | Not started |
