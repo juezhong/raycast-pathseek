@@ -1,10 +1,11 @@
 import { Action, ActionPanel, Detail, environment } from "@raycast/api";
 import { execFile } from "node:child_process";
-import { readFile, readdir, stat } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { useEffect, useState } from "react";
+import { readIndex, indexFilePath } from "./lib/index-store";
 
 const run = promisify(execFile);
 
@@ -53,53 +54,32 @@ async function collectDiagnostics(): Promise<Diagnostics> {
 
   try {
     const entries = await readdir(root);
-    generationCount = String(entries.filter((name) => /^index-[a-f0-9-]+\.nul$/.test(name)).length);
+    generationCount = String(entries.filter((name) => name === "index.nul" || /^index-[a-f0-9-]+\.nul$/.test(name)).length);
   } catch (error) {
     generationCount = `unavailable (${errorCode(error)})`;
   }
 
-  let raw: string | undefined;
   try {
-    raw = await readFile(path.join(root, "index.json"), "utf8");
-    metadataStatus = "present";
-  } catch (error) {
-    metadataStatus = `unavailable (${errorCode(error)})`;
-    activeStatus = "not checked";
-  }
-
-  if (raw !== undefined) {
-    try {
-      const meta: unknown = JSON.parse(raw);
-      if (
-        !meta ||
-        typeof meta !== "object" ||
-        !("filename" in meta) ||
-        typeof meta.filename !== "string" ||
-        !/^index-[a-f0-9-]+\.nul$/.test(meta.filename)
-      ) {
-        metadataStatus = "invalid structure";
-        activeStatus = "not checked";
-      } else {
-        const payload = meta as Record<string, unknown>;
-        declaredCount = typeof payload.count === "number" ? String(payload.count) : "invalid";
-        createdAt = typeof payload.createdAt === "string" ? payload.createdAt : "invalid";
-        rootCount = Array.isArray(payload.roots) ? String(payload.roots.length) : "invalid";
-        try {
-          const info = await stat(path.join(root, meta.filename));
-          activeStatus = info.isFile() ? "present" : "not a regular file";
-          indexBytes = String(info.size);
-        } catch (error) {
-          activeStatus = `missing/unavailable (${errorCode(error)})`;
-        }
-      }
-    } catch {
-      metadataStatus = "invalid JSON";
+    const metadata = await readIndex();
+    if (!metadata) {
+      metadataStatus = "not built";
       activeStatus = "not checked";
+    } else {
+      metadataStatus = metadata.version === 2 ? "v2 embedded header" : "v1 legacy index.json";
+      declaredCount = String(metadata.count);
+      rootCount = String(metadata.roots.length);
+      createdAt = metadata.createdAt;
+      const info = await stat(indexFilePath(metadata));
+      activeStatus = info.isFile() ? "present" : "not a regular file";
+      indexBytes = String(info.size);
     }
+  } catch (error) {
+    metadataStatus = "invalid or inaccessible";
+    activeStatus = "missing/unavailable (" + errorCode(error) + ")";
   }
 
   report.push(
-    `- index.json: ${metadataStatus}`,
+    `- index format/metadata: ${metadataStatus}`,
     `- active index file: ${activeStatus}`,
     `- active index size (bytes): ${indexBytes}`,
     `- metadata path count: ${declaredCount}`,
