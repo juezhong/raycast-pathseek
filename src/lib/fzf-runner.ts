@@ -2,6 +2,11 @@ import { spawn } from "node:child_process";
 import { openIndexDataStream } from "./index-files.ts";
 import { appendFzfOutputChunk, createFzfOutputState } from "./fzf-output.ts";
 import {
+  createPinyinFilterInput,
+  originalPathFromPinyinResult,
+  shouldUsePinyinAliases,
+} from "./pinyin-filter.ts";
+import {
   cancelledError,
   registerChild,
   terminateChild,
@@ -25,6 +30,9 @@ export async function runFzfFilter(
 ): Promise<FilterResult> {
   throwIfAborted(signal);
   const input = await openIndexDataStream(indexPath);
+  const pinyinMode = shouldUsePinyinAliases(query);
+  const augmented = pinyinMode ? createPinyinFilterInput() : undefined;
+  const source = augmented ?? input;
   if (signal?.aborted) {
     input.destroy();
     throw cancelledError();
@@ -55,15 +63,22 @@ export async function runFzfFilter(
     registerChild(child);
 
     // 等待解压管道关闭后再结束 Promise，避免遗留文件描述符。
-    const inputClosed = new Promise<void>((resolve) => {
-      if (input.closed) resolve();
-      else input.once("close", () => resolve());
-    });
+    const waitForClose = (stream: typeof input | NonNullable<typeof augmented>) =>
+      new Promise<void>((resolve) => {
+        if (stream.closed) resolve();
+        else stream.once("close", () => resolve());
+      });
+    const inputClosed = Promise.all([
+      waitForClose(input),
+      ...(augmented ? [waitForClose(augmented)] : []),
+    ]);
 
     const stop = () => {
       if (stopping) return;
       stopping = true;
-      input.unpipe(child.stdin);
+      input.unpipe();
+      source.unpipe(child.stdin);
+      source.destroy();
       input.destroy();
       child.stdin.destroy();
       terminateChild(child);
@@ -93,6 +108,7 @@ export async function runFzfFilter(
     };
 
     input.once("error", fail);
+    if (augmented) augmented.once("error", fail);
     child.stdin.on("error", (error: NodeJS.ErrnoException) => {
       if (!cancelled && !limited && error.code !== "EPIPE") fail(error);
     });
@@ -123,6 +139,7 @@ export async function runFzfFilter(
       if (deadline) clearTimeout(deadline);
       signal?.removeEventListener("abort", onAbort);
       input.destroy();
+      augmented?.destroy();
       child.stdin.destroy();
 
       void inputClosed.then(() => {
@@ -137,7 +154,9 @@ export async function runFzfFilter(
           reject(fatal);
         } else if (limited || code === 0 || (code === 1 && !stderr)) {
           resolve({
-            paths: output.results,
+            paths: pinyinMode
+              ? output.results.map(originalPathFromPinyinResult)
+              : output.results,
             exitCode: code,
             limited,
             cancelled: false,
@@ -148,6 +167,9 @@ export async function runFzfFilter(
       });
     });
 
-    if (!cancelled && !stopping) input.pipe(child.stdin);
+    if (!cancelled && !stopping) {
+      if (augmented) input.pipe(augmented).pipe(child.stdin);
+      else input.pipe(child.stdin);
+    }
   });
 }
