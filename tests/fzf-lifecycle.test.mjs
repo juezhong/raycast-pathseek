@@ -642,7 +642,7 @@ test("scoped fzf search matches all descendant levels without leaking sibling pa
     assert.ok(ordinary.includes(entries[5]));
     assert.deepEqual(
       new Set((await runFzfFilter("fzf", index, "raypath/.ts$")).paths),
-      new Set([entries[1], entries[5]]),
+      new Set([entries[1], entries[5], entries[7]]),
     );
   });
 });
