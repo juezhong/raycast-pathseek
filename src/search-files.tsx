@@ -14,11 +14,7 @@ import os from "node:os";
 import path from "node:path";
 import { fuzzySearch } from "./lib/fuzzy-search";
 import { SearchAssistanceActions } from "./search-guides";
-import {
-  indexFilePath,
-  readIndex,
-  type IndexMetadata,
-} from "./lib/index-store";
+import { indexFilePath, readIndex, type IndexMetadata } from "./lib/index-store";
 import {
   findIndexedDirectoryChoices,
   matchesSelectedDirectory,
@@ -66,7 +62,9 @@ export function SearchFilesView({
   }
   const directoryExpression = subtreeQuery?.directoryExpression;
   const scopedFolder =
-    subtreeQuery && activeScope && activeScope.expression === directoryExpression
+    subtreeQuery &&
+    activeScope &&
+    activeScope.expression === directoryExpression
       ? activeScope.folder
       : undefined;
   const selectingFolder = Boolean(subtreeQuery && !scopedFolder);
@@ -113,7 +111,8 @@ export function SearchFilesView({
       } catch {
         // 当前表达式无效时，从真实的选中目录名称重新开始。
       }
-      const expression = request?.directoryExpression ?? path.basename(filepath);
+      const expression =
+        request?.directoryExpression ?? path.basename(filepath);
       const nextQuery = request ? queryRef.current : expression + "/ ";
       const folder = filepath === "/" ? "/" : filepath.replace(/\/+$/u, "");
       setActiveScope({ expression, folder });
@@ -165,9 +164,8 @@ export function SearchFilesView({
 
     const expression = subtreeQuery.directoryExpression;
     const patterns = subtreeQuery.directoryPatterns;
-    const hint = scopeHint?.expression === expression
-      ? scopeHint.selectedPath
-      : null;
+    const hint =
+      scopeHint?.expression === expression ? scopeHint.selectedPath : null;
     setScopeError(undefined);
     setDirectoryChoices([]);
     setChoicesTruncated(false);
@@ -317,7 +315,8 @@ export function SearchFilesView({
         scopedFolder
           ? "Search Within " + scopedFolder
           : selectingFolder
-            ? "Choose Indexed Folder" + (choicesTruncated ? " (refine query)" : "")
+            ? "Choose Indexed Folder" +
+              (choicesTruncated ? " (refine query)" : "")
             : undefined
       }
       onSearchTextChange={onQueryChange}
