@@ -250,6 +250,7 @@ test("real fzf searches arbitrary Chinese names using initials and partial pinyi
     const entries = [
       "/tmp/第二次.txt",
       "/tmp/第一次.txt",
+      "/tmp/第三次",
       "/tmp/第三次/报告.txt",
       "/tmp/开发记录.md",
       "/tmp/电子技术.txt",
