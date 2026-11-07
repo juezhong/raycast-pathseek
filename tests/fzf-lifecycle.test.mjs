@@ -419,7 +419,11 @@ test("slash-delimited fuzzy path search matches directory levels before the real
     const directories = await runFzfFilter("fzf", index, "th/");
     assert.deepEqual(
       new Set(directories.paths),
-      new Set([...targets, "/sample/first/second/third/archive"]),
+      new Set([
+        ...targets,
+        "/sample/first/second/third/archive",
+        "/sample/first/second/third/fourth/log.txt",
+      ]),
     );
     const nonAdjacent = await runFzfFilter("fzf", index, "fir/th/four");
     assert.deepEqual(nonAdjacent.paths, []);
