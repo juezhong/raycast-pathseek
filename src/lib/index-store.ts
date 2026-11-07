@@ -8,7 +8,7 @@ import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Transform, PassThrough, type Writable } from "node:stream";
 import { createBrotliCompress, constants as zlibConstants } from "node:zlib";
-import { PathPrefixEncoder } from "./index-codec";
+import { PathPrefixEncoder } from "./index-codec.ts";
 import lockfile from "proper-lockfile";
 import { beginCommandTrace } from "./command-trace";
 import { getConfiguredIndexRoots } from "./index-roots";
