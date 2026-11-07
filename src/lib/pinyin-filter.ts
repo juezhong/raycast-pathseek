@@ -90,9 +90,7 @@ export function createPinyinFilterInput(
           pending = Buffer.alloc(0);
 
           const filepath = record.toString("utf8");
-          if (
-            matchesParent && !matchesParent(filepath)
-          ) {
+          if (matchesParent && !matchesParent(filepath)) {
             offset = end + 1;
             continue;
           }

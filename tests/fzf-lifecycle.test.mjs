@@ -66,7 +66,13 @@ test("aborting an in-flight fzf kills child, reaps it, and returns no stale path
     );
     await chmod(binary, 0o755);
     const controller = new AbortController();
-    const task = runFzfFilter(binary, index, "driver", controller.signal, 10000);
+    const task = runFzfFilter(
+      binary,
+      index,
+      "driver",
+      controller.signal,
+      10000,
+    );
     const pid = await waitForPid(pidFile);
     controller.abort();
     const result = await task;
@@ -371,7 +377,6 @@ test("pinyin search still surfaces Chinese among 300 shorter prefix matches", as
   });
 });
 
-
 test("slash-delimited fuzzy path search matches directory levels before the real fzf filename term", async () => {
   await fixture(async (dir) => {
     const entries = [
@@ -438,15 +443,14 @@ test("slash-delimited fuzzy path search matches directory levels before the real
     const pinyinDirectories = await runFzfFilter("fzf", index, "dyc/");
     assert.deepEqual(
       new Set(pinyinDirectories.paths),
-      new Set([
-        "/sample/第一次/第二次",
-        "/sample/第一次/第二次.txt",
-      ]),
+      new Set(["/sample/第一次/第二次", "/sample/第一次/第二次.txt"]),
     );
 
     const plain = await runFzfFilter("fzf", index, "four");
     assert.ok(plain.paths.includes(targets[0]));
-    assert.ok(plain.paths.includes("/sample/first/second/third/archive/fourth"));
+    assert.ok(
+      plain.paths.includes("/sample/first/second/third/archive/fourth"),
+    );
     const advanced = await runFzfFilter("fzf", index, "third/.txt$");
     assert.deepEqual(advanced.paths, [targets[1]]);
     const malformed = await assert.rejects(
@@ -456,7 +460,6 @@ test("slash-delimited fuzzy path search matches directory levels before the real
     void malformed;
   });
 });
-
 
 test("smart-case and fzf extended operators on parent segments preserve real fzf leaf matches", async () => {
   await fixture(async (dir) => {
@@ -480,7 +483,8 @@ test("smart-case and fzf extended operators on parent segments preserve real fzf
     });
     await publishIndex(stage, dir);
     const index = path.join(dir, "index.nul");
-    const lookup = async (query) => new Set((await runFzfFilter("fzf", index, query)).paths);
+    const lookup = async (query) =>
+      new Set((await runFzfFilter("fzf", index, query)).paths);
 
     assert.deepEqual(
       await lookup("^Src/lib/.c$"),

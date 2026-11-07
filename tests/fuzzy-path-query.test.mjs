@@ -37,12 +37,40 @@ test("each ancestor part independently matches a *direct* parent level", () => {
   const target = "/root/first/second/third/fourth";
   for (const input of ["th/for", "third/fou", "fir/seco/th/four"]) {
     const parsed = parseFuzzyPathQuery(input);
-    assert.equal(matchesFuzzyParentPath(target, parsed.directoryPatterns, pinyinAlias), true, input);
+    assert.equal(
+      matchesFuzzyParentPath(target, parsed.directoryPatterns, pinyinAlias),
+      true,
+      input,
+    );
   }
-  assert.equal(matchesFuzzyParentPath("/root/first/second/third/archive/fourth", ["th"], pinyinAlias), false);
-  assert.equal(matchesFuzzyParentPath(target, ["fir", "th"], pinyinAlias), false);
-  assert.equal(matchesFuzzyParentPath("/root/first/third/fourth", ["seco", "th"], pinyinAlias), false);
-  assert.equal(matchesFuzzyParentPath("/root/forfirthird/fourth", ["fir", "th"], pinyinAlias), false);
+  assert.equal(
+    matchesFuzzyParentPath(
+      "/root/first/second/third/archive/fourth",
+      ["th"],
+      pinyinAlias,
+    ),
+    false,
+  );
+  assert.equal(
+    matchesFuzzyParentPath(target, ["fir", "th"], pinyinAlias),
+    false,
+  );
+  assert.equal(
+    matchesFuzzyParentPath(
+      "/root/first/third/fourth",
+      ["seco", "th"],
+      pinyinAlias,
+    ),
+    false,
+  );
+  assert.equal(
+    matchesFuzzyParentPath(
+      "/root/forfirthird/fourth",
+      ["fir", "th"],
+      pinyinAlias,
+    ),
+    false,
+  );
 });
 
 test("directory pinyin is dynamically recognized with common initials and full syllables", () => {
@@ -51,7 +79,10 @@ test("directory pinyin is dynamically recognized with common initials and full s
     assert.equal(matchesFuzzyParentPath(target, [pat], pinyinAlias), true, pat);
   }
   assert.equal(matchesFuzzyParentPath(target, ["dec"], pinyinAlias), false);
-  assert.equal(matchesFuzzyParentPath("/root/第二次/普通文件", ["dec"], pinyinAlias), true);
+  assert.equal(
+    matchesFuzzyParentPath("/root/第二次/普通文件", ["dec"], pinyinAlias),
+    true,
+  );
 });
 
 test("native non-slash search retains its existing meaning", () => {
@@ -60,13 +91,24 @@ test("native non-slash search retains its existing meaning", () => {
   assert.equal(parseFuzzyPathQuery(".pdf$"), null);
 });
 
-
 test("fzf Smart Case on directory segments: lowercase ignores case, uppercase is sensitive", () => {
   const file = "/project/SrcCore/docs/Readme.md";
-  assert.equal(matchesFuzzyParentPath(file, ["src", "docs"], pinyinAlias), true);
-  assert.equal(matchesFuzzyParentPath(file, ["Src", "docs"], pinyinAlias), true);
-  assert.equal(matchesFuzzyParentPath(file, ["SRC", "docs"], pinyinAlias), false);
-  assert.equal(matchesFuzzyParentPath(file, ["src", "Docs"], pinyinAlias), false);
+  assert.equal(
+    matchesFuzzyParentPath(file, ["src", "docs"], pinyinAlias),
+    true,
+  );
+  assert.equal(
+    matchesFuzzyParentPath(file, ["Src", "docs"], pinyinAlias),
+    true,
+  );
+  assert.equal(
+    matchesFuzzyParentPath(file, ["SRC", "docs"], pinyinAlias),
+    false,
+  );
+  assert.equal(
+    matchesFuzzyParentPath(file, ["src", "Docs"], pinyinAlias),
+    false,
+  );
 });
 
 test("directory extended syntax supports exact, prefix, suffix, inverse, AND and OR", () => {
@@ -86,7 +128,8 @@ test("directory extended syntax supports exact, prefix, suffix, inverse, AND and
     "!tmp$",
     "^source | ^module",
     "^test | ^Source",
-  ]) assert.equal(match(expression), true, expression);
+  ])
+    assert.equal(match(expression), true, expression);
   for (const expression of [
     "^SOURCE",
     "^sources",
@@ -97,29 +140,74 @@ test("directory extended syntax supports exact, prefix, suffix, inverse, AND and
     "!Core$",
     "^test | ^mod",
     "source ^invalid",
-  ]) assert.equal(match(expression), false, expression);
+  ])
+    assert.equal(match(expression), false, expression);
 });
 
 test("fzf word boundaries include punctuation and underscores as separators", () => {
   const wordFile = "/root/doc-lib/assets/source.c";
-  assert.equal(matchesFuzzyParentPath(wordFile, ["'doc'","assets"], pinyinAlias), true);
-  assert.equal(matchesFuzzyParentPath("/root/doclib/assets/source.c", ["'doc'","assets"], pinyinAlias), false);
-  assert.equal(matchesFuzzyParentPath("/root/doc_utils/assets/source.c", ["'doc'","assets"], pinyinAlias), true);
+  assert.equal(
+    matchesFuzzyParentPath(wordFile, ["'doc'", "assets"], pinyinAlias),
+    true,
+  );
+  assert.equal(
+    matchesFuzzyParentPath(
+      "/root/doclib/assets/source.c",
+      ["'doc'", "assets"],
+      pinyinAlias,
+    ),
+    false,
+  );
+  assert.equal(
+    matchesFuzzyParentPath(
+      "/root/doc_utils/assets/source.c",
+      ["'doc'", "assets"],
+      pinyinAlias,
+    ),
+    true,
+  );
 });
 
 test("Chinese aliases continue to work in each path level, advanced syntax uses original names only", () => {
   const file = "/project/第一次/第二次/说明.txt";
-  assert.equal(matchesFuzzyParentPath(file, ["dyc", "derc"], pinyinAlias), true);
+  assert.equal(
+    matchesFuzzyParentPath(file, ["dyc", "derc"], pinyinAlias),
+    true,
+  );
   assert.equal(matchesFuzzyParentPath(file, ["DYC", "DEC"], pinyinAlias), true);
-  assert.equal(matchesFuzzyParentPath(file, ["yc d", "d er c"], pinyinAlias), true);
-  assert.equal(matchesFuzzyParentPath(file, ["'第一次", "dec"], pinyinAlias), true);
-  assert.equal(matchesFuzzyParentPath(file, ["^dyc", "dec"], pinyinAlias), false);
-  assert.equal(matchesFuzzyParentPath(file, ["!第一次", "dec"], pinyinAlias), false);
-  assert.equal(matchesFuzzyParentPath(file, ["!dyc", "dec"], pinyinAlias), true);
+  assert.equal(
+    matchesFuzzyParentPath(file, ["yc d", "d er c"], pinyinAlias),
+    true,
+  );
+  assert.equal(
+    matchesFuzzyParentPath(file, ["'第一次", "dec"], pinyinAlias),
+    true,
+  );
+  assert.equal(
+    matchesFuzzyParentPath(file, ["^dyc", "dec"], pinyinAlias),
+    false,
+  );
+  assert.equal(
+    matchesFuzzyParentPath(file, ["!第一次", "dec"], pinyinAlias),
+    false,
+  );
+  assert.equal(
+    matchesFuzzyParentPath(file, ["!dyc", "dec"], pinyinAlias),
+    true,
+  );
 });
 
 test("the slash-free path stays outside the parser regardless of fzf syntax", () => {
-  for (const raw of ["^Source", ".pdf$", "!tmp", "'abc", "abc def", "foo | bar", "dyc", "DYC"]) {
+  for (const raw of [
+    "^Source",
+    ".pdf$",
+    "!tmp",
+    "'abc",
+    "abc def",
+    "foo | bar",
+    "dyc",
+    "DYC",
+  ]) {
     assert.equal(parseFuzzyPathQuery(raw), null, raw);
   }
   assert.equal(parseFuzzyPathQuery("src\\lib"), null);

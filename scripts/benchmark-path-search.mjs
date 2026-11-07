@@ -6,9 +6,10 @@ import { readIndexHeader } from "../src/lib/index-files.ts";
 
 function parseArgs(args) {
   const [indexPath, ...rest] = args;
-  if (!indexPath) throw new Error(
-    "Usage: npm run benchmark:path -- \"/path/to/index.nul\" \"src\" \"src/lib\" [--runs 5]",
-  );
+  if (!indexPath)
+    throw new Error(
+      'Usage: npm run benchmark:path -- "/path/to/index.nul" "src" "src/lib" [--runs 5]',
+    );
   const queries = [];
   let runs = 5;
   for (let i = 0; i < rest.length; i++) {
@@ -20,7 +21,11 @@ function parseArgs(args) {
       queries.push(rest[i]);
     }
   }
-  if (queries.length < 1 || queries.length > 8 || queries.some((q) => !q.trim()))
+  if (
+    queries.length < 1 ||
+    queries.length > 8 ||
+    queries.some((q) => !q.trim())
+  )
     throw new Error("Pass between 1 and 8 non-empty search queries");
   if (!Number.isInteger(runs) || runs < 2 || runs > 20)
     throw new Error("--runs must be between 2 and 20");
@@ -29,7 +34,8 @@ function parseArgs(args) {
 
 function stats(samples) {
   const sorted = [...samples].sort((a, b) => a - b);
-  const at = (percentile) => sorted[Math.max(0, Math.ceil(percentile * sorted.length) - 1)];
+  const at = (percentile) =>
+    sorted[Math.max(0, Math.ceil(percentile * sorted.length) - 1)];
   return {
     minMs: Number(sorted[0].toFixed(2)),
     p50Ms: Number(at(0.5).toFixed(2)),
@@ -109,6 +115,9 @@ async function benchmark() {
 try {
   await benchmark();
 } catch (error) {
-  console.error("Path search benchmark failed:", error instanceof Error ? error.message : String(error));
+  console.error(
+    "Path search benchmark failed:",
+    error instanceof Error ? error.message : String(error),
+  );
   process.exitCode = 1;
 }

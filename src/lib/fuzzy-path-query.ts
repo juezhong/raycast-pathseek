@@ -99,17 +99,25 @@ function compileTerm(input: string, ignoreCase: boolean): Predicate {
   const needle = ignoreCase ? term.toLowerCase() : term;
 
   const positive: Predicate =
-    kind === "fuzzy" ? (name) => orderedMatch(needle, name) :
-    kind === "exact" ? (name) => name.includes(needle) :
-    kind === "word" ? (name) => exactWordMatch(needle, name) :
-    kind === "prefix" ? (name) => name.startsWith(needle) :
-    kind === "suffix" ? (name) => name.endsWith(needle) :
-    (name) => name === needle;
+    kind === "fuzzy"
+      ? (name) => orderedMatch(needle, name)
+      : kind === "exact"
+        ? (name) => name.includes(needle)
+        : kind === "word"
+          ? (name) => exactWordMatch(needle, name)
+          : kind === "prefix"
+            ? (name) => name.startsWith(needle)
+            : kind === "suffix"
+              ? (name) => name.endsWith(needle)
+              : (name) => name === needle;
 
   return inverse ? (name) => !positive(name) : positive;
 }
 
-type SegmentMatcher = (name: string, getAlias: (name: string) => string) => boolean;
+type SegmentMatcher = (
+  name: string,
+  getAlias: (name: string) => string,
+) => boolean;
 
 /**
  * 每个目录段在搜索开始时只解析一次 Extended Search：
@@ -145,7 +153,9 @@ function compileSegment(pattern: string): SegmentMatcher {
     if (!allowPinyin || !/\p{Script=Han}/u.test(name)) return false;
     const alias = getAlias(name);
     return alias
-      ? evaluate(ignoreCase ? (name + " " + alias).toLowerCase() : name + " " + alias)
+      ? evaluate(
+          ignoreCase ? (name + " " + alias).toLowerCase() : name + " " + alias,
+        )
       : false;
   };
 }
