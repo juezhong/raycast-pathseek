@@ -1,7 +1,11 @@
 import { spawn } from "node:child_process";
+import { performance } from "node:perf_hooks";
 import type { Readable } from "node:stream";
 import { openIndexDataStream } from "./index-files.ts";
-import { parseFuzzyPathQuery } from "./fuzzy-path-query.ts";
+import {
+  isNativeFuzzyPathQuery,
+  parseFuzzyPathQuery,
+} from "./fuzzy-path-query.ts";
 import { appendFzfOutputChunk, createFzfOutputState } from "./fzf-output.ts";
 import {
   appendPinyinPriorityChunk,
@@ -10,8 +14,9 @@ import {
 } from "./fzf-pinyin-priority.ts";
 import {
   createPinyinFilterInput,
+  type PinyinInputDiagnostics,
   originalPathFromPinyinResult,
-  shouldUsePinyinAliases,
+  shouldPrioritizePinyinResults,
 } from "./pinyin-filter.ts";
 import {
   cancelledError,
@@ -19,6 +24,12 @@ import {
   terminateChild,
   throwIfAborted,
 } from "./managed-child.ts";
+
+export type FzfSearchDiagnostics = PinyinInputDiagnostics & {
+  decoderEndMs?: number;
+  stdinFinishMs?: number;
+  childCloseMs?: number;
+};
 
 export type FilterResult = {
   paths: string[];
@@ -34,16 +45,27 @@ export async function runFzfFilter(
   query: string,
   signal?: AbortSignal,
   timeoutMs = 60_000,
+  diagnostics?: FzfSearchDiagnostics,
 ): Promise<FilterResult> {
+  const startedAt = diagnostics ? performance.now() : 0;
   throwIfAborted(signal);
   const pathQuery = parseFuzzyPathQuery(query);
+  const nativePath = pathQuery !== null && isNativeFuzzyPathQuery(pathQuery);
   const nameQuery = pathQuery?.nameQuery ?? query;
   const input = await openIndexDataStream(indexPath);
-  const pinyinMode = shouldUsePinyinAliases(nameQuery);
+  const prioritizePinyin = shouldPrioritizePinyinResults(nameQuery);
   const augmented = createPinyinFilterInput(
-    pinyinMode,
+    true,
     pathQuery?.directoryPatterns ?? [],
+    nativePath ? pathQuery!.nameQuery : undefined,
+    nameQuery,
+    diagnostics,
   );
+  if (diagnostics) {
+    input.once("end", () => {
+      diagnostics.decoderEndMs = performance.now() - startedAt;
+    });
+  }
   const source = augmented;
   if (signal?.aborted) {
     input.destroy();
@@ -53,7 +75,9 @@ export async function runFzfFilter(
 
   return new Promise<FilterResult>((resolve, reject) => {
     const output = createFzfOutputState();
-    const pinyinOutput = pinyinMode ? createPinyinPriorityOutput() : undefined;
+    const pinyinOutput = prioritizePinyin
+      ? createPinyinPriorityOutput()
+      : undefined;
     let limited = false;
     let cancelled = false;
     let fatal: Error | undefined;
@@ -74,8 +98,11 @@ export async function runFzfFilter(
           "\t",
           "--nth",
           "1",
+          ...(nativePath ? ["--scheme", "path"] : []),
           "--filter",
-          nameQuery,
+          nativePath
+            ? [...pathQuery!.directoryPatterns, pathQuery!.nameQuery].join("/")
+            : nameQuery,
         ],
         { stdio: ["pipe", "pipe", "pipe"] },
       );
@@ -86,6 +113,11 @@ export async function runFzfFilter(
       return;
     }
     registerChild(child);
+    if (diagnostics) {
+      child.stdin.once("finish", () => {
+        diagnostics.stdinFinishMs = performance.now() - startedAt;
+      });
+    }
 
     // 等待解压管道关闭后再结束 Promise，避免遗留文件描述符。
     const waitForClose = (stream: Readable) =>
@@ -161,6 +193,7 @@ export async function runFzfFilter(
     });
     child.once("close", (code) => {
       if (finished) return;
+      if (diagnostics) diagnostics.childCloseMs = performance.now() - startedAt;
       finished = true;
       if (deadline) clearTimeout(deadline);
       signal?.removeEventListener("abort", onAbort);

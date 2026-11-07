@@ -122,7 +122,7 @@ type SegmentMatcher = (
 /**
  * 每个目录段在搜索开始时只解析一次 Extended Search：
  * 空格表示 AND；独立的 | 表示相邻条件之间的 OR。
- * 大写字母触发 fzf Smart Case，不包含运算符的纯拉丁查询仍支持拼音。
+ * 大写字母触发 fzf Smart Case；所有目录段均支持中文与拼音别名。
  */
 function compileSegment(pattern: string): SegmentMatcher {
   const ignoreCase = pattern === pattern.toLowerCase();
@@ -141,22 +141,25 @@ function compileSegment(pattern: string): SegmentMatcher {
   }
   const evaluate = (name: string) =>
     groups.every((alternatives) => alternatives.some((test) => test(name)));
-
-  const allowPinyin =
-    pattern.length <= 80 &&
-    /[a-z]/i.test(pattern) &&
-    /^[a-z0-9]+(?:\s+[a-z0-9]+)*$/i.test(pattern);
+  const hasNegation = tokens.some((token) => token.startsWith("!"));
 
   return (name, getAlias) => {
     const comparable = ignoreCase ? name.toLowerCase() : name;
-    if (evaluate(comparable)) return true;
-    if (!allowPinyin || !/\p{Script=Han}/u.test(name)) return false;
+    const direct = evaluate(comparable);
+    if (!/\p{Script=Han}/u.test(name)) return direct;
+    if (direct && !hasNegation) return true;
     const alias = getAlias(name);
-    return alias
-      ? evaluate(
-          ignoreCase ? (name + " " + alias).toLowerCase() : name + " " + alias,
-        )
-      : false;
+    if (!alias) return direct;
+    const combined = ignoreCase
+      ? (name + " " + alias).toLowerCase()
+      : name + " " + alias;
+    // 否定项必须对原名与所有拼音共同求值，否则会出现假阳性。
+    if (hasNegation) return evaluate(combined);
+    const comparableAlias = ignoreCase ? alias.toLowerCase() : alias;
+    return (
+      evaluate(combined) ||
+      comparableAlias.split(" ").some((reading) => evaluate(reading))
+    );
   };
 }
 
@@ -171,12 +174,16 @@ export function compileFuzzyParentPathMatcher(
   const matchers = directoryPatterns.map(compileSegment);
   return (filepath: string) => {
     if (!matchers.length) return true;
-    let end = filepath.lastIndexOf("/");
+    // fd 的目录记录可能以 '/' 结束；尾部分隔符不算一个父目录层级。
+    const normalized = filepath.endsWith("/")
+      ? filepath.replace(/\/+$/u, "")
+      : filepath;
+    let end = normalized.lastIndexOf("/");
     if (end <= 0) return false;
 
     for (let i = matchers.length - 1; i >= 0; i--) {
-      const begin = filepath.lastIndexOf("/", end - 1);
-      const dirname = filepath.slice(begin + 1, end);
+      const begin = normalized.lastIndexOf("/", end - 1);
+      const dirname = normalized.slice(begin + 1, end);
       if (!dirname || !matchers[i](dirname, getAlias)) return false;
       end = begin;
       if (end < 0 && i > 0) return false;
@@ -192,4 +199,23 @@ export function matchesFuzzyParentPath(
   getAlias: (name: string) => string,
 ): boolean {
   return compileFuzzyParentPathMatcher(directoryPatterns, getAlias)(filepath);
+}
+
+/**
+ * 无 Extended Search 运算符的路径查询由原生 fzf 执行完整路径模糊匹配和排序。
+ * 其余查询仍兼容原来的逐段锚点、否定和 AND/OR 语义。
+ */
+export function isNativeFuzzyPathQuery(query: FuzzyPathQuery): boolean {
+  return [...query.directoryPatterns, query.nameQuery].every(
+    (part) => !/[\s^$'!|\\]/u.test(part),
+  );
+}
+
+/** 只做目标名称层级检查，不取代 fzf 的实际匹配评分。 */
+export function compileFuzzyTargetNameMatcher(
+  pattern: string,
+  getAlias: (name: string) => string,
+): (name: string) => boolean {
+  const matcher = compileSegment(pattern);
+  return (name: string) => matcher(name, getAlias);
 }

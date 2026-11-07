@@ -5,7 +5,7 @@ import {
   createPinyinFilterInput,
   originalPathFromPinyinResult,
   pinyinAlias,
-  shouldUsePinyinAliases,
+  shouldPrioritizePinyinResults,
 } from "../src/lib/pinyin-filter.ts";
 
 test("Chinese phrase initials and full pinyin are generated without touching the source path", () => {
@@ -15,7 +15,7 @@ test("Chinese phrase initials and full pinyin are generated without touching the
   assert.equal(pinyinAlias("/Users/test/driver.c"), "");
 });
 
-test("complex fzf patterns bypass phonetic transformation", () => {
+test("complex fzf patterns do not request special pinyin result priority", () => {
   for (const input of [
     "dyc",
     "yc d",
@@ -25,7 +25,7 @@ test("complex fzf patterns bypass phonetic transformation", () => {
     "diyici",
     "2026 dyc",
   ])
-    assert.equal(shouldUsePinyinAliases(input), true, input);
+    assert.equal(shouldPrioritizePinyinResults(input), true, input);
   for (const input of [
     ".pdf$",
     "^driver",
@@ -36,7 +36,7 @@ test("complex fzf patterns bypass phonetic transformation", () => {
     "",
     "  ",
   ])
-    assert.equal(shouldUsePinyinAliases(input), false, input);
+    assert.equal(shouldPrioritizePinyinResults(input), false, input);
 });
 
 test("streaming pinyin input preserves tabs and line breaks inside filenames across chunks", async () => {
@@ -127,4 +127,124 @@ test("native fzf operator queries do not insert pinyin aliases", async () => {
     Buffer.concat(output).toString("utf8"),
     "2026_driver.txt\t" + path + "\0",
   );
+});
+
+test("ASCII basename fast path is byte-exact and does not expose parent text", async () => {
+  const entries = [
+    "/中文父目录/driver.c",
+    "/ASCII/SOURCE_DRIVER.H",
+    "/ASCII/subdir/",
+    "/ASCII/quote'word.c",
+    "/ASCII/file name.txt",
+    "/ASCII/tab\tname.c",
+    "/ASCII/café.txt",
+    "/ASCII/第一次.txt",
+    "/ASCII/line\nbreak.c",
+  ];
+  const input = Buffer.from(entries.join("\0") + "\0", "utf8");
+  const output = [];
+  for await (const chunk of Readable.from([input]).pipe(createPinyinFilterInput(true))) {
+    output.push(chunk);
+  }
+  const records = Buffer.concat(output).toString("utf8").split("\0").filter(Boolean);
+  assert.equal(records.length, entries.length);
+  assert.deepEqual(records.map(originalPathFromPinyinResult), entries);
+  assert.equal(records[0], "driver.c\t" + entries[0]);
+  assert.equal(records[1], "SOURCE_DRIVER.H\t" + entries[1]);
+  assert.equal(records[2], "subdir\t" + entries[2]);
+  assert.equal(records[3], "quote'word.c\t" + entries[3]);
+  assert.equal(records[4], "file name.txt\t" + entries[4]);
+  assert.equal(records[5], "tab name.c\t" + entries[5]);
+  assert.equal(records[6], "café.txt\t" + entries[6]);
+  assert.match(records[7], /^第一次\.txt dyc diyici /);
+  assert.equal(records[8], "line\nbreak.c\t" + entries[8]);
+});
+
+
+test("batched fzf records preserve exact bytes and order with split input chunks", async () => {
+  const entries = [
+    ...Array.from({ length: 2600 }, (_, i) => "/目录/sample-" + i + ".txt"),
+    "/docs/第一次.txt",
+    "/docs/tab\tname.c",
+    "/docs/café.txt",
+    "/docs/line\nbreak.c",
+    "/docs/ending/",
+  ];
+  const source = Buffer.from(entries.join("\0") + "\0", "utf8");
+  const expected = Buffer.concat(
+    entries.map((entry) => {
+      const basename = entry.split("/").filter(Boolean).at(-1);
+      const alias = pinyinAlias(basename);
+      const label = basename.replaceAll("\t", " ");
+      const field = alias ? label + " " + alias : label;
+      return Buffer.from(field + "\t" + entry + "\0", "utf8");
+    }),
+  );
+  const collect = async (chunks) => {
+    const results = [];
+    for await (const chunk of Readable.from(chunks).pipe(createPinyinFilterInput(true)))
+      results.push(chunk);
+    return results;
+  };
+
+  const merged = await collect([source]);
+  assert.ok(merged.length < 100, "a batch should contain many NUL-delimited records");
+  assert.deepEqual(Buffer.concat(merged), expected);
+
+  // 索引流跨任意输入边界时，也必须恢复同一字节序列。
+  const fragments = [];
+  let position = 0;
+  let sequence = 0;
+  while (position < source.length) {
+    const size = [43, 777, 4096, 3][sequence++ % 4];
+    fragments.push(source.subarray(position, position + size));
+    position += size;
+  }
+  assert.deepEqual(Buffer.concat(await collect(fragments)), expected);
+});
+
+test("batched output preserves separately anchored original and Chinese alias records", async () => {
+  const entries = ["/docs/第一次.txt", "/docs/第二次.md", "/docs/driver.c"];
+  const chunks = [];
+  const raw = Buffer.from(entries.join("\0") + "\0");
+  for await (const chunk of Readable.from([raw]).pipe(
+    createPinyinFilterInput(true, [], undefined, "^dyc$"),
+  )) {
+    chunks.push(chunk);
+  }
+  const records = Buffer.concat(chunks).toString("utf8").split("\0").filter(Boolean);
+  assert.ok(records.includes("第一次.txt\t" + entries[0]));
+  assert.ok(records.includes("dyc\t" + entries[0]));
+  assert.ok(records.includes("diyici\t" + entries[0]));
+  assert.ok(records.includes("driver.c\t" + entries[2]));
+  assert.deepEqual(new Set(records.map(originalPathFromPinyinResult)), new Set(entries));
+});
+
+
+test("opt-in pipeline diagnostics count records without changing emitted bytes", async () => {
+  const entries = ["/docs/driver.c", "/docs/第一次.txt", "/docs/very-long-driver.c"];
+  const data = Buffer.from(entries.join("\0") + "\0");
+  const baseline = [];
+  for await (const chunk of Readable.from([data]).pipe(createPinyinFilterInput())) {
+    baseline.push(chunk);
+  }
+  const diagnostics = {
+    inputRecords: 0,
+    outputRecords: 0,
+    outputBytes: 0,
+    outputChunks: 0,
+    transformMs: 0,
+  };
+  const profiled = [];
+  for await (const chunk of Readable.from([data]).pipe(
+    createPinyinFilterInput(true, [], undefined, "", diagnostics),
+  )) {
+    profiled.push(chunk);
+  }
+  assert.deepEqual(Buffer.concat(profiled), Buffer.concat(baseline));
+  assert.equal(diagnostics.inputRecords, entries.length);
+  assert.equal(diagnostics.outputRecords, entries.length);
+  assert.equal(diagnostics.outputBytes, Buffer.concat(profiled).length);
+  assert.ok(diagnostics.outputChunks > 0);
+  assert.ok(diagnostics.transformMs >= 0);
 });

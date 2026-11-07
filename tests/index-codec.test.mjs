@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Readable } from "node:stream";
+import { finished } from "node:stream/promises";
 import { createBrotliCompress, createBrotliDecompress, constants } from "node:zlib";
 import { PathPrefixEncoder, PathPrefixDecoder } from "../src/lib/index-codec.ts";
 
@@ -62,4 +63,49 @@ test("encoder rejects an unterminated path instead of publishing partial data", 
   await assert.rejects(
     collect(Readable.from([Buffer.from("/Users/demo/unfinished")]).pipe(new PathPrefixEncoder())),
   );
+});
+
+
+test("decoder batches complete NUL paths, preserving bytes across fragmented input", async () => {
+  const entries = [
+    ...Array.from({ length: 8000 }, (_, i) => "/projects/中文目录/file-" + i + ".txt"),
+    "/projects/第一次/报告.txt",
+    "/projects/tab\tname.c",
+    "/projects/line\nbreak",
+    "/projects/directory/",
+  ];
+  const raw = Buffer.from(entries.join("\0") + "\0", "utf8");
+  const encoded = await collect(
+    Readable.from([raw]).pipe(new PathPrefixEncoder()),
+  );
+  const fragments = [];
+  for (let i = 0; i < encoded.length; i += 517)
+    fragments.push(encoded.subarray(i, i + 517));
+
+  const decoded = [];
+  const decoder = Readable.from(fragments).pipe(new PathPrefixDecoder());
+  decoder.on("data", (block) => {
+    decoded.push(block);
+    assert.equal(block[block.length - 1], 0);
+  });
+  await finished(decoder);
+  assert.deepEqual(Buffer.concat(decoded), raw);
+  assert.ok(decoded.length < entries.length / 40);
+  assert.ok(decoded.every((block) => block.length <= 66 * 1024));
+});
+
+test("decoder handles an individually oversized output batch with a valid long path", async () => {
+  const raw = Buffer.from(
+    "/projects/" + "x".repeat(90 * 1024) + "\0" +
+      "/projects/下一次.txt\0",
+  );
+  const encoded = await collect(
+    Readable.from([raw]).pipe(new PathPrefixEncoder()),
+  );
+  const decoded = [];
+  const decoder = Readable.from([encoded]).pipe(new PathPrefixDecoder());
+  decoder.on("data", (block) => decoded.push(block));
+  await finished(decoder);
+  assert.deepEqual(Buffer.concat(decoded), raw);
+  assert.equal(decoded.length, 2);
 });

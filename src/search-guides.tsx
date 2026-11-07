@@ -36,7 +36,7 @@ Use / to separate **directory levels** from the final file or directory name. Ev
 - dir/.pdf$ filters PDF filenames directly inside matching dir directories; the final segment still uses fzf extended syntax.
 - Levels must be consecutive: first/third/fourth does not skip the second directory.
 - Every directory level supports Smart Case (lowercase ignores case, uppercase is sensitive), fuzzy characters, \`'exact\`, \`^prefix\`, \`suffix$\`, \`!exclude\`, AND (space), and OR (standalone \`|\`).
-- Directory pinyin works for ordinary Latin queries. Extended operators use real directory names without phonetic aliases, just like the final fzf term.
+- Chinese, English, pinyin initials and full pinyin are always searchable in every directory level and the final name. Extended operators retain fzf syntax.
 - Only / activates path mode. Without /, existing filename-only fzf search remains unchanged.
 - \`fzf\` extended syntax is **not** full regex: patterns such as \`a.*b\` are not treated as regular expressions.
 
@@ -44,7 +44,7 @@ All checks read the existing local index; no on-demand filesystem traversal, sec
 
 ## Chinese Pinyin
 
-For simple Latin-letter/digit queries (including spaces), PathSeek also supplies temporary pinyin initials and full readings of Chinese names to fzf. Examples for Chinese file/folder names:
+For every query, PathSeek supplies temporary pinyin initials and full readings of Chinese names to fzf. The query shape only determines whether special Chinese result slots are reserved. Examples for Chinese file/folder names:
 
 - \`dyc\`, \`d y c\` — ordered or separate initials
 - \`yc d\`, \`y c d\` — the independent terms can appear in any order
@@ -52,7 +52,7 @@ For simple Latin-letter/digit queries (including spaces), PathSeek also supplies
 - \`dec\`, \`derc\`, \`d erc\`, \`d er c\` — common matching forms of \`第二次\`
 - \`2026 dyc\` — both year and initials must appear in **the same name**, not its parent folders
 
-Pinyin aliases are generated **only while searching**, not stored in a second index. They support the same \`fzf\` matcher, but no transliteration library can guarantee every polyphonic proper name. Complex \`fzf\` operators (\`!\`, \`^\`, \`$\`, \`'\`, \`|\`) still use native fzf syntax, restricted to the **original file/directory name**.
+Pinyin aliases are generated **only while searching**, not stored in a second index. They support the same \`fzf\` matcher, but no transliteration library can guarantee every polyphonic proper name. Complex \`fzf\` operators (\`!\`, \`^\`, \`$\`, \`'\`, \`|\`) retain native fzf syntax while searching both original names and phonetic aliases.
 
 ## Notes
 
