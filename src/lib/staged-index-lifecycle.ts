@@ -21,7 +21,10 @@ process.once("exit", () => {
 });
 
 export function trackStagedIndex(filename: string): () => void {
-  if (!path.isAbsolute(filename) || !STAGED_INDEX_NAME.test(path.basename(filename))) {
+  if (
+    !path.isAbsolute(filename) ||
+    !STAGED_INDEX_NAME.test(path.basename(filename))
+  ) {
     throw new Error("Invalid PathSeek staged index path");
   }
   stages.add(filename);

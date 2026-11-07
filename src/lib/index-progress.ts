@@ -3,11 +3,7 @@ import path from "node:path";
 import { performance } from "node:perf_hooks";
 
 export type BuildPhase =
-  | "scanning"
-  | "finalizing"
-  | "published"
-  | "failed"
-  | "cancelled";
+  "scanning" | "finalizing" | "published" | "failed" | "cancelled";
 
 export type IndexBuildProgress = {
   version: 1;

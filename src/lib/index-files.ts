@@ -314,7 +314,11 @@ export async function cleanupStaleBuildTemps(
       continue;
     const fullPath = path.join(indexDirectory, filename);
     const info = await stat(fullPath).catch(() => null);
-    if (!info || !info.isFile() || (graceMs > 0 && now - info.mtimeMs < graceMs))
+    if (
+      !info ||
+      !info.isFile() ||
+      (graceMs > 0 && now - info.mtimeMs < graceMs)
+    )
       continue;
     await rm(fullPath, { force: true });
     removed++;
