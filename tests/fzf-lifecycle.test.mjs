@@ -550,7 +550,7 @@ test("native fzf matches hyphenated leaf names, leading slash and mixed pinyin l
     const expected = paths.slice(0, 2);
     assert.deepEqual(new Set(await find("fir/sec/thi/four-fi")), new Set(expected));
     assert.deepEqual(new Set(await find("/fir/sec/thi/four-fi")), new Set(expected));
-    assert.deepEqual(await find("fir/sec/arc/four-fi"), []);
+    assert.deepEqual(await find("fir/thi/arc/four-fi"), []);
     assert.deepEqual(await find("dyc/dec/bg"), [paths[3]]);
     assert.deepEqual(await find("第一次/dec/报告"), [paths[3]]);
     assert.deepEqual(await find("dyc/第二次/bao"), [paths[3]]);

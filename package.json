@@ -150,6 +150,7 @@
     "benchmark:quality": "node --experimental-strip-types scripts/benchmark-compression.mjs",
     "benchmark:search": "node --experimental-strip-types scripts/benchmark-search.mjs",
     "benchmark:standalone": "node --experimental-strip-types scripts/benchmark-standalone.mjs",
-    "benchmark:path": "node --experimental-strip-types scripts/benchmark-path-search.mjs"
+    "benchmark:path": "node --experimental-strip-types scripts/benchmark-path-search.mjs",
+    "benchmark:cold": "node --experimental-strip-types scripts/benchmark-cold-search.mjs"
   }
 }

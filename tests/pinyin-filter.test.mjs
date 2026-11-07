@@ -15,7 +15,7 @@ test("Chinese phrase initials and full pinyin are generated without touching the
   assert.equal(pinyinAlias("/Users/test/driver.c"), "");
 });
 
-test("complex fzf patterns bypass phonetic transformation", () => {
+test("complex fzf patterns do not request special pinyin result priority", () => {
   for (const input of [
     "dyc",
     "yc d",
@@ -36,7 +36,7 @@ test("complex fzf patterns bypass phonetic transformation", () => {
     "",
     "  ",
   ])
-    assert.equal(shouldUsePinyinAliases(input), false, input);
+    assert.equal(shouldPrioritizePinyinResults(input), false, input);
 });
 
 test("streaming pinyin input preserves tabs and line breaks inside filenames across chunks", async () => {

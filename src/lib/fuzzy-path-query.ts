@@ -141,6 +141,7 @@ function compileSegment(pattern: string): SegmentMatcher {
   }
   const evaluate = (name: string) =>
     groups.every((alternatives) => alternatives.some((test) => test(name)));
+  const hasNegation = tokens.some((token) => token.startsWith("!"));
 
   return (name, getAlias) => {
     const comparable = ignoreCase ? name.toLowerCase() : name;
@@ -151,7 +152,7 @@ function compileSegment(pattern: string): SegmentMatcher {
     const comparableAlias = ignoreCase ? alias.toLowerCase() : alias;
     return (
       evaluate(ignoreCase ? (name + " " + alias).toLowerCase() : name + " " + alias) ||
-      comparableAlias.split(" ").some((reading) => evaluate(reading))
+      (!hasNegation && comparableAlias.split(" ").some((reading) => evaluate(reading)))
     );
   };
 }
