@@ -40,6 +40,8 @@ export function parseSubtreeQuery(input: string): SubtreeQuery | null {
     throw new Error("Subtree directory query needs 1 to 16 non-empty levels (max 128 characters each)");
   }
   const nameQuery = match[3].trimStart();
+  if (nameQuery.startsWith("/"))
+    throw new Error("Subtree search cannot start with an empty directory level (///)");
   if (nameQuery.length > 512) throw new Error("Subtree filename query is too long");
 
   return {
