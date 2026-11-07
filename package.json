@@ -24,15 +24,6 @@
       "required": false
     },
     {
-      "name": "followSymlinks",
-      "title": "Follow Symbolic Links",
-      "description": "Follow symlinked directories (can cause extensive traversal).",
-      "type": "checkbox",
-      "label": "Follow symlinked directories",
-      "default": false,
-      "required": false
-    },
-    {
       "name": "excludePatterns",
       "title": "Exclude Patterns",
       "description": "Optional fd glob patterns to exclude, separated by commas.",
