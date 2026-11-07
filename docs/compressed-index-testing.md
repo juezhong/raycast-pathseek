@@ -59,7 +59,7 @@ npm run benchmark:quality -- "$OLD_INDEX" 2 --include-max
 
 若 **View Diagnostics** 显示 `heartbeat stale: yes`，说明最近超过 15 秒未写入进度，但不能单凭此项认定进程已退出。对比 `last raw input at`、`last compressed output at`、CPU 用时以及连续两次诊断值，才能区分扫描停滞、压缩背压和扩展进程退出。
 
-你的旧日志包含 `--hidden --follow`；建议先在偏好设置中**取消 Follow Symbolic Links** 来做可比性测试。
+当前分支已**移除全局 Follow Symbolic Links 开关**。可在开发版 **Build Index → Change Indexed Folders → Symlink Shortcut Folder (Optional)** 选择一个存放软链接的真实目录。只展开它直接包含的目录软链接；其他目录仍不跟随。
 
 ## 3. 不重扫磁盘：直接评估旧 8GB 索引可以压缩多少
 
@@ -130,7 +130,7 @@ ln "$TEST_DIR/index.nul" "$DEV_INDEX"
 
 ## 5. 可选：测试新的重建流程
 
-如果你还想验证 `fd → 前缀编码 → Brotli` 的完整重建过程，可以在开发版 **Build Index** 中先选择一个小目录手动建索引，确认正常后再索引家目录。
+如果你还想验证 `fd → 前缀编码 → Brotli` 的完整重建过程，可以在开发版 **Build Index** 中先选择一个小目录手动建索引，再选一个单独的软链接快捷目录（可选）。确认正常后再索引家目录。指定的快捷目录之外，不会跟随任何目录软链接。
 
 执行 Build Index 会原子替换**开发版**索引，正式版的 8GB 数据不受影响。由于前面使用硬链接，位于 `TEST_DIR` 的压缩测试结果仍保留。
 
