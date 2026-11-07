@@ -125,6 +125,13 @@ async function scanFd(root, sink, counters, signal, shortcut) {
             counters.sampledPathQuery =
               (ancestor.slice(0, 3) + "/" + leaf.slice(0, 3)).toLowerCase();
             counters.sampledLeafQuery = leaf.slice(0, 3).toLowerCase();
+            if (process.env.PATHSEEK_TEST_QUERY === "1") {
+              counters.debugSample = {
+                relative: path.relative(path.dirname(path.dirname(candidate)), candidate),
+                directory: parent,
+                leaf: name,
+              };
+            }
             break;
           }
           start = end + 1;
@@ -329,6 +336,7 @@ async function run() {
       includeHidden: args.hidden,
       compressionQuality: args.quality,
       compareRequested: args.compare,
+      compareTestSample: process.env.PATHSEEK_TEST_QUERY === "1" ? counters.debugSample : undefined,
       comparison: args.compare
         ? {
             available: Boolean(counters.sampledPathQuery),
