@@ -120,7 +120,7 @@ export function SearchFilesView({
       searchBarPlaceholder={
         dialogMode
           ? "Search names (fzf: keyword, .pdf$, !temp)"
-          : "Search file/folder names with fzf, pinyin: 2026 dyc"
+          : "Search names (fzf: keyword, .pdf$, !temp)"
       }
       onSearchTextChange={setQuery}
     >
