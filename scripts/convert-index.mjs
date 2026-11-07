@@ -14,14 +14,15 @@ import {
   readIndexHeader,
 } from "../src/lib/index-files.ts";
 
-const [sourceIndex, destinationDirectory] = process.argv.slice(2);
+const [sourceIndex, destinationDirectory, qualityRaw = "7"] = process.argv.slice(2);
+const quality = Number(qualityRaw);
 const abortController = new AbortController();
 const onInterrupt = () => abortController.abort(new Error("Conversion interrupted"));
 process.once("SIGINT", onInterrupt);
 process.once("SIGTERM", onInterrupt);
 
-if (!sourceIndex || !destinationDirectory) {
-  console.error('Usage: npm run convert:index -- "/absolute/path/to/old/index.nul" "/new/nonexistent/test-directory"');
+if (!sourceIndex || !destinationDirectory || ![5, 7, 9, 11].includes(quality)) {
+  console.error('Usage: npm run convert:index -- "/absolute/path/to/old/index.nul" "/new/nonexistent/test-directory" [quality=7]');
   process.exitCode = 2;
 } else {
   let staged;
@@ -50,7 +51,7 @@ if (!sourceIndex || !destinationDirectory) {
       new PathPrefixEncoder(),
       createBrotliCompress({
         params: {
-          [constants.BROTLI_PARAM_QUALITY]: 11,
+          [constants.BROTLI_PARAM_QUALITY]: quality,
           [constants.BROTLI_PARAM_LGWIN]: 24,
         },
       }),
@@ -72,6 +73,7 @@ if (!sourceIndex || !destinationDirectory) {
 
     console.log(JSON.stringify({
       formatVersion: 3,
+      compressionQuality: quality,
       indexedPaths: actualCount,
       originalBytes: originalSize,
       compressedBytes: compressedSize,
