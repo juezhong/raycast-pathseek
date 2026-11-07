@@ -26,7 +26,7 @@ async function fixture(action) {
 }
 
 async function waitForPid(file) {
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 300; i++) {
     try { return Number(await readFile(file, "utf8")); }
     catch { await new Promise((resolve) => setTimeout(resolve, 20)); }
   }
@@ -80,7 +80,9 @@ test("timeout escalates to SIGKILL when fzf ignores SIGTERM", async () => {
       "process.on('SIGTERM', () => {});\n" +
       "process.stdin.resume(); setInterval(() => {}, 1000);\n");
     await chmod(binary, 0o755);
-    await assert.rejects(runFzfFilter(binary, index, pidFile, undefined, 250), /time limit/);
+    // CI 或繁忙的 macOS 上 Node shebang 冷启动可能超过 250ms。
+    // 等待真实超时/升级 SIGKILL，但不要用过短超时误判尚未启动。
+    await assert.rejects(runFzfFilter(binary, index, pidFile, undefined, 3000), /time limit/);
     const pid = await waitForPid(pidFile);
     assertGone(pid);
   });
