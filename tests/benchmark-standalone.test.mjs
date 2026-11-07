@@ -108,6 +108,10 @@ test("standalone benchmark builds, searches and removes only its temporary index
     assert.ok(noMatch.recordsSentToFzf > 0);
     assert.ok(noMatch.bytesSentToFzf > 0);
     assert.ok(noMatch.batchesSentToFzf > 0);
+    assert.ok(
+      noMatch.batchesSentToFzf < noMatch.recordsSentToFzf / 10,
+      "codec and fzf input must batch paths instead of emitting each record",
+    );
     assert.ok(noMatch.transformSyncWallMs >= 0);
     assert.ok(noMatch.decoderEndMs > 0);
     assert.ok(noMatch.stdinFinishMs > 0);
