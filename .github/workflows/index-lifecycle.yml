@@ -12,6 +12,7 @@ on:
       - "tsconfig.json"
   pull_request:
     paths:
+      - "scripts/**"
       - "package-lock.json"
       - "src/**"
       - "tests/**"
@@ -29,8 +30,10 @@ jobs:
           node-version: "22"
       - name: Install locked npm dependencies
         run: npm ci --no-audit --no-fund
-      - name: Install fd for real-scan integration tests
-        run: command -v fd || brew install fd
+      - name: Install fd and fzf for real-scanner and search integration tests
+        run: |
+          command -v fd || brew install fd
+          command -v fzf || brew install fzf
       - name: Index format and atomic-publish tests
         run: npm test
       - name: Raycast build (generates preference types)
