@@ -1,12 +1,12 @@
 import { spawn } from "node:child_process";
-import { openIndexDataStream } from "./index-files";
-import { appendFzfOutputChunk, createFzfOutputState } from "./fzf-output";
+import { openIndexDataStream } from "./index-files.ts";
+import { appendFzfOutputChunk, createFzfOutputState } from "./fzf-output.ts";
 import {
   cancelledError,
   registerChild,
   terminateChild,
   throwIfAborted,
-} from "./managed-child";
+} from "./managed-child.ts";
 
 export type FilterResult = {
   paths: string[];
@@ -39,11 +39,18 @@ export async function runFzfFilter(
     let finished = false;
     let deadline: ReturnType<typeof setTimeout> | undefined;
 
-    const child = spawn(
-      binary,
-      ["--extended", "--read0", "--print0", "--filter", query],
-      { stdio: ["pipe", "pipe", "pipe"] },
-    );
+    let child;
+    try {
+      child = spawn(
+        binary,
+        ["--extended", "--read0", "--print0", "--filter", query],
+        { stdio: ["pipe", "pipe", "pipe"] },
+      );
+    } catch (error) {
+      input.destroy();
+      reject(error);
+      return;
+    }
     registerChild(child);
 
     const stop = () => {
