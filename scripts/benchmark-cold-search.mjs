@@ -34,6 +34,7 @@ try {
   await writeFile(path.join(chinese, "报告.txt"), "");
 
   const started = performance.now();
+  const buildCpuStart = process.cpuUsage();
   const stage = path.join(root, "stage.tmp");
   await createStreamingIndexStage(stage);
   const scan = spawn("fd", ["--absolute-path", "--print0", ".", fixture], {
@@ -78,16 +79,21 @@ try {
   });
   await publishIndex(stage, root);
   const buildMs = performance.now() - started;
+  const buildCpu = process.cpuUsage(buildCpuStart);
 
   const index = path.join(root, "index.nul");
   const queries = ["four", "fir/sec/thi/four-fi", "dyc/dec/bg"];
   const firstSearches = [];
   for (const [ordinal, query] of queries.entries()) {
     const begin = performance.now();
+    const cpuStart = process.cpuUsage();
     const result = await runFzfFilter("fzf", index, query);
+    const cpu = process.cpuUsage(cpuStart);
     firstSearches.push({
       id: ordinal + 1,
       elapsedMs: Number((performance.now() - begin).toFixed(2)),
+      nodeCpuMs: Number(((cpu.user + cpu.system) / 1000).toFixed(2)),
+      nodeRssBytes: process.memoryUsage().rss,
       resultCount: result.paths.length,
     });
   }
@@ -96,8 +102,9 @@ try {
     fixtureFiles: count + 1,
     indexedPaths: pathCount,
     buildMs: Number(buildMs.toFixed(2)),
+    buildNodeCpuMs: Number(((buildCpu.user + buildCpu.system) / 1000).toFixed(2)),
     firstSearches,
-    note: "Starts without a cached index in a fresh temporary directory. No real user files or index are removed.",
+    note: "Starts without a cached index in a fresh temporary directory. No real user files or index are removed; CPU and RSS exclude the fd and fzf child processes.",
   }, null, 2));
 } finally {
   await rm(root, { force: true, recursive: true });
