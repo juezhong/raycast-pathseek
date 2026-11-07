@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Readable } from "node:stream";
+import { finished } from "node:stream/promises";
 import { createBrotliCompress, createBrotliDecompress, constants } from "node:zlib";
 import { PathPrefixEncoder, PathPrefixDecoder } from "../src/lib/index-codec.ts";
 
@@ -82,12 +83,12 @@ test("decoder batches complete NUL paths, preserving bytes across fragmented inp
     fragments.push(encoded.subarray(i, i + 517));
 
   const decoded = [];
-  for await (const block of Readable.from(fragments).pipe(
-    new PathPrefixDecoder(),
-  )) {
+  const decoder = Readable.from(fragments).pipe(new PathPrefixDecoder());
+  decoder.on("data", (block) => {
     decoded.push(block);
     assert.equal(block[block.length - 1], 0);
-  }
+  });
+  await finished(decoder);
   assert.deepEqual(Buffer.concat(decoded), raw);
   assert.ok(decoded.length < entries.length / 40);
   assert.ok(decoded.every((block) => block.length <= 66 * 1024));
@@ -102,9 +103,9 @@ test("decoder handles an individually oversized output batch with a valid long p
     Readable.from([raw]).pipe(new PathPrefixEncoder()),
   );
   const decoded = [];
-  for await (const block of Readable.from([encoded]).pipe(
-    new PathPrefixDecoder(),
-  )) decoded.push(block);
+  const decoder = Readable.from([encoded]).pipe(new PathPrefixDecoder());
+  decoder.on("data", (block) => decoded.push(block));
+  await finished(decoder);
   assert.deepEqual(Buffer.concat(decoded), raw);
   assert.equal(decoded.length, 2);
 });
