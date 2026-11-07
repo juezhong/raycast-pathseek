@@ -88,9 +88,9 @@ test("only the current entry name is searchable, never its parent directory", as
     "/projects/2026/driver.c",
   ];
   const input = Buffer.from(entries.join("\0") + "\0");
-  const chunks: Buffer[] = [];
+  const chunks = [];
   for await (const chunk of Readable.from([input]).pipe(createPinyinFilterInput(true)))
-    chunks.push(chunk as Buffer);
+    chunks.push(chunk);
   const records = Buffer.concat(chunks).toString("utf8").split("\0").filter(Boolean);
   assert.equal(records.length, entries.length);
   assert.equal(records[0].split("\t")[0], "第一次.txt dyc diyici DYC DIYICI");
@@ -102,8 +102,8 @@ test("only the current entry name is searchable, never its parent directory", as
 
 test("native fzf operator queries do not insert pinyin aliases", async () => {
   const path = "/parent/第一次/2026_driver.txt";
-  const output: Buffer[] = [];
+  const output = [];
   for await (const chunk of Readable.from([Buffer.from(path + "\0")]).pipe(createPinyinFilterInput(false)))
-    output.push(chunk as Buffer);
+    output.push(chunk);
   assert.equal(Buffer.concat(output).toString("utf8"), "2026_driver.txt\t" + path + "\0");
 });
