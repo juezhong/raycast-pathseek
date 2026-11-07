@@ -259,7 +259,7 @@ export function SearchFilesView({
   }, [index, query, scopedFolder, subtreeSyntaxError]);
 
   const activeError = subtreeSyntaxError ?? scopeError ?? loadError;
-  const missingBinary = getMissingBinary(activeError);
+  const missingBinary = getMissingBinary(loadError);
 
   const emptyTitle = missingBinary
     ? "Missing Required Tool"
