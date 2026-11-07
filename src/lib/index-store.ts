@@ -11,6 +11,7 @@ import { createBrotliCompress, constants as zlibConstants } from "node:zlib";
 import { PathPrefixEncoder } from "./index-codec.ts";
 import { createNonClosingSink } from "./non-closing-sink";
 import { beginIndexBuildProgress } from "./index-progress";
+import { cancelledError, registerChild, terminateChild, throwIfAborted } from "./managed-child";
 import lockfile from "proper-lockfile";
 import { beginCommandTrace } from "./command-trace";
 import {
@@ -165,6 +166,7 @@ async function runFd(
   reason: "manual-rebuild",
   progress: Awaited<ReturnType<typeof beginIndexBuildProgress>>,
   shortcut?: SelectiveSymlinkTarget,
+  signal?: AbortSignal,
 ): Promise<number> {
   // Show effective flags without exposing directory names or exclude patterns.
   const flags = args.filter((arg) =>
@@ -176,9 +178,16 @@ async function runFd(
     flags.join(" ") +
     (excludeCount ? " --exclude <redacted> (x" + excludeCount + ")" : "") +
     (shortcut ? " . <selective-symlink-target>" : " . <root>");
+  throwIfAborted(signal);
   const trace = await beginCommandTrace("fd", reason, invocation);
+  throwIfAborted(signal);
   const child = spawn(fdPath, args, { stdio: ["ignore", "pipe", "pipe"] });
+  registerChild(child);
   progress.fdStarted(child.pid);
+  const closed = new Promise<void>((resolve) => child.once("close", () => resolve()));
+  const abort = () => terminateChild(child);
+  signal?.addEventListener("abort", abort, { once: true });
+  if (signal?.aborted) abort();
   let exitCode: number | null | undefined;
   const chunks: string[] = [];
   let count = 0;
@@ -225,14 +234,18 @@ async function runFd(
         : pipeline(child.stdout, meter, createNonClosingSink(output)),
       completed,
     ]);
+    throwIfAborted(signal);
     progress.fdFinished(exitCode);
     await trace?.finish("success", count, exitCode);
     return count;
   } catch (error) {
-    child.kill();
+    terminateChild(child);
+    await closed;
     progress.fdFinished(exitCode);
     await trace?.finish("failure", count, exitCode, error);
-    throw error;
+    throw signal?.aborted ? cancelledError() : error;
+  } finally {
+    signal?.removeEventListener("abort", abort);
   }
 }
 
@@ -243,7 +256,9 @@ async function runFd(
  */
 export async function rebuildIndex(
   selectedRoots?: string[],
+  signal?: AbortSignal,
 ): Promise<IndexMetadata> {
+  throwIfAborted(signal);
   await mkdir(indexDirectory, { recursive: true });
   // Heartbeat prevents simultaneous rebuilds. Abandoned locks expire.
   const release = await lockfile.lock(indexDirectory, {
@@ -254,6 +269,7 @@ export async function rebuildIndex(
   });
 
   try {
+    throwIfAborted(signal);
     // Maintenance runs only after the explicit Build/Rebuild action acquires
     // the write lock. Search Files and Index Status never touch these files.
     try {
@@ -324,7 +340,10 @@ export async function rebuildIndex(
     let total = 0;
     const input = new PassThrough({ highWaterMark: 1024 * 1024 });
     let writer: Promise<void> | undefined;
+    const abortWriter = () => input.destroy(cancelledError());
+    signal?.addEventListener("abort", abortWriter, { once: true });
     try {
+      throwIfAborted(signal);
       await createStreamingIndexStage(stagedTemp);
       // 仅保存压缩数据，不落盘存储整个家目录的原始路径列表。
       writer = pipeline(
@@ -354,6 +373,8 @@ export async function rebuildIndex(
           input,
           "manual-rebuild",
           progress,
+          undefined,
+          signal,
         );
       }
       for (const [index, shortcut] of (discovery?.targets ?? []).entries()) {
@@ -365,11 +386,14 @@ export async function rebuildIndex(
           "manual-rebuild",
           progress,
           shortcut,
+          signal,
         );
       }
+      throwIfAborted(signal);
       progress.finalizing();
       input.end();
       await writer;
+      throwIfAborted(signal);
 
       const metadata: IndexMetadata = {
         version: 3,
@@ -383,6 +407,7 @@ export async function rebuildIndex(
         stagedTemp,
         metadata,
       );
+      throwIfAborted(signal);
       await publishIndex(stagedTemp, indexDirectory);
 
       try {
@@ -398,6 +423,7 @@ export async function rebuildIndex(
       await progress.finish("failed", error).catch(() => undefined);
       throw error;
     } finally {
+      signal?.removeEventListener("abort", abortWriter);
       await rm(stagedTemp, { force: true }).catch(() => undefined);
     }
   } finally {
