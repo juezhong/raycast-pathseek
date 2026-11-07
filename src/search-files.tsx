@@ -481,7 +481,7 @@ export function SearchFilesView({
             />
           );
         })}
-        })}   </List>
+    </List>
   );
 }
 
