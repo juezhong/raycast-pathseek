@@ -5,6 +5,7 @@ on:
     paths:
       - "src/**"
       - "tests/**"
+      - "scripts/**"
       - ".github/workflows/index-lifecycle.yml"
       - "package.json"
       - "package-lock.json"
