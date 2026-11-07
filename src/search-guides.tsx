@@ -9,7 +9,11 @@ import {
 import { useEffect, useState } from "react";
 import path from "node:path";
 import { fuzzySearch } from "./lib/fuzzy-search";
-import type { IndexMetadata } from "./lib/index-store";
+import { indexFilePath, type IndexMetadata } from "./lib/index-store";
+import {
+  findIndexedDirectoryChoices,
+  parseSubtreeQuery,
+} from "./lib/subtree-search";
 
 const HELP = `# Search Syntax Guide
 
@@ -107,7 +111,27 @@ function SearchExpressionBuilder({
 
     setLoading(true);
     const timer = setTimeout(() => {
-      fuzzySearch(index, expression, controller.signal)
+      const preview = async () => {
+        const subtree = parseSubtreeQuery(expression);
+        if (!subtree) return fuzzySearch(index, expression, controller.signal);
+        const choices = await findIndexedDirectoryChoices(
+          indexFilePath(index),
+          subtree.directoryPatterns,
+          controller.signal,
+        );
+        if (choices.paths.length !== 1 || choices.truncated) {
+          throw new Error(
+            "Subtree preview needs one matching directory. Apply the expression in the main list to choose a folder.",
+          );
+        }
+        return fuzzySearch(
+          index,
+          subtree.nameQuery,
+          controller.signal,
+          choices.paths[0],
+        );
+      };
+      void preview()
         .then((paths) => {
           if (!controller.signal.aborted) setPreview(paths);
         })
