@@ -55,7 +55,9 @@ npm run convert:index -- "$OLD_INDEX" "$TEST_DIR" 7
 - v2 旧格式为 `PSIDX002` + JSON 头 + NUL 分隔完整绝对路径，仍可搜索。
 - 旧 v1 索引通过 `index.json + index-<UUID>.nul` 读取，保持向后兼容。
 - 构建失败或中止前不会替换当前有效索引。
-- 跟随符号链接（`--follow`）与包含隐藏文件（`--hidden`）可能显著扩大扫描范围。排查时建议先取消 **Follow Symbolic Links**。
+- 常规扫描始终不执行 `--follow`。只有用户在 **Build Index** 指定一个“Symlink Shortcut Folder”时，才会额外扫描该目录**直接包含的目录软链接**的目标；生成的搜索路径保留软链接名称。目标内部的软链接不会继续递归展开。默认不配置此目录。
+- 在 **Build Index → Change Indexed Folders** 可以更换或清空该目录；不提供全局软链接跟随开关。配置修改后需要手动重建。
+- 隐藏文件由 `Include Hidden Files` 控制；失效的软链接会被跳过，并在诊断中统计数量。
 - 压缩文件仍含有真实的文件名和路径。不要把 `index.nul` 上传至公开 Issue，只发送 `Copy Sanitized Debug Info`。
 
 详细实机步骤见 [compressed-index-testing.md](compressed-index-testing.md)。
