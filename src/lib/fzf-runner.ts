@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import type { Readable } from "node:stream";
 import { openIndexDataStream } from "./index-files.ts";
+import { parseFuzzyPathQuery } from "./fuzzy-path-query.ts";
 import { appendFzfOutputChunk, createFzfOutputState } from "./fzf-output.ts";
 import {
   appendPinyinPriorityChunk,
@@ -35,9 +36,14 @@ export async function runFzfFilter(
   timeoutMs = 60_000,
 ): Promise<FilterResult> {
   throwIfAborted(signal);
+  const pathQuery = parseFuzzyPathQuery(query);
+  const nameQuery = pathQuery?.nameQuery ?? query;
   const input = await openIndexDataStream(indexPath);
-  const pinyinMode = shouldUsePinyinAliases(query);
-  const augmented = createPinyinFilterInput(pinyinMode);
+  const pinyinMode = shouldUsePinyinAliases(nameQuery);
+  const augmented = createPinyinFilterInput(
+    pinyinMode,
+    pathQuery?.directoryPatterns ?? [],
+  );
   const source = augmented;
   if (signal?.aborted) {
     input.destroy();
@@ -69,7 +75,7 @@ export async function runFzfFilter(
           "--nth",
           "1",
           "--filter",
-          query,
+          nameQuery,
         ],
         { stdio: ["pipe", "pipe", "pipe"] },
       );

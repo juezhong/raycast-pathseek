@@ -117,11 +117,7 @@ export function SearchFilesView({
       isLoading={index === undefined || isSearching}
       filtering={false}
       searchText={query}
-      searchBarPlaceholder={
-        dialogMode
-          ? "Search names (fzf: keyword, .pdf$, !temp)"
-          : "Search names (fzf: keyword, .pdf$, !temp)"
-      }
+      searchBarPlaceholder="Search names or dir/file (.pdf$, !temp)"
       onSearchTextChange={setQuery}
     >
       <List.EmptyView

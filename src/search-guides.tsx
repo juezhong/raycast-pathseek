@@ -13,7 +13,7 @@ import type { IndexMetadata } from "./lib/index-store";
 
 const HELP = `# Search Syntax Guide
 
-PathSeek searches **only each indexed file or directory name** with \`fzf --extended --read0 --print0 --filter\`. A search is not a live filesystem scan.
+By default PathSeek matches only each indexed file or directory name with \`fzf --extended --read0 --print0 --filter\`. A search is not a live filesystem scan.
 
 | Expression | Behavior |
 | --- | --- |
@@ -25,6 +25,19 @@ PathSeek searches **only each indexed file or directory name** with \`fzf --exte
 | \`!node_modules\` | Exclude names containing \`node_modules\` |
 | \`driver .c$\` | Both conditions must match (AND) |
 | \`.c$ | .h$\` | Either alternative may match (OR) |
+
+## Fuzzy path segments
+
+Use / to separate **directory levels** from the final file or directory name. Every level is matched independently (ordered fuzzy characters), in the same order as the actual path. You may omit earlier ancestor directories and type only a suffix of the directory hierarchy.
+
+- For first/second/third/fourth: th/for, third/fou and fir/seco/th/four all match fourth.
+- For a Chinese directory 第一次 containing 第二次.txt: dyc/dec matches that file.
+- th/ lists entries **directly inside** directories matching th.
+- dir/.pdf$ filters PDF filenames directly inside matching dir directories; the final segment still uses fzf extended syntax.
+- Levels must be consecutive: first/third/fourth does not skip the second directory.
+- Without /, the regular filename-only matching (including pinyin) remains unchanged.
+
+All checks read the existing local index; no on-demand filesystem traversal, second index, or background service is added.
 
 ## Chinese Pinyin
 
@@ -136,7 +149,7 @@ function SearchExpressionBuilder({
       <Form.TextField
         id="expression"
         title="Expression"
-        placeholder="report .pdf$"
+        placeholder="src/.pdf$"
         value={expression}
         onChange={setExpression}
         autoFocus
