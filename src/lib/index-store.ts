@@ -9,6 +9,7 @@ import { pipeline } from "node:stream/promises";
 import { Transform, PassThrough, type Writable } from "node:stream";
 import { createBrotliCompress, constants as zlibConstants } from "node:zlib";
 import { PathPrefixEncoder } from "./index-codec.ts";
+import { beginIndexBuildProgress } from "./index-progress";
 import lockfile from "proper-lockfile";
 import { beginCommandTrace } from "./command-trace";
 import { getConfiguredIndexRoots } from "./index-roots";
@@ -153,6 +154,7 @@ async function runFd(
   args: string[],
   output: Writable,
   reason: "manual-rebuild",
+  progress: Awaited<ReturnType<typeof beginIndexBuildProgress>>,
 ): Promise<number> {
   // Show effective flags without exposing directory names or exclude patterns.
   const flags = args.filter((arg) =>
@@ -166,6 +168,7 @@ async function runFd(
     " . <root>";
   const trace = await beginCommandTrace("fd", reason, invocation);
   const child = spawn(fdPath, args, { stdio: ["ignore", "pipe", "pipe"] });
+  progress.fdStarted(child.pid);
   let exitCode: number | null | undefined;
   const chunks: string[] = [];
   let count = 0;
@@ -175,7 +178,10 @@ async function runFd(
 
   const meter = new Transform({
     transform(chunk: Buffer, _encoding, callback) {
-      for (const byte of chunk) if (byte === 0) count++;
+      let found = 0;
+      for (let offset = chunk.indexOf(0); offset >= 0; offset = chunk.indexOf(0, offset + 1)) found++;
+      count += found;
+      progress.input(chunk.length, found);
       callback(null, chunk);
     },
   });
@@ -197,10 +203,12 @@ async function runFd(
       pipeline(child.stdout, meter, output, { end: false }),
       completed,
     ]);
+    progress.fdFinished(exitCode);
     await trace?.finish("success", count, exitCode);
     return count;
   } catch (error) {
     child.kill();
+    progress.fdFinished(exitCode);
     await trace?.finish("failure", count, exitCode, error);
     throw error;
   }
@@ -247,6 +255,16 @@ export async function rebuildIndex(
 
     const fd = await findBinary("fd", prefs.fdBinary);
     const id = randomUUID();
+    const quality = [5, 7, 9, 11].includes(Number(prefs.compressionQuality))
+      ? Number(prefs.compressionQuality)
+      : 7;
+    const progress = await beginIndexBuildProgress(indexDirectory, {
+      buildId: id,
+      rootCount: roots.length,
+      compressionQuality: quality,
+      followSymlinks: prefs.followSymlinks === true,
+      includeHidden: prefs.includeHidden === true,
+    });
     const stagedTemp = path.join(indexDirectory, "index-" + id + ".nul.tmp");
     const args = ["--absolute-path", "--print0"];
     if (prefs.includeHidden) args.push("--hidden");
@@ -269,17 +287,25 @@ export async function rebuildIndex(
         new PathPrefixEncoder(),
         createBrotliCompress({
           params: {
-            [zlibConstants.BROTLI_PARAM_QUALITY]: 11,
+            [zlibConstants.BROTLI_PARAM_QUALITY]: quality,
             [zlibConstants.BROTLI_PARAM_LGWIN]: 24,
+          },
+        }),
+        new Transform({
+          transform(chunk: Buffer, _encoding, callback) {
+            progress.output(chunk.length);
+            callback(null, chunk);
           },
         }),
         createWriteStream(stagedTemp, { flags: "a" }),
       );
       // 防止扫描尚未结束时编码管线提前失败产生 unhandled rejection。
       void writer.catch(() => undefined);
-      for (const root of roots) {
-        total += await runFd(fd, [...args, ".", root], input, "manual-rebuild");
+      for (const [index, root] of roots.entries()) {
+        progress.root(index + 1);
+        total += await runFd(fd, [...args, ".", root], input, "manual-rebuild", progress);
       }
+      progress.finalizing();
       input.end();
       await writer;
 
@@ -302,10 +328,12 @@ export async function rebuildIndex(
       } catch (error) {
         console.warn("Legacy index cleanup deferred:", error);
       }
+      await progress.finish("published");
       return stagedMetadata;
     } catch (error) {
       input.destroy();
       await writer?.catch(() => undefined);
+      await progress.finish("failed", error).catch(() => undefined);
       throw error;
     } finally {
       await rm(stagedTemp, { force: true }).catch(() => undefined);
