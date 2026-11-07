@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 import {
   matchesFuzzyParentPath,
@@ -224,4 +225,29 @@ test("compiled directory matching does not generate pinyin for ASCII names", () 
     assert.equal(matcher("/home/pkg/archive/file" + i + ".c"), false);
   }
   assert.equal(aliasCalls, 0);
+});
+
+
+test("directory operator decisions agree with real fzf for ASCII names", () => {
+  const names = [
+    "SrcCore", "srcCore", "SourceCore", "TestCore", "test-core",
+    "src_lib", "doc-lib", "doclib", "doc_utils", "driver",
+    "lib", "LIB", "README.md",
+  ];
+  const input = Buffer.from(names.join("\0") + "\0");
+  for (const pattern of [
+    "src", "^src", "^Src", "SRC", "'src", "'doc'",
+    "core$", "!core", "!^test", "^src | ^test",
+    "^src core$", "src lib", "lib$ | .md$",
+  ]) {
+    const proc = spawnSync(
+      "fzf", ["--extended", "--read0", "--print0", "--no-sort", "--filter", pattern],
+      { input, maxBuffer: 1024 * 1024 },
+    );
+    assert.ok(proc.status === 0 || proc.status === 1, String(proc.stderr));
+    const expected = new Set(proc.stdout.toString("utf8").split("\0").filter(Boolean));
+    const matcher = compileFuzzyParentPathMatcher([pattern], () => "");
+    const actual = new Set(names.filter((name) => matcher("/tmp/" + name + "/file.txt")));
+    assert.deepEqual(actual, expected, pattern);
+  }
 });
