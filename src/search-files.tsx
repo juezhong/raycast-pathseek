@@ -377,33 +377,36 @@ export function SearchFilesView({
           </ActionPanel>
         }
       />
-      {selectingFolder && !isLocatingDirectory && directoryChoices.map((folder) => (
-        <List.Item
-          key={"directory:" + folder}
-          id={"directory:" + folder}
-          title={path.basename(folder)}
-          subtitle={
-            (folder.startsWith(os.homedir() + path.sep)
-              ? "~" + folder.slice(os.homedir().length)
-              : folder) + (choicesTruncated ? " · More matches: refine path" : "")
-          }
-          icon={Icon.Folder}
-          actions={
-            <ActionPanel>
-              <Action
-                title="Search Within This Folder"
-                icon={Icon.Folder}
-                shortcut={{ modifiers: [], key: "tab" }}
-                onAction={() => void enterFolder(folder)}
-              />
-              <Action.CopyToClipboard
-                title="Copy Folder Path"
-                content={folder}
-              />
-            </ActionPanel>
-          }
-        />
-      ))}
+      {selectingFolder &&
+        !isLocatingDirectory &&
+        directoryChoices.map((folder) => (
+          <List.Item
+            key={"directory:" + folder}
+            id={"directory:" + folder}
+            title={path.basename(folder)}
+            subtitle={
+              (folder.startsWith(os.homedir() + path.sep)
+                ? "~" + folder.slice(os.homedir().length)
+                : folder) +
+              (choicesTruncated ? " · More matches: refine path" : "")
+            }
+            icon={Icon.Folder}
+            actions={
+              <ActionPanel>
+                <Action
+                  title="Search Within This Folder"
+                  icon={Icon.Folder}
+                  shortcut={{ modifiers: [], key: "tab" }}
+                  onAction={() => void enterFolder(folder)}
+                />
+                <Action.CopyToClipboard
+                  title="Copy Folder Path"
+                  content={folder}
+                />
+              </ActionPanel>
+            }
+          />
+        ))}
       {!selectingFolder && results.map((filepath) => {
         const display = filepath.startsWith(os.homedir() + path.sep)
           ? "~" + filepath.slice(os.homedir().length)
