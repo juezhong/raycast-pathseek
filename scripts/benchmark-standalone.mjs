@@ -329,6 +329,9 @@ async function run() {
       includeHidden: args.hidden,
       compressionQuality: args.quality,
       compareRequested: args.compare,
+      comparisonTestQuery: process.env.PATHSEEK_TEST_QUERY === "1"
+        ? counters.sampledPathQuery
+        : undefined,
       comparison: args.compare
         ? {
             available: Boolean(counters.sampledPathQuery),
