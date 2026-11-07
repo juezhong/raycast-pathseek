@@ -1,46 +1,61 @@
 # PathSeek 索引存储
 
-PathSeek 的索引保存在 Raycast 提供的 `environment.supportPath` 目录中，不在 Git 仓库，也不是 Raycast 加密的 LocalStorage。运行 **View Index Status** 可以查看构建时间、路径数量和存储位置。
+PathSeek 在 Raycast 的 `environment.supportPath` 下维护索引。开发模式使用独立的 `index-development-v3/` 子目录，避免覆盖正式版索引。
 
 ## 手动索引
 
-- 第一次运行 **Build Index**，自行选择一个或多个目录，再明确提交建立索引。
-- 修改目录或扫描选项后，仍须手动执行 **Rebuild Index Now** 才会更新搜索结果。
-- 打开 Raycast、搜索、查看状态、修改目录以及长时间不使用时，**都不会自动启动 `fd`**。
-- 搜索通过 `fzf` 读取已发布的索引；不会为了搜索词重新扫描文件系统。
+- 仅用户明确执行 **Build Index** 时调用 `fd`。搜索、打开状态和诊断界面不会重扫磁盘。
+- `fd` 的路径流直接进入前缀编码器和 Brotli 压缩流，不会额外写入完整的 8GB 未压缩路径副本。
+- 重建时仍会同时保留旧版索引和一个压缩的临时索引；构建成功后原子替换。
+- 重建尚未成功发布时，**View Index Status** 可能显示 `not built`；请到 **Build Index** 查看实时进度或 **View Diagnostics** 查看持久化心跳。
 
-## v3 压缩格式（当前）
-
-当前新建的索引仍为 `index.nul`，但文件内容采用路径字节公共前缀编码 + Brotli 最高质量无损压缩。重建时直接将 `fd` 的 NUL 路径流编码压缩后写入临时索引，不再保留一份巨大的原始路径临时文件。
-
-流式构建使用固定 64KiB 的预留头部。构建完成后写入记录数量及索引根目录，并原子替换旧索引。搜索时仅流式解压和恢复路径，不向磁盘写出解压文件。由于每次模糊搜索仍需扫描路径流，压缩后搜索可能更慢。
-
-### 压缩流程
+## v3 压缩格式
 
 ```text
-fd --print0 → PathPrefixEncoder → Brotli(quality=11) → staged index
-index.nul → Brotli Decoder → PathPrefixDecoder → fzf --read0
+[8 bytes: "PSIDX003"][4 bytes JSON length][JSON metadata]
+[optional reserved header space to byte 65536]
+[Brotli encoded prefix-delta NUL path records]
 ```
 
-单条路径使用前条路径 UTF-8 字节的共享前缀长度（LEB128）和余下字节编码，再以 NUL 分隔。保持 UTF-8、换行文件名等完整字节，不做有损归一化。没有要求额外安装压缩程序。
+索引使用 UTF-8 原始路径字节、与上一条路径共享的前缀长度（unsigned LEB128）以及剩余路径字节来编码；随后进行无损 Brotli 压缩。解压后直接输出原始 NUL 分隔路径到 `fzf`，不产生未压缩的磁盘临时文件。
 
-### 兼容
-
-## v3 压缩格式（当前）
-
-v2 旧索引仍采用原有的 NUL 分隔绝对路径格式。
+Brotli 压缩等级可以在扩展偏好设置中选择：5（快）、7（平衡，默认）、9（高）、11（最高，可能极慢）。**最高等级不保证在所有文件路径数据上都获得最佳压缩率**。改变等级后需要手动重建。
 
 ```text
-[8 bytes: "PSIDX002"]
-[4 bytes: little-endian JSON header length]
-[JSON metadata: version, createdAt, count, roots]
-[UTF-8 absolute path][NUL]
-[UTF-8 absolute path][NUL]
-...
+fd --absolute-path --print0
+    → PathPrefixEncoder → Brotli(quality=5|7|9|11)
+    → staged index → atomic rename(index.nul)
+
+index.nul → BrotliDecompress → PathPrefixDecoder
+    → fzf --read0 --filter
 ```
 
-使用 NUL 分隔可以正确处理路径中的中文、空格和换行。新文件先写入临时路径并校验，然后原子替换当前 `index.nul`；同一份打开的文件描述符供读者读取头部与路径，避免读取过程中混用新旧索引。
+## 诊断和压缩测试
 
-对早期 v1 格式 `index.json + index-<UUID>.nul` 保留兼容读取；在新版构建成功、经过宽限期后，旧数据可被清理。失败的构建不会在发布前破坏当前索引。
+Build Index 页和 View Diagnostics 显示持续刷新的原始输入字节数、路径数量、压缩输出字节数、耗时、处理速率、根目录序号、压缩等级和扩展进程的 CPU 用时。记录不包含真实文件名、路径、搜索词、排除规则。进度文件固定为一个小型 `build-progress.json`，大约每两秒更新一次（不记录逐条路径），异常终止会保留最后一次心跳。心跳不断更新不代表 `fd` 正在产生数据。
 
-**隐私注意：** 尽管索引已压缩，它仍包含真实文件名与绝对路径，不要把 `index.nul` 上传到公开 Issue。排查问题请使用 **View Diagnostics → Copy Sanitized Debug Info**。
+对旧 v2 索引可以运行：
+
+```bash
+npm run benchmark:quality -- "/absolute/path/to/old/index.nul" 2
+# 可选：比较非常耗时的 quality=11
+npm run benchmark:quality -- "/absolute/path/to/old/index.nul" 2 --include-max
+```
+
+该工具最多读取指定 MiB 的原始路径数据，所有压缩结果都在内存中计算，终端只输出汇总数值，不创建额外的索引文件。样本结果不能代替完整 8GB 测试。
+
+也可以将旧索引转换到不存在的新目录，使用第三个参数指定压缩等级（默认7）：
+
+```bash
+npm run convert:index -- "$OLD_INDEX" "$TEST_DIR" 7
+```
+
+## 兼容和安全
+
+- v2 旧格式为 `PSIDX002` + JSON 头 + NUL 分隔完整绝对路径，仍可搜索。
+- 旧 v1 索引通过 `index.json + index-<UUID>.nul` 读取，保持向后兼容。
+- 构建失败或中止前不会替换当前有效索引。
+- 跟随符号链接（`--follow`）与包含隐藏文件（`--hidden`）可能显著扩大扫描范围。排查时建议先取消 **Follow Symbolic Links**。
+- 压缩文件仍含有真实的文件名和路径。不要把 `index.nul` 上传至公开 Issue，只发送 `Copy Sanitized Debug Info`。
+
+详细实机步骤见 [compressed-index-testing.md](compressed-index-testing.md)。
