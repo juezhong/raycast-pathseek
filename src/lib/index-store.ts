@@ -270,7 +270,7 @@ export async function rebuildIndex(
       }
 
       const metadata: IndexMetadata = {
-        version: 2,
+        version: 3,
         filename: ACTIVE_INDEX_FILENAME,
         createdAt: new Date().toISOString(),
         count: total,
