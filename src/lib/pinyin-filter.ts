@@ -195,14 +195,20 @@ export function createPinyinFilterInput(
           }
           if (anchoredQuery && !segmentQueries) {
             // 前后锚点必须作用于真实名称；拼音候选独立参与同一个 fzf 查询。
-            emitRecord(Buffer.from(filename.replaceAll("\t", " "), "utf8"), record);
+            emitRecord(
+              Buffer.from(filename.replaceAll("\t", " "), "utf8"),
+              record,
+            );
             if (enablePinyin) {
               const aliases = pinyinAlias(filename).split(" ").filter(Boolean);
               for (const alias of aliases)
                 emitRecord(Buffer.from(alias, "utf8"), record);
             }
           } else {
-            emitRecord(Buffer.from(projectPath(searchPath, filename), "utf8"), record);
+            emitRecord(
+              Buffer.from(projectPath(searchPath, filename), "utf8"),
+              record,
+            );
           }
           offset = end + 1;
         }
