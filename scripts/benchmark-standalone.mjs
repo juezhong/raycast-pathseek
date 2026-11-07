@@ -36,30 +36,18 @@ function summarizeTimes(values) {
   };
 }
 
-function pipelineSummary(samples) {
-  const range = (field) => {
-    const values = samples.map((item) => item[field]);
-    return {
-      min: Math.min(...values),
-      max: Math.max(...values),
-    };
-  };
-  const median = (field) => {
-    const values = samples
-      .map((item) => item[field])
-      .filter((value) => typeof value === "number" && Number.isFinite(value));
-    return values.length ? summarizeTimes(values).p50Ms : null;
-  };
-
+function pipelineSummary(sample) {
+  // 只在预热轮次采样，保证正式测量轮次不增加记录计数开销。
   return {
-    recordsDecoded: range("inputRecords"),
-    recordsSentToFzf: range("outputRecords"),
-    bytesSentToFzf: range("outputBytes"),
-    batchesSentToFzf: range("outputChunks"),
-    transformCpuLikeMsP50: median("transformMs"),
-    decoderEndMsP50: median("decoderEndMs"),
-    stdinFinishMsP50: median("stdinFinishMs"),
-    childCloseMsP50: median("childCloseMs"),
+    recordsDecoded: sample.inputRecords,
+    recordsSentToFzf: sample.outputRecords,
+    bytesSentToFzf: sample.outputBytes,
+    batchesSentToFzf: sample.outputChunks,
+    transformSyncWallMs: Number(sample.transformMs.toFixed(2)),
+    decoderEndMs: sample.decoderEndMs ?? null,
+    stdinFinishMs: sample.stdinFinishMs ?? null,
+    childCloseMs: sample.childCloseMs ?? null,
+    scope: "Warmup run only; stages overlap and times cannot be summed.",
   };
 }
 
@@ -461,13 +449,11 @@ async function run() {
           entry.query,
           controller.signal,
           60_000,
-          profile,
+          round === 0 ? profile : undefined,
         );
         const elapsed = performance.now() - startedQuery;
-        if (round > 0) {
-          entry.timings.push(elapsed);
-          (entry.profiles ??= []).push(profile);
-        }
+        if (round === 0) entry.profile = profile;
+        else entry.timings.push(elapsed);
         entry.count = result.paths.length;
         entry.limited = result.limited;
         if (result.cancelled) throw new Error("Search cancelled");
@@ -479,7 +465,7 @@ async function run() {
       ...summarizeTimes(entry.timings),
       resultCount: entry.count,
       limitReached: entry.limited,
-      pipeline: pipelineSummary(entry.profiles),
+      pipeline: pipelineSummary(entry.profile),
     }));
     if (tests[2].count !== 0) throw new Error("No-match control unexpectedly matched");
 
@@ -530,7 +516,7 @@ async function run() {
       warmupRounds: 1,
       measuredRounds: args.runs,
       queries: measurements,
-      note: "CPU times are Node-only; RSS also includes periodically sampled fd/fzf descendants in processTreeRss. Pipeline stage times can overlap, are not additive, and include optional measurement overhead. No path or query text is emitted.",
+      note: "CPU times are Node-only; RSS also includes periodically sampled fd/fzf descendants in processTreeRss. Pipeline diagnostic times come from the warmup pass only, can overlap, and are not additive; measured P50/P95 passes do not enable profiling. No path or query text is emitted.",
     };
   } finally {
     clearInterval(rssSampler);
