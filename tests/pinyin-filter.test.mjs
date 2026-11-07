@@ -128,3 +128,34 @@ test("native fzf operator queries do not insert pinyin aliases", async () => {
     "2026_driver.txt\t" + path + "\0",
   );
 });
+
+test("ASCII basename fast path is byte-exact and does not expose parent text", async () => {
+  const entries = [
+    "/中文父目录/driver.c",
+    "/ASCII/SOURCE_DRIVER.H",
+    "/ASCII/subdir/",
+    "/ASCII/quote'word.c",
+    "/ASCII/file name.txt",
+    "/ASCII/tab\\tname.c",
+    "/ASCII/café.txt",
+    "/ASCII/第一次.txt",
+    "/ASCII/line\\nbreak.c",
+  ];
+  const input = Buffer.from(entries.join("\\0") + "\\0", "utf8");
+  const output = [];
+  for await (const chunk of Readable.from([input]).pipe(
+    createPinyinFilterInput(true),
+  )) output.push(chunk);
+  const records = Buffer.concat(output).toString("utf8").split("\\0").filter(Boolean);
+  assert.equal(records.length, entries.length);
+  assert.deepEqual(records.map(originalPathFromPinyinResult), entries);
+  assert.equal(records[0], "driver.c\\t" + entries[0]);
+  assert.equal(records[1], "SOURCE_DRIVER.H\\t" + entries[1]);
+  assert.equal(records[2], "subdir\\t" + entries[2]);
+  assert.equal(records[3], "quote'word.c\\t" + entries[3]);
+  assert.equal(records[4], "file name.txt\\t" + entries[4]);
+  assert.equal(records[5], "tab name.c\\t" + entries[5]);
+  assert.equal(records[6], "café.txt\\t" + entries[6]);
+  assert.match(records[7], /^第一次\\.txt dyc diyici /);
+  assert.equal(records[8], "line\\nbreak.c\\t" + entries[8]);
+});

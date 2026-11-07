@@ -140,6 +140,28 @@ export function createPinyinFilterInput(
             : section;
           pending = Buffer.alloc(0);
 
+          if (!matchesParent && !matchesName && !segmentQueries) {
+            // 普通无路径查询最常见：仅英文文件名直接复用索引字节。
+            // 跳过 UTF-8 解码、path.basename、拼音正则和字段重新编码；
+            // 中文/其他非 ASCII 名称以及 TAB 仍走原有兼容路径。
+            let nameEnd = record.length;
+            while (nameEnd > 1 && record[nameEnd - 1] === 47) nameEnd--;
+            const separator = record.lastIndexOf(47, nameEnd - 1);
+            const nameBytes = record.subarray(separator + 1, nameEnd);
+            let simpleAscii = nameBytes.length > 0;
+            for (let i = 0; simpleAscii && i < nameBytes.length; i++) {
+              const byte = nameBytes[i];
+              if (byte === 9 || byte > 127) simpleAscii = false;
+            }
+            if (simpleAscii) {
+              if (nameBytes.length + TAB.length + record.length > MAX_FZF_PATH_BYTES)
+                throw new Error("Search record exceeds size limit");
+              this.push(Buffer.concat([nameBytes, TAB, record, NUL]));
+              offset = end + 1;
+              continue;
+            }
+          }
+
           const filepath = record.toString("utf8");
           // 仅归一化用于匹配的路径；始终输出记录原始路径字节。
           const searchPath = filepath.endsWith("/")
