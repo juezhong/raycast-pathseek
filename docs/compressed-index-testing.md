@@ -9,7 +9,7 @@
 - 离线转换命令只读取旧 `index.nul`，目标必须是**全新的、不存在的目录**。如果目标存在，命令会失败，而不是覆盖。
 - 8 GB 的旧索引在整个测试过程中仍保留。产生的新测试数据只有压缩后的索引及少量元数据，但它仍然需要额外磁盘空间。
 - 不要上传 `index.nul` 或含真实路径的终端日志；只分享工具输出的数值及 `View Diagnostics → Copy Sanitized Debug Info`。
-- 这版只使用 CPU；尚未实现 GPU 加速。压缩质量固定 Brotli 11，构建可能耗时很长。优先比较压缩率和正确性。
+- 这版只使用 CPU；尚未实现 GPU 加速。Brotli 等级可选 5/7/9/11，默认 7。最高等级 11 在某些数据集上可能异常缓慢。
 
 ## 1. 准备源码
 
@@ -25,7 +25,43 @@ npm run build
 
 Node.js 至少需要 22.14。确认测试、构建都成功再进入下一步。如果你已安装 fd/fzf，不用重复安装。
 
-## 2. 不重扫磁盘：直接评估旧 8GB 索引可以压缩多少
+## 2. 先做无额外磁盘占用的压缩等级测试（优先）
+
+如果已克隆测试分支，请先在仓库中执行：
+
+```bash
+git checkout feat/compact-compressed-index-v3
+git pull --ff-only
+npm ci
+npm test
+npm run build
+```
+
+在正式版 PathSeek → **View Index Status** 中复制旧索引文件路径，然后：
+
+```bash
+OLD_INDEX="/path/copied/from/view-index-status/index.nul"
+
+# 只读取 2 MiB 原始路径字节并比较 5/7/9 级；不写任何索引文件到磁盘。
+npm run benchmark:quality -- "$OLD_INDEX" 2
+
+# 仅在愿意测试极慢的最高压缩等级时才执行：
+npm run benchmark:quality -- "$OLD_INDEX" 2 --include-max
+```
+
+记录各等级的 `compressedBytes`、`sizeReductionPercent` 和 `elapsedMs`。它们是有限样本结果，不应按比例线性推算真实 8GB 索引的最终大小和耗时。
+
+**不要在 `npm run dev`、重建中的 Raycast 扩展或 Node.js 进程还在工作时修改源代码或重启开发服务器。** 开发扩展重新加载可能造成上一轮构建被中断，留下仅有 `started` 记录的诊断日志。
+
+### 查看重建诊断
+
+在 Raycast 开发版打开 **Build Index**，建索引期间会显示扫描路径数、已读原始路径字节数、压缩写出字节数、平均输入速率和扩展进程 CPU 用时。**View Diagnostics** 会显示同一份每两秒刷新的进度文件；即使正式索引还未发布也能观察。
+
+若 **View Diagnostics** 显示 `heartbeat stale: yes`，说明最近超过 15 秒未写入进度，但不能单凭此项认定进程已退出。对比 `last raw input at`、`last compressed output at`、CPU 用时以及连续两次诊断值，才能区分扫描停滞、压缩背压和扩展进程退出。
+
+你的旧日志包含 `--hidden --follow`；建议先在偏好设置中**取消 Follow Symbolic Links** 来做可比性测试。
+
+## 3. 不重扫磁盘：直接评估旧 8GB 索引可以压缩多少
 
 首先在现有 PathSeek 正式版本中打开 `View Index Status`，使用 `Copy Active Index File Path` 复制旧索引绝对路径。**以下路径变量需要替换为你实际复制的路径**：
 
@@ -43,7 +79,7 @@ npm run benchmark:index -- "$OLD_INDEX" "kernel"
 然后将原有索引转成测试用 v3 格式（不会修改或删除旧文件）：
 
 ```bash
-npm run convert:index -- "$OLD_INDEX" "$TEST_DIR"
+npm run convert:index -- "$OLD_INDEX" "$TEST_DIR" 7
 ```
 
 转换完成后验证完整索引能正确解码、路径数量一致，以及解压搜索延迟：
@@ -63,7 +99,7 @@ npm run benchmark:index -- "$TEST_DIR/index.nul" "kernel"
 
 注意：离线转换不会重新扫描文件系统，搜索覆盖范围以原索引为准。离线压缩后的测试索引不自动被 Raycast 使用。
 
-## 3. 在 Raycast 开发版直接搜索 8GB 原索引的压缩结果
+## 4. 在 Raycast 开发版直接搜索 8GB 原索引的压缩结果
 
 ```bash
 npm run dev
@@ -92,7 +128,7 @@ ln "$TEST_DIR/index.nul" "$DEV_INDEX"
 
 这样可以**不重新扫描整个家目录**，直接测试对 8GB 旧索引无损压缩后的真实搜索性能，且硬链接不会产生第二份压缩数据。
 
-## 4. 可选：测试新的重建流程
+## 5. 可选：测试新的重建流程
 
 如果你还想验证 `fd → 前缀编码 → Brotli` 的完整重建过程，可以在开发版 **Build Index** 中先选择一个小目录手动建索引，确认正常后再索引家目录。
 
@@ -101,13 +137,13 @@ ln "$TEST_DIR/index.nul" "$DEV_INDEX"
 确认 **View Index Status** 的 Format、Index size、Bytes per path，之后测试中文、空格及换行文件名和 Open/Save 粘贴。
 
 
-## 5. 回传结果与恢复
+## 6. 回传结果与恢复
 
-回传 `benchmark:index` 的两份 JSON 数值、`convert:index` 的 JSON 数值，以及 `View Diagnostics → Copy Sanitized Debug Info`。也可描述实际搜索是否出现卡顿、空结果或长时间运行。
+回传 `benchmark:quality` 的 JSON、`benchmark:index` 的两份 JSON、`convert:index` 的 JSON，以及 `View Diagnostics → Copy Sanitized Debug Info`。也可描述实际搜索是否出现卡顿、空结果或长时间运行。
 
 按 `Ctrl+C` 停止 `npm run dev`；正式版索引不受影响。测试目录可自行检查后再删除，但删除属于不可恢复操作；如仍需反复测试，建议先保留。
 
-## 6. 尚未完成的验证
+## 7. 尚未完成的验证
 
 本分支虽有 macOS GitHub Actions 测试，但尚无你的完整家目录的实际基准数据。暂不能保证：
 
