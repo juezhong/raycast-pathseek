@@ -158,8 +158,77 @@ export function SearchFilesView({
 
   useEffect(() => {
     const controller = new AbortController();
+    if (!index || !subtreeQuery || scopedFolder || subtreeSyntaxError) {
+      setIsLocatingDirectory(false);
+      return () => controller.abort();
+    }
 
-    if (!index || !query.trim()) {
+    const expression = subtreeQuery.directoryExpression;
+    const patterns = subtreeQuery.directoryPatterns;
+    const hint = scopeHint?.expression === expression
+      ? scopeHint.selectedPath
+      : null;
+    setScopeError(undefined);
+    setDirectoryChoices([]);
+    setChoicesTruncated(false);
+    setIsLocatingDirectory(true);
+
+    const resolve = async () => {
+      // 用户先高亮某个目录、再输入 "/ " 或 "//"：优先锁定高亮目录。
+      if (hint && matchesSelectedDirectory(hint, patterns)) {
+        const selected = await stat(hint).catch(() => null);
+        if (selected?.isDirectory()) {
+          if (!controller.signal.aborted) {
+            setActiveScope({
+              expression,
+              folder: hint === "/" ? "/" : hint.replace(/\\/+$/u, ""),
+            });
+          }
+          return;
+        }
+      }
+
+      const choices = await findIndexedDirectoryChoices(
+        indexFilePath(index),
+        patterns,
+        controller.signal,
+      );
+      if (controller.signal.aborted) return;
+      if (choices.paths.length === 1 && !choices.truncated) {
+        setActiveScope({ expression, folder: choices.paths[0] });
+      } else {
+        setDirectoryChoices(choices.paths);
+        setChoicesTruncated(choices.truncated);
+      }
+    };
+
+    void resolve()
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setScopeError(String(error));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLocatingDirectory(false);
+      });
+    return () => controller.abort();
+  }, [
+    index,
+    directoryExpression,
+    scopedFolder,
+    subtreeSyntaxError,
+    scopeHint?.expression,
+    scopeHint?.selectedPath,
+  ]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const awaitingScope = subtreeQuery && !scopedFolder;
+
+    if (
+      !index ||
+      subtreeSyntaxError ||
+      awaitingScope ||
+      (!query.trim() && !scopedFolder)
+    ) {
       setResults([]);
       setIsSearching(false);
       return () => controller.abort();
@@ -170,7 +239,8 @@ export function SearchFilesView({
     setIsSearching(true);
 
     const timer = setTimeout(() => {
-      fuzzySearch(index, query, controller.signal)
+      const actualQuery = subtreeQuery ? subtreeQuery.nameQuery : query;
+      fuzzySearch(index, actualQuery, controller.signal, scopedFolder)
         .then((paths) => {
           if (!controller.signal.aborted) setResults(paths);
         })
@@ -186,7 +256,7 @@ export function SearchFilesView({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [index, query]);
+  }, [index, query, scopedFolder, subtreeSyntaxError]);
 
   const missingBinary = getMissingBinary(loadError);
 
