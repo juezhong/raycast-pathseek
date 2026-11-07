@@ -40,8 +40,16 @@ test("offline converter leaves legacy v2 untouched and produces searchable v3", 
         cwd: path.resolve("."),
       });
 
-    const conversion = await runScript("scripts/convert-index.mjs", source, outputDirectory);
+    const qualityBenchmark = await runScript("scripts/benchmark-compression.mjs", source, "1");
+    const comparison = JSON.parse(qualityBenchmark.stdout);
+    assert.deepEqual(comparison.levels.map((item) => item.quality), [5, 7, 9]);
+    assert.ok(comparison.sampleBytes > 0);
+    assert.ok(comparison.levels.every((item) => item.compressedBytes > 0));
+    assert.ok(!qualityBenchmark.stdout.includes("/Users/test/"));
+
+    const conversion = await runScript("scripts/convert-index.mjs", source, outputDirectory, "7");
     assert.equal(JSON.parse(conversion.stdout).formatVersion, 3);
+    assert.equal(JSON.parse(conversion.stdout).compressionQuality, 7);
 
     const generated = path.join(outputDirectory, "index.nul");
     assert.equal((await readIndexHeader(generated)).version, 3);
