@@ -21,7 +21,7 @@ export async function fuzzySearch(
   const trace = await beginCommandTrace(
     "fzf",
     "fuzzy-query",
-    "fzf --extended --read0 --print0 --filter <redacted>",
+    "fzf --extended --read0 --print0 --delimiter <TAB> --nth 1 --filter <redacted>",
   );
 
   try {
