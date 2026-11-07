@@ -141,17 +141,21 @@ export function createPinyinFilterInput(
           pending = Buffer.alloc(0);
 
           const filepath = record.toString("utf8");
-          if (matchesParent && !matchesParent(filepath)) {
+          // 仅归一化用于匹配的路径；始终输出记录原始路径字节。
+          const searchPath = filepath.endsWith("/")
+            ? filepath.replace(/\/+$/u, "")
+            : filepath;
+          if (matchesParent && !matchesParent(searchPath)) {
             offset = end + 1;
             continue;
           }
-          const filename = path.basename(filepath);
+          const filename = path.basename(searchPath);
           if (matchesName && !matchesName(filename)) {
             offset = end + 1;
             continue;
           }
           const matchField = Buffer.from(
-            projectPath(filepath, filename),
+            projectPath(searchPath, filename),
             "utf8",
           );
           if (

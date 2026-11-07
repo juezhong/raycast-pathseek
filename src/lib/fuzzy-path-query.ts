@@ -174,12 +174,16 @@ export function compileFuzzyParentPathMatcher(
   const matchers = directoryPatterns.map(compileSegment);
   return (filepath: string) => {
     if (!matchers.length) return true;
-    let end = filepath.lastIndexOf("/");
+    // fd 的目录记录可能以 '/' 结束；尾部分隔符不算一个父目录层级。
+    const normalized = filepath.endsWith("/")
+      ? filepath.replace(/\/+$/u, "")
+      : filepath;
+    let end = normalized.lastIndexOf("/");
     if (end <= 0) return false;
 
     for (let i = matchers.length - 1; i >= 0; i--) {
-      const begin = filepath.lastIndexOf("/", end - 1);
-      const dirname = filepath.slice(begin + 1, end);
+      const begin = normalized.lastIndexOf("/", end - 1);
+      const dirname = normalized.slice(begin + 1, end);
       if (!dirname || !matchers[i](dirname, getAlias)) return false;
       end = begin;
       if (end < 0 && i > 0) return false;

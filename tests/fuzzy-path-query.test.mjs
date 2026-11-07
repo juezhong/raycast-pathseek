@@ -257,3 +257,14 @@ test("native path mode only applies to pure fuzzy slash queries", async () => {
   assert.equal(isNativeFuzzyPathQuery(parseFuzzyPathQuery("fir/sec/thi/four-fi")), true);
   assert.equal(isNativeFuzzyPathQuery(parseFuzzyPathQuery("src/.txt$")), false);
 });
+
+test("directory paths with trailing slash preserve direct parent matching", () => {
+  assert.equal(
+    matchesFuzzyParentPath(
+      "/private/var/tmp/pathseek-standalone-fixture-abc/Shortcuts/",
+      ["pat"],
+      pinyinAlias,
+    ),
+    true,
+  );
+});

@@ -581,7 +581,7 @@ test("anchored fzf expressions preserve native filename suffixes and match pinyi
 
 test("native fzf path query matches a top-level directory under hyphenated parent", async () => {
   await fixture(async (dir) => {
-    const target = "/private/var/tmp/pathseek-standalone-fixture-abc/Shortcuts";
+    const target = "/private/var/tmp/pathseek-standalone-fixture-abc/Shortcuts/";
     const raw = path.join(dir, "hyphen-root.paths");
     const stage = path.join(dir, "hyphen-root.stage");
     await writeFile(raw, target + "\0");
