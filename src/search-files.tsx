@@ -258,45 +258,72 @@ export function SearchFilesView({
     };
   }, [index, query, scopedFolder, subtreeSyntaxError]);
 
-  const missingBinary = getMissingBinary(loadError);
+  const activeError = subtreeSyntaxError ?? scopeError ?? loadError;
+  const missingBinary = getMissingBinary(activeError);
 
   const emptyTitle = missingBinary
     ? "Missing Required Tool"
-    : loadError
+    : activeError
       ? "Search Error"
       : index === undefined
         ? "Loading Index"
         : !index
           ? "No Index Yet"
-          : isSearching
-            ? "Searching Index"
-            : !query.trim()
-              ? "Type to Search"
-              : "No Matching Files";
+          : isLocatingDirectory
+            ? "Finding Indexed Folders"
+            : selectingFolder
+              ? directoryChoices.length
+                ? "Choose a Folder"
+                : "No Matching Indexed Folders"
+              : isSearching
+                ? "Searching Index"
+                : !query.trim()
+                  ? "Type to Search"
+                  : "No Matching Files";
 
   const emptyDescription = missingBinary
     ? missingBinaryMessage(missingBinary)
-    : loadError
-      ? loadError
+    : activeError
+      ? activeError
       : !index
-        ? "No index yet. First install fd and fzf (brew install fd fzf), then choose folders in Build Index. Nothing is indexed automatically."
-        : isSearching
-          ? "Searching " + index.count.toLocaleString() + " indexed paths…"
-          : !query.trim()
-            ? "Indexed " +
-              index.count.toLocaleString() +
-              " paths on " +
-              new Date(index.createdAt).toLocaleString() +
-              "."
-            : "Try a different pattern or rebuild the index to include new files.";
+        ? "No index yet. Choose folders and build an index manually."
+        : isLocatingDirectory
+          ? "Finding real directory paths in the existing index (no fd scan)…"
+          : selectingFolder
+            ? directoryChoices.length
+              ? "Select the intended folder to search its entire subtree."
+              : "Try a more specific directory expression or select an indexed folder and press Tab."
+            : isSearching
+              ? "Searching " + index.count.toLocaleString() + " indexed paths…"
+              : !query.trim()
+                ? "Indexed " +
+                  index.count.toLocaleString() +
+                  " paths on " +
+                  new Date(index.createdAt).toLocaleString() +
+                  "."
+                : "Try a different pattern or rebuild the index to include new files.";
 
   return (
     <List
-      isLoading={index === undefined || isSearching}
+      isLoading={index === undefined || isSearching || isLocatingDirectory}
       filtering={false}
       searchText={query}
-      searchBarPlaceholder="Search names or dir/file (.pdf$, !temp)"
-      onSearchTextChange={setQuery}
+      searchBarPlaceholder={
+        scopedFolder
+          ? "Within " + scopedFolder + " — search any descendant name"
+          : "Search name, dir/file, or dir/ term (subtree)"
+      }
+      navigationTitle={
+        scopedFolder
+          ? "Search Within " + scopedFolder
+          : selectingFolder
+            ? "Choose Indexed Folder" + (choicesTruncated ? " (refine query)" : "")
+            : undefined
+      }
+      onSearchTextChange={onQueryChange}
+      onSelectionChange={(id) => {
+        selectedPathRef.current = id || null;
+      }}
     >
       <List.EmptyView
         title={emptyTitle}
@@ -304,11 +331,13 @@ export function SearchFilesView({
         icon={Icon.MagnifyingGlass}
         actions={
           <ActionPanel>
-            <SearchAssistanceActions
-              index={index}
-              query={query}
-              onApply={setQuery}
-            />
+            {!subtreeQuery && (
+              <SearchAssistanceActions
+                index={index}
+                query={query}
+                onApply={onQueryChange}
+              />
+            )}
             {!index && index !== undefined && (
               <Action
                 title="Choose Folders and Build Index"
@@ -349,13 +378,41 @@ export function SearchFilesView({
           </ActionPanel>
         }
       />
-      {results.map((filepath) => {
+      {selectingFolder && !isLocatingDirectory && directoryChoices.map((folder) => (
+        <List.Item
+          key={"directory:" + folder}
+          id={"directory:" + folder}
+          title={path.basename(folder)}
+          subtitle={
+            (folder.startsWith(os.homedir() + path.sep)
+              ? "~" + folder.slice(os.homedir().length)
+              : folder) + (choicesTruncated ? " · More matches: refine path" : "")
+          }
+          icon={Icon.Folder}
+          actions={
+            <ActionPanel>
+              <Action
+                title="Search Within This Folder"
+                icon={Icon.Folder}
+                shortcut={{ modifiers: [], key: "tab" }}
+                onAction={() => void enterFolder(folder)}
+              />
+              <Action.CopyToClipboard
+                title="Copy Folder Path"
+                content={folder}
+              />
+            </ActionPanel>
+          }
+        />
+      ))}
+      {!selectingFolder && results.map((filepath) => {
         const display = filepath.startsWith(os.homedir() + path.sep)
           ? "~" + filepath.slice(os.homedir().length)
           : filepath;
         return (
           <List.Item
             key={filepath}
+            id={filepath}
             title={path.basename(filepath)}
             subtitle={path.dirname(display)}
             icon={{ fileIcon: filepath }}
@@ -380,6 +437,19 @@ export function SearchFilesView({
                 )}
                 <ActionPanel.Section title="Other File Actions">
                   <Action.Open title="Open" target={filepath} />
+                  <Action
+                    title="Search Within This Folder"
+                    icon={Icon.Folder}
+                    shortcut={{ modifiers: [], key: "tab" }}
+                    onAction={() => void enterFolder(filepath)}
+                  />
+                  {scopedFolder && (
+                    <Action
+                      title="Leave Folder Scope"
+                      icon={Icon.ArrowLeft}
+                      onAction={leaveFolder}
+                    />
+                  )}
                   <Action.ShowInFinder title="Show in Finder" path={filepath} />
                   <Action.Open
                     title="Open Containing Folder"
@@ -401,7 +471,7 @@ export function SearchFilesView({
                 <SearchAssistanceActions
                   index={index}
                   query={query}
-                  onApply={setQuery}
+                  onApply={onQueryChange}
                 />
               </ActionPanel>
             }
