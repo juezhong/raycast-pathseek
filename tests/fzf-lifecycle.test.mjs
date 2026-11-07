@@ -7,7 +7,9 @@ import { runFzfFilter } from "../src/lib/fzf-runner.ts";
 import { prepareIndex, publishIndex } from "../src/lib/index-files.ts";
 
 async function fixture(action) {
-  const dir = await mkdtemp(path.join(os.tmpdir(), "pathseek-child-lifecycle-"));
+  const dir = await mkdtemp(
+    path.join(os.tmpdir(), "pathseek-child-lifecycle-"),
+  );
   try {
     const raw = path.join(dir, "raw");
     const staged = path.join(dir, "staged.tmp");
@@ -27,8 +29,11 @@ async function fixture(action) {
 
 async function waitForPid(file) {
   for (let i = 0; i < 300; i++) {
-    try { return Number(await readFile(file, "utf8")); }
-    catch { await new Promise((resolve) => setTimeout(resolve, 20)); }
+    try {
+      return Number(await readFile(file, "utf8"));
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
   }
   throw new Error("Fake fzf child failed to start");
 }
@@ -52,11 +57,13 @@ test("aborting an in-flight fzf kills child, reaps it, and returns no stale path
   await fixture(async (dir, index) => {
     const binary = path.join(dir, "fake-fzf");
     const pidFile = path.join(dir, "child.pid");
-    await writeFile(binary,
+    await writeFile(
+      binary,
       "#!/usr/bin/env node\n" +
-      "const fs = require('node:fs');\n" +
-      "fs.writeFileSync(process.argv.at(-1), String(process.pid));\n" +
-      "process.stdin.resume(); setInterval(() => {}, 1000);\n");
+        "const fs = require('node:fs');\n" +
+        "fs.writeFileSync(process.argv.at(-1), String(process.pid));\n" +
+        "process.stdin.resume(); setInterval(() => {}, 1000);\n",
+    );
     await chmod(binary, 0o755);
     const controller = new AbortController();
     const task = runFzfFilter(binary, index, pidFile, controller.signal, 10000);
@@ -73,16 +80,21 @@ test("timeout escalates to SIGKILL when fzf ignores SIGTERM", async () => {
   await fixture(async (dir, index) => {
     const binary = path.join(dir, "stubborn-fzf");
     const pidFile = path.join(dir, "stubborn.pid");
-    await writeFile(binary,
+    await writeFile(
+      binary,
       "#!/usr/bin/env node\n" +
-      "const fs = require('node:fs');\n" +
-      "fs.writeFileSync(process.argv.at(-1), String(process.pid));\n" +
-      "process.on('SIGTERM', () => {});\n" +
-      "process.stdin.resume(); setInterval(() => {}, 1000);\n");
+        "const fs = require('node:fs');\n" +
+        "fs.writeFileSync(process.argv.at(-1), String(process.pid));\n" +
+        "process.on('SIGTERM', () => {});\n" +
+        "process.stdin.resume(); setInterval(() => {}, 1000);\n",
+    );
     await chmod(binary, 0o755);
     // CI 或繁忙的 macOS 上 Node shebang 冷启动可能超过 250ms。
     // 等待真实超时/升级 SIGKILL，但不要用过短超时误判尚未启动。
-    await assert.rejects(runFzfFilter(binary, index, pidFile, undefined, 3000), /time limit/);
+    await assert.rejects(
+      runFzfFilter(binary, index, pidFile, undefined, 3000),
+      /time limit/,
+    );
     const pid = await waitForPid(pidFile);
     assertGone(pid);
   });
@@ -107,6 +119,74 @@ test("malformed fzf stdout is bounded and the child is reaped", async () => {
     );
     const pid = await waitForPid(pidFile);
     await rejection;
+    assertGone(pid);
+  });
+});
+
+test("real fzf accepts Chinese pinyin initials, unordered terms, and native extended operators", async () => {
+  await fixture(async (dir) => {
+    const entries = [
+      "/example/第一次.txt",
+      "/example/第一次/记录.md",
+      "/example/driver.c",
+      "/example/abc" + String.fromCharCode(9) + "def.txt",
+      "/example/普通中文.txt",
+    ];
+    const raw = path.join(dir, "pinyin-input.paths");
+    const staged = path.join(dir, "pinyin-stage.nul.tmp");
+    await writeFile(
+      raw,
+      entries.join(String.fromCharCode(0)) + String.fromCharCode(0),
+    );
+    await prepareIndex(raw, staged, {
+      version: 3,
+      count: entries.length,
+      createdAt: new Date().toISOString(),
+      roots: ["/example"],
+    });
+    await publishIndex(staged, dir);
+    const index = path.join(dir, "index.nul");
+    for (const query of ["dyc", "yc d", "d y c", "y c d", "diyici", "DYC"]) {
+      const matched = await runFzfFilter("fzf", index, query);
+      assert.ok(matched.paths.includes("/example/第一次.txt"), query);
+      assert.ok(
+        matched.paths.every((value) => entries.includes(value)),
+        query,
+      );
+    }
+    const exactChinese = await runFzfFilter("fzf", index, "'第一次");
+    assert.ok(exactChinese.paths.includes("/example/第一次.txt"));
+    const extended = await runFzfFilter("fzf", index, ".md$");
+    assert.deepEqual(extended.paths, ["/example/第一次/记录.md"]);
+    const noPinyinSyntaxOverride = await runFzfFilter("fzf", index, "'dyc");
+    assert.equal(
+      noPinyinSyntaxOverride.paths.includes("/example/第一次.txt"),
+      false,
+    );
+    const tabName = await runFzfFilter("fzf", index, "abc");
+    assert.ok(tabName.paths.includes(entries[3]));
+  });
+});
+
+test("pinyin-mode cancellation closes the decoder and reaps the fzf child", async () => {
+  await fixture(async (dir, index) => {
+    const binary = path.join(dir, "fake-pinyin-fzf");
+    const pidFile = path.join(dir, "pinyin-child.pid");
+    await writeFile(
+      binary,
+      "#!/usr/bin/env node\n" +
+        "const fs = require('node:fs');\n" +
+        `fs.writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));\n` +
+        "process.stdin.resume(); setInterval(() => {}, 1000);\n",
+    );
+    await chmod(binary, 0o755);
+    const controller = new AbortController();
+    const task = runFzfFilter(binary, index, "dyc", controller.signal, 10_000);
+    const pid = await waitForPid(pidFile);
+    controller.abort();
+    const outcome = await task;
+    assert.equal(outcome.cancelled, true);
+    assert.deepEqual(outcome.paths, []);
     assertGone(pid);
   });
 });

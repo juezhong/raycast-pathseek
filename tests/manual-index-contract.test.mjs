@@ -111,3 +111,19 @@ test("build cancellation and temporary cleanup never delete Raycast configuratio
   assert.match(store, /cleanupStaleBuildTemps\(indexDirectory, Date\.now\(\), 0\)/);
   assert.match(store, /rm\(stagedTemp, \{ force: true \}\)/);
 });
+
+test("fzf help and live preview are available in both search commands without starting fd", async () => {
+  const search = await source("search-files.tsx");
+  const dialog = await source("dialog-search.tsx");
+  const guides = await source("search-guides.tsx");
+  assert.match(search, /searchText=\{query\}/);
+  assert.match(search, /SearchAssistanceActions/);
+  assert.match(dialog, /<SearchFilesView dialogMode \/>/);
+  assert.match(guides, /title="Search Syntax Help"/);
+  assert.match(guides, /title="Compose Expression & Preview"/);
+  assert.match(guides, /fuzzySearch\(index, expression, controller\.signal\)/);
+  assert.match(guides, /onApply\(values\.expression\)/);
+  assert.match(guides, /controller\.abort\(\)/);
+  assert.doesNotMatch(guides, /\brebuildIndex\s*\(/);
+  assert.doesNotMatch(guides, /\bspawn\s*\(/);
+});

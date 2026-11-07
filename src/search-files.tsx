@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import os from "node:os";
 import path from "node:path";
 import { fuzzySearch } from "./lib/fuzzy-search";
+import { SearchAssistanceActions } from "./search-guides";
 import { readIndex, type IndexMetadata } from "./lib/index-store";
 import { getDialogNavigationPaths } from "./lib/dialog-navigation";
 import {
@@ -115,10 +116,11 @@ export function SearchFilesView({
     <List
       isLoading={index === undefined || isSearching}
       filtering={false}
+      searchText={query}
       searchBarPlaceholder={
         dialogMode
-          ? "Search files or folders to locate in the Open/Save dialog"
-          : "Search with fzf: filename, path, .pdf$, !node_modules…"
+          ? "Search paths, fzf syntax or pinyin initials: dyc / yc d"
+          : "Search paths with fzf, or Chinese pinyin: dyc / yc d"
       }
       onSearchTextChange={setQuery}
     >
@@ -127,43 +129,50 @@ export function SearchFilesView({
         description={emptyDescription}
         icon={Icon.MagnifyingGlass}
         actions={
-          index !== undefined && (!index || missingBinary) ? (
-            <ActionPanel>
-              {!index && (
-                <Action
-                  title="Choose Folders and Build Index"
-                  icon={Icon.Folder}
-                  onAction={() =>
-                    launchCommand({
-                      name: "rebuild-index",
-                      type: LaunchType.UserInitiated,
-                    })
-                  }
-                />
-              )}
-              <Action.CopyToClipboard
-                title="Copy fd/fzf Install Command"
-                icon={Icon.CopyClipboard}
-                content={HOMEBREW_INSTALL_COMMAND}
+          <ActionPanel>
+            <SearchAssistanceActions
+              index={index}
+              query={query}
+              onApply={setQuery}
+            />
+            {!index && index !== undefined && (
+              <Action
+                title="Choose Folders and Build Index"
+                icon={Icon.Folder}
+                onAction={() =>
+                  launchCommand({
+                    name: "rebuild-index",
+                    type: LaunchType.UserInitiated,
+                  })
+                }
               />
-              <Action.OpenInBrowser
-                title="How to Install Homebrew"
-                url={HOMEBREW_URL}
-              />
-              {!index && (
-                <Action
-                  title="View Index Status"
-                  icon={Icon.Info}
-                  onAction={() =>
-                    launchCommand({
-                      name: "index-status",
-                      type: LaunchType.UserInitiated,
-                    })
-                  }
+            )}
+            {(!index || missingBinary) && (
+              <>
+                <Action.CopyToClipboard
+                  title="Copy fd/fzf Install Command"
+                  icon={Icon.CopyClipboard}
+                  content={HOMEBREW_INSTALL_COMMAND}
                 />
-              )}
-            </ActionPanel>
-          ) : undefined
+                <Action.OpenInBrowser
+                  title="How to Install Homebrew"
+                  url={HOMEBREW_URL}
+                />
+              </>
+            )}
+            {!index && index !== undefined && (
+              <Action
+                title="View Index Status"
+                icon={Icon.Info}
+                onAction={() =>
+                  launchCommand({
+                    name: "index-status",
+                    type: LaunchType.UserInitiated,
+                  })
+                }
+              />
+            )}
+          </ActionPanel>
         }
       />
       {results.map((filepath) => {
@@ -215,6 +224,11 @@ export function SearchFilesView({
                     shortcut={{ modifiers: ["cmd"], key: "y" }}
                   />
                 </ActionPanel.Section>
+                <SearchAssistanceActions
+                  index={index}
+                  query={query}
+                  onApply={setQuery}
+                />
               </ActionPanel>
             }
           />
