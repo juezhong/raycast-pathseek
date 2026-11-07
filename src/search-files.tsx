@@ -14,7 +14,11 @@ import os from "node:os";
 import path from "node:path";
 import { fuzzySearch } from "./lib/fuzzy-search";
 import { SearchAssistanceActions } from "./search-guides";
-import { indexFilePath, readIndex, type IndexMetadata } from "./lib/index-store";
+import {
+  indexFilePath,
+  readIndex,
+  type IndexMetadata,
+} from "./lib/index-store";
 import {
   findIndexedDirectoryChoices,
   matchesSelectedDirectory,
@@ -427,7 +431,9 @@ export function SearchFilesView({
                       <Action.Paste
                         title="Select File or Go to Folder (Paste Full Path)"
                         icon={Icon.ArrowRight}
-                        content={getDialogNavigationPaths(filepath).selectedPath}
+                        content={
+                          getDialogNavigationPaths(filepath).selectedPath
+                        }
                       />
                       <Action.Paste
                         title="Go to Containing Folder (Fallback)"
@@ -453,7 +459,10 @@ export function SearchFilesView({
                         onAction={leaveFolder}
                       />
                     )}
-                    <Action.ShowInFinder title="Show in Finder" path={filepath} />
+                    <Action.ShowInFinder
+                      title="Show in Finder"
+                      path={filepath}
+                    />
                     <Action.Open
                       title="Open Containing Folder"
                       target={path.dirname(filepath)}
