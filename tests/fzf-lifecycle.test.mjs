@@ -87,3 +87,23 @@ test("timeout escalates to SIGKILL when fzf ignores SIGTERM", async () => {
     assertGone(pid);
   });
 });
+
+test("malformed fzf stdout is bounded and the child is reaped", async () => {
+  await fixture(async (dir, index) => {
+    const binary = path.join(dir, "malformed-fzf");
+    const pidFile = path.join(dir, "malformed.pid");
+    await writeFile(
+      binary,
+      "#!/usr/bin/env node\n" +
+        "const fs = require('node:fs');\n" +
+        "fs.writeFileSync(process.argv.at(-1), String(process.pid));\n" +
+        "process.stdout.write(Buffer.alloc(2 * 1024 * 1024, 65));\n" +
+        "process.stdin.resume(); setInterval(() => {}, 1000);\n",
+    );
+    await chmod(binary, 0o755);
+    const task = runFzfFilter(binary, index, pidFile, undefined, 10_000);
+    const pid = await waitForPid(pidFile);
+    await assert.rejects(task, /fzf output path exceeds size limit/);
+    assertGone(pid);
+  });
+});
