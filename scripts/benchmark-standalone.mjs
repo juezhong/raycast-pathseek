@@ -99,6 +99,7 @@ async function scanFd(root, sink, counters, signal, shortcut) {
     });
   });
 
+  let samplePending = Buffer.alloc(0);
   const meter = new Transform({
     transform(chunk, _encoding, callback) {
       counters.rawBytes += chunk.length;
@@ -107,18 +108,31 @@ async function scanFd(root, sink, counters, signal, shortcut) {
       }
       // 仅短暂从扫描数据中抽取查询词，输出不包含文件名和路径。
       if (counters.compare && !counters.sampledPathQuery) {
-        const records = chunk.toString("utf8").split("\0").slice(0, -1);
-        for (const candidate of records) {
+        // fd 的路径可能跨 chunk；只从完整 NUL 记录采样，不能拿截断路径拼查询。
+        const records = samplePending.length
+          ? Buffer.concat([samplePending, chunk])
+          : chunk;
+        let start = 0;
+        while (start < records.length) {
+          const end = records.indexOf(0, start);
+          if (end < 0) break;
+          const candidate = records.subarray(start, end).toString("utf8");
           const name = path.basename(candidate);
           const parent = path.basename(path.dirname(candidate));
           const leaf = name.match(/[A-Za-z0-9]{3,16}/)?.[0];
           const ancestor = parent.match(/[A-Za-z0-9]{3,16}/)?.[0];
-          if (leaf && ancestor) {
-            counters.sampledPathQuery = ancestor.slice(0, 3) + "/" + leaf.slice(0, 3);
+          if (candidate.startsWith("/") && leaf && ancestor) {
+            counters.sampledPathQuery =
+              ancestor.slice(0, 3) + "/" + leaf.slice(0, 3);
             counters.sampledLeafQuery = leaf.slice(0, 3);
             break;
           }
+          start = end + 1;
         }
+        samplePending = counters.sampledPathQuery
+          ? Buffer.alloc(0)
+          : Buffer.from(records.subarray(start));
+        if (samplePending.length > 1024 * 1024) samplePending = Buffer.alloc(0);
       }
       // 只抽取搜索样本，不保存任何完整文件路径或文件名。
       if (!counters.sample && counters.rawBytes < 8 * 1024 * 1024) {
