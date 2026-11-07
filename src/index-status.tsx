@@ -54,7 +54,7 @@ export default function IndexStatus() {
         ? "# No Index Yet\n\nPathSeek has not indexed anything. Nothing will be scanned automatically.\n\nChoose your folders through **Build Index**, then explicitly build your first index."
         : state.status === "error"
           ? `# Index Error\n\n${state.message}\n\nCheck the index files, then use **Build Index** to recover.`
-          : `# Index Status\n\n- **Indexed paths:** ${state.metadata.count.toLocaleString()}\n- **Last built:** ${new Date(state.metadata.createdAt).toLocaleString()}\n- **Index file:** \`${state.metadata.filename}\`\n- **Format:** ${state.metadata.version === 2 ? "v2 self-describing" : "v1 legacy"}\n- **Search roots:**\n${state.metadata.roots.map((root) => `  - \`${root}\``).join("\n")}\n\nThis index is reused until you manually run Build Index. **No automatic refresh or background scanning.**`;
+          : `# Index Status\n\n- **Indexed paths:** ${state.metadata.count.toLocaleString()}\n- **Last built:** ${new Date(state.metadata.createdAt).toLocaleString()}\n- **Index file:** \`${state.metadata.filename}\`\n- **Format:** ${state.metadata.version === 3 ? "v3 prefix + Brotli (compressed)" : state.metadata.version === 2 ? "v2 self-describing" : "v1 legacy"}\n- **Search roots:**\n${state.metadata.roots.map((root) => `  - \`${root}\``).join("\n")}\n\nThis index is reused until you manually run Build Index. **No automatic refresh or background scanning.**`;
 
   return (
     <Detail
