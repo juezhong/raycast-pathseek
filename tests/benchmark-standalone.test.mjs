@@ -45,8 +45,7 @@ test("standalone benchmark builds, searches and removes only its temporary index
         "3",
         "--compare",
       ],
-      { cwd: path.resolve("."), timeout: 30_000, maxBuffer: 1024 * 1024,
-        env: { ...process.env, PATHSEEK_TEST_QUERY: "1" } },
+      { cwd: path.resolve("."), timeout: 30_000, maxBuffer: 1024 * 1024 },
     );
 
     const output = JSON.parse(stdout);
@@ -81,9 +80,7 @@ test("standalone benchmark builds, searches and removes only its temporary index
     assert.equal(output.queries[3].kind, "compare-leaf-fuzzy");
     assert.equal(output.queries[4].kind, "compare-direct-parent-fuzzy");
     assert.ok(output.queries[3].resultCount > 0);
-    assert.ok(output.queries[4].resultCount > 0,
-      "synthetic sampled query=" + output.comparisonTestQuery
-      + "; resultCounts=" + JSON.stringify(output.queries.map((item) => item.resultCount)));
+    assert.ok(output.queries[4].resultCount > 0);
     assert.equal(output.measuredRounds, 3);
     assert.equal(output.warmupRounds, 1);
     assert.equal(output.queries[0].kind, "frequent-early-limit");
