@@ -1,4 +1,5 @@
 import path from "node:path";
+import { performance } from "node:perf_hooks";
 import { Transform } from "node:stream";
 import { pinyin } from "pinyin-pro";
 import { MAX_FZF_PATH_BYTES } from "./fzf-output.ts";
@@ -12,6 +13,15 @@ const NUL = Buffer.from([0]);
 const TAB = Buffer.from("\t");
 const MAX_ALIAS_CHARS = 2048;
 const FZF_INPUT_BATCH_BYTES = 64 * 1024;
+
+export type PinyinInputDiagnostics = {
+  inputRecords: number;
+  outputRecords: number;
+  outputBytes: number;
+  outputChunks: number;
+  transformMs: number;
+};
+
 
 /**
  * 只决定中文名称的保留配额，不影响拼音是否参与匹配。
@@ -56,6 +66,7 @@ export function createPinyinFilterInput(
   directoryPatterns: readonly string[] = [],
   nativePathNameQuery?: string,
   filenameQuery = "",
+  diagnostics?: PinyinInputDiagnostics,
 ): Transform {
   let pending = Buffer.alloc(0);
   // 同一个父目录会被大量文件复用，限制为 2048 项的单次搜索缓存。
@@ -123,6 +134,7 @@ export function createPinyinFilterInput(
 
   return new Transform({
     transform(chunk: Buffer, _encoding, callback) {
+      const started = diagnostics ? performance.now() : 0;
       try {
         // 在单个输入块内合并完整记录，减少 Buffer.concat 和 stream.push 次数。
         // 每次转换结束即提交，避免跨块积累真实路径或额外常驻索引。
@@ -131,6 +143,7 @@ export function createPinyinFilterInput(
         const flushBatch = () => {
           if (!batchBytes) return;
           this.push(Buffer.concat(parts, batchBytes));
+          if (diagnostics) diagnostics.outputChunks++;
           parts.length = 0;
           batchBytes = 0;
         };
@@ -140,6 +153,10 @@ export function createPinyinFilterInput(
             throw new Error("Search record exceeds size limit");
           parts.push(field, TAB, record, NUL);
           batchBytes += recordBytes + NUL.length;
+          if (diagnostics) {
+            diagnostics.outputRecords++;
+            diagnostics.outputBytes += recordBytes + NUL.length;
+          }
           if (batchBytes >= FZF_INPUT_BATCH_BYTES) flushBatch();
         };
         let offset = 0;
@@ -158,6 +175,7 @@ export function createPinyinFilterInput(
             ? Buffer.concat([pending, section])
             : section;
           pending = Buffer.alloc(0);
+          if (diagnostics) diagnostics.inputRecords++;
 
           if (!matchesParent && !matchesName && !segmentQueries) {
             // 普通无路径查询最常见：仅英文文件名直接复用索引字节。
@@ -213,8 +231,10 @@ export function createPinyinFilterInput(
           offset = end + 1;
         }
         flushBatch();
+        if (diagnostics) diagnostics.transformMs += performance.now() - started;
         callback();
       } catch (error) {
+        if (diagnostics) diagnostics.transformMs += performance.now() - started;
         callback(error as Error);
       }
     },
