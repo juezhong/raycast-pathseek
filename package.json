@@ -129,6 +129,7 @@
     "lint:code": "eslint src",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
-    "benchmark:index": "node --experimental-strip-types scripts/benchmark-index.mjs"
+    "benchmark:index": "node --experimental-strip-types scripts/benchmark-index.mjs",
+    "convert:index": "node --experimental-strip-types scripts/convert-index.mjs"
   }
 }
