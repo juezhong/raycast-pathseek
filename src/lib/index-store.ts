@@ -2,20 +2,39 @@ import { environment, getPreferenceValues } from "@raycast/api";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { createWriteStream, constants } from "node:fs";
-import { access, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
-import { Transform } from "node:stream";
+import { Transform, PassThrough, type Writable } from "node:stream";
+import { createBrotliCompress, constants as zlibConstants } from "node:zlib";
+import { PathPrefixEncoder } from "./index-codec.ts";
+import { createNonClosingSink } from "./non-closing-sink";
+import { beginIndexBuildProgress } from "./index-progress";
+import {
+  cancelledError,
+  registerChild,
+  terminateChild,
+  throwIfAborted,
+} from "./managed-child";
 import lockfile from "proper-lockfile";
 import { beginCommandTrace } from "./command-trace";
-import { getConfiguredIndexRoots } from "./index-roots";
+import {
+  getConfiguredIndexRoots,
+  getConfiguredSymlinkDirectory,
+} from "./index-roots";
+import {
+  AliasPathMapper,
+  discoverSelectiveSymlinks,
+  type SelectiveSymlinkTarget,
+} from "./selective-symlinks";
 import { selectRebuildRoots } from "./index-root-paths";
 import {
   ACTIVE_INDEX_FILENAME,
   cleanupLegacyIndexes,
   cleanupStaleBuildTemps,
-  prepareIndex,
+  createStreamingIndexStage,
+  finalizeStreamingIndexStage,
   publishIndex,
   readIndexHeader,
   type SavedIndexMetadata,
@@ -23,7 +42,10 @@ import {
 
 export type IndexMetadata = SavedIndexMetadata;
 
-const indexDirectory = environment.supportPath;
+// 开发版索引与正式安装版隔离，避免测试重建覆盖用户原有数据。
+export const indexDirectory = environment.isDevelopment
+  ? path.join(environment.supportPath, "index-development-v3")
+  : environment.supportPath;
 const metadataPath = path.join(indexDirectory, "index.json");
 
 export function getPreferences(): Preferences {
@@ -145,21 +167,34 @@ export async function readIndex(): Promise<IndexMetadata | null> {
 async function runFd(
   fdPath: string,
   args: string[],
-  outputPath: string,
+  output: Writable,
   reason: "manual-rebuild",
+  progress: Awaited<ReturnType<typeof beginIndexBuildProgress>>,
+  shortcut?: SelectiveSymlinkTarget,
+  signal?: AbortSignal,
 ): Promise<number> {
   // Show effective flags without exposing directory names or exclude patterns.
   const flags = args.filter((arg) =>
-    ["--absolute-path", "--print0", "--hidden", "--follow"].includes(arg),
+    ["--absolute-path", "--print0", "--hidden"].includes(arg),
   );
   const excludeCount = args.filter((arg) => arg === "--exclude").length;
   const invocation =
     "fd " +
     flags.join(" ") +
     (excludeCount ? " --exclude <redacted> (x" + excludeCount + ")" : "") +
-    " . <root>";
+    (shortcut ? " . <selective-symlink-target>" : " . <root>");
+  throwIfAborted(signal);
   const trace = await beginCommandTrace("fd", reason, invocation);
+  throwIfAborted(signal);
   const child = spawn(fdPath, args, { stdio: ["ignore", "pipe", "pipe"] });
+  registerChild(child);
+  progress.fdStarted(child.pid);
+  const closed = new Promise<void>((resolve) =>
+    child.once("close", () => resolve()),
+  );
+  const abort = () => terminateChild(child);
+  signal?.addEventListener("abort", abort, { once: true });
+  if (signal?.aborted) abort();
   let exitCode: number | null | undefined;
   const chunks: string[] = [];
   let count = 0;
@@ -169,7 +204,15 @@ async function runFd(
 
   const meter = new Transform({
     transform(chunk: Buffer, _encoding, callback) {
-      for (const byte of chunk) if (byte === 0) count++;
+      let found = 0;
+      for (
+        let offset = chunk.indexOf(0);
+        offset >= 0;
+        offset = chunk.indexOf(0, offset + 1)
+      )
+        found++;
+      count += found;
+      progress.input(chunk.length, found);
       callback(null, chunk);
     },
   });
@@ -188,19 +231,28 @@ async function runFd(
 
   try {
     await Promise.all([
-      pipeline(
-        child.stdout,
-        meter,
-        createWriteStream(outputPath, { flags: "a" }),
-      ),
+      shortcut
+        ? pipeline(
+            child.stdout,
+            new AliasPathMapper(shortcut),
+            meter,
+            createNonClosingSink(output),
+          )
+        : pipeline(child.stdout, meter, createNonClosingSink(output)),
       completed,
     ]);
+    throwIfAborted(signal);
+    progress.fdFinished(exitCode);
     await trace?.finish("success", count, exitCode);
     return count;
   } catch (error) {
-    child.kill();
+    terminateChild(child);
+    await closed;
+    progress.fdFinished(exitCode);
     await trace?.finish("failure", count, exitCode, error);
-    throw error;
+    throw signal?.aborted ? cancelledError() : error;
+  } finally {
+    signal?.removeEventListener("abort", abort);
   }
 }
 
@@ -211,7 +263,9 @@ async function runFd(
  */
 export async function rebuildIndex(
   selectedRoots?: string[],
+  signal?: AbortSignal,
 ): Promise<IndexMetadata> {
+  throwIfAborted(signal);
   await mkdir(indexDirectory, { recursive: true });
   // Heartbeat prevents simultaneous rebuilds. Abandoned locks expire.
   const release = await lockfile.lock(indexDirectory, {
@@ -222,6 +276,7 @@ export async function rebuildIndex(
   });
 
   try {
+    throwIfAborted(signal);
     // Maintenance runs only after the explicit Build/Rebuild action acquires
     // the write lock. Search Files and Index Status never touch these files.
     try {
@@ -243,13 +298,45 @@ export async function rebuildIndex(
       if (!info.isDirectory()) throw new Error("Not a directory: " + root);
     }
 
+    const symlinkDirectory = await getConfiguredSymlinkDirectory();
+    // 普通扫描始终不跟随软链接，仅显式目录内的直接目录链接另行扫描。
+    const discovery = symlinkDirectory
+      ? await discoverSelectiveSymlinks(
+          symlinkDirectory,
+          prefs.includeHidden === true,
+        )
+      : null;
+    const scanRoots = [...roots];
+    if (
+      symlinkDirectory &&
+      !roots.some((root) => {
+        const relative = path.relative(root, symlinkDirectory);
+        return (
+          relative === "" ||
+          (relative !== ".." &&
+            !relative.startsWith(".." + path.sep) &&
+            !path.isAbsolute(relative))
+        );
+      })
+    )
+      scanRoots.push(symlinkDirectory);
+
     const fd = await findBinary("fd", prefs.fdBinary);
     const id = randomUUID();
-    const rawTemp = path.join(indexDirectory, "index-" + id + ".paths.tmp");
+    const quality = [5, 7, 9, 11].includes(Number(prefs.compressionQuality))
+      ? Number(prefs.compressionQuality)
+      : 7;
+    const progress = await beginIndexBuildProgress(indexDirectory, {
+      buildId: id,
+      rootCount: scanRoots.length + (discovery?.targets.length ?? 0),
+      compressionQuality: quality,
+      selectiveSymlinkTargets: discovery?.targets.length ?? 0,
+      selectiveSymlinkSkipped: discovery?.linksSkipped ?? 0,
+      includeHidden: prefs.includeHidden === true,
+    });
     const stagedTemp = path.join(indexDirectory, "index-" + id + ".nul.tmp");
     const args = ["--absolute-path", "--print0"];
     if (prefs.includeHidden) args.push("--hidden");
-    if (prefs.followSymlinks) args.push("--follow");
     for (const pattern of (prefs.excludePatterns || "")
       .split(",")
       .map((x) => x.trim())
@@ -258,42 +345,93 @@ export async function rebuildIndex(
     }
 
     let total = 0;
+    const input = new PassThrough({ highWaterMark: 1024 * 1024 });
+    let writer: Promise<void> | undefined;
+    const abortWriter = () => input.destroy(cancelledError());
+    signal?.addEventListener("abort", abortWriter, { once: true });
     try {
-      await writeFile(rawTemp, "", { flag: "wx" });
-      for (const root of roots) {
+      throwIfAborted(signal);
+      await createStreamingIndexStage(stagedTemp);
+      // 仅保存压缩数据，不落盘存储整个家目录的原始路径列表。
+      writer = pipeline(
+        input,
+        new PathPrefixEncoder(),
+        createBrotliCompress({
+          params: {
+            [zlibConstants.BROTLI_PARAM_QUALITY]: quality,
+            [zlibConstants.BROTLI_PARAM_LGWIN]: 24,
+          },
+        }),
+        new Transform({
+          transform(chunk: Buffer, _encoding, callback) {
+            progress.output(chunk.length);
+            callback(null, chunk);
+          },
+        }),
+        createWriteStream(stagedTemp, { flags: "a" }),
+      );
+      // 防止扫描尚未结束时编码管线提前失败产生 unhandled rejection。
+      void writer.catch(() => undefined);
+      for (const [index, root] of scanRoots.entries()) {
+        progress.root(index + 1);
         total += await runFd(
           fd,
           [...args, ".", root],
-          rawTemp,
+          input,
           "manual-rebuild",
+          progress,
+          undefined,
+          signal,
         );
       }
+      for (const [index, shortcut] of (discovery?.targets ?? []).entries()) {
+        progress.root(scanRoots.length + index + 1);
+        total += await runFd(
+          fd,
+          [...args, ".", shortcut.realPath],
+          input,
+          "manual-rebuild",
+          progress,
+          shortcut,
+          signal,
+        );
+      }
+      throwIfAborted(signal);
+      progress.finalizing();
+      input.end();
+      await writer;
+      throwIfAborted(signal);
 
       const metadata: IndexMetadata = {
-        version: 2,
+        version: 3,
         filename: ACTIVE_INDEX_FILENAME,
         createdAt: new Date().toISOString(),
         count: total,
         roots,
       };
 
-      // Write metadata and NUL paths into ONE staged file. A single rename
-      // makes both available together. No index.json second-phase commit.
-      const stagedMetadata = await prepareIndex(rawTemp, stagedTemp, metadata);
+      const stagedMetadata = await finalizeStreamingIndexStage(
+        stagedTemp,
+        metadata,
+      );
+      throwIfAborted(signal);
       await publishIndex(stagedTemp, indexDirectory);
 
-      // Cleanup failures must not turn a published index into a failed build.
       try {
         await cleanupLegacyIndexes(indexDirectory);
       } catch (error) {
         console.warn("Legacy index cleanup deferred:", error);
       }
+      await progress.finish("published");
       return stagedMetadata;
+    } catch (error) {
+      input.destroy();
+      await writer?.catch(() => undefined);
+      await progress.finish("failed", error).catch(() => undefined);
+      throw error;
     } finally {
-      await Promise.all([
-        rm(rawTemp, { force: true }).catch(() => undefined),
-        rm(stagedTemp, { force: true }).catch(() => undefined),
-      ]);
+      signal?.removeEventListener("abort", abortWriter);
+      await rm(stagedTemp, { force: true }).catch(() => undefined);
     }
   } finally {
     await release();

@@ -2,9 +2,11 @@ import { Action, ActionPanel, Detail, environment } from "@raycast/api";
 import { execFile } from "node:child_process";
 import { readdir, stat } from "node:fs/promises";
 import os from "node:os";
+import path from "node:path";
 import { promisify } from "node:util";
 import { useEffect, useState } from "react";
-import { readIndex, indexFilePath } from "./lib/index-store";
+import { readIndex, indexFilePath, indexDirectory } from "./lib/index-store";
+import { readIndexBuildProgress, isProgressStale } from "./lib/index-progress";
 import {
   commandTracingEnabled,
   readCommandTrace,
@@ -36,7 +38,7 @@ async function getMacOSVersion(): Promise<string> {
 }
 
 async function collectDiagnostics(): Promise<Diagnostics> {
-  const root = environment.supportPath;
+  const root = indexDirectory;
   const report: string[] = [
     "## PathSeek 诊断信息（已隐藏绝对路径）",
     "",
@@ -57,9 +59,19 @@ async function collectDiagnostics(): Promise<Diagnostics> {
   let generationCount = "unknown";
   let createdAt = "unknown";
   let rootCount = "unknown";
+  let stagedBytes = 0;
+  let stagedCount = 0;
 
   try {
     const entries = await readdir(root);
+    for (const name of entries) {
+      if (!/^index-[a-f0-9-]+\\.nul\\.tmp$/.test(name)) continue;
+      const fileInfo = await stat(path.join(root, name)).catch(() => null);
+      if (fileInfo?.isFile()) {
+        stagedBytes += fileInfo.size;
+        stagedCount++;
+      }
+    }
     generationCount = String(
       entries.filter(
         (name) => name === "index.nul" || /^index-[a-f0-9-]+\.nul$/.test(name),
@@ -76,7 +88,11 @@ async function collectDiagnostics(): Promise<Diagnostics> {
       activeStatus = "not checked";
     } else {
       metadataStatus =
-        metadata.version === 2 ? "v2 embedded header" : "v1 legacy index.json";
+        metadata.version === 3
+          ? "v3 compressed prefix + Brotli"
+          : metadata.version === 2
+            ? "v2 embedded header"
+            : "v1 legacy index.json";
       declaredCount = String(metadata.count);
       rootCount = String(metadata.roots.length);
       createdAt = metadata.createdAt;
@@ -97,10 +113,52 @@ async function collectDiagnostics(): Promise<Diagnostics> {
     `- root directories count: ${rootCount}`,
     `- last rebuild: ${createdAt}`,
     `- index generation files: ${generationCount}`,
+    `- staging files: ${stagedCount}`,
+    `- staging bytes: ${stagedBytes}`,
     "",
     "> 此报告不包含用户名、绝对路径、搜索词或文件名，可粘贴到公开 Issue。",
     "> 终端 `node --version` 显示的是系统 Node.js 版本，可能不同于 Raycast 内部 Node.js。",
   );
+
+  report.push("", "## 重建进度（数值指标，不含实际文件路径）");
+  const progress = await readIndexBuildProgress(root);
+  if (!progress) {
+    report.push(
+      "No build-progress record (build may not have started in this version).",
+    );
+  } else {
+    const ageSeconds = Math.max(
+      0,
+      Math.floor((Date.now() - Date.parse(progress.updatedAt)) / 1000),
+    );
+    const rate =
+      progress.elapsedMs > 0
+        ? progress.inputBytes / 1048576 / (progress.elapsedMs / 1000)
+        : 0;
+    report.push(
+      `- phase: ${progress.phase}`,
+      `- progress heartbeat age: ${ageSeconds} seconds`,
+      `- heartbeat stale (>15s): ${isProgressStale(progress) ? "yes (may have been terminated)" : "no"}`,
+      `- elapsed milliseconds: ${progress.elapsedMs}`,
+      `- root number/count: ${progress.rootNumber}/${progress.rootCount}`,
+      `- scanned path count: ${progress.pathCount}`,
+      `- raw input bytes: ${progress.inputBytes}`,
+      `- compressed output bytes: ${progress.compressedBytes}`,
+      `- mean input rate: ${rate.toFixed(2)} MiB/s`,
+      `- compression quality: ${progress.compressionQuality}`,
+      `- selectively followed shortcut directories: ${progress.selectiveSymlinkTargets ?? 0}`,
+      `- selective shortcut links skipped: ${progress.selectiveSymlinkSkipped ?? 0}`,
+      `- include hidden: ${progress.includeHidden}`,
+      `- extension CPU user/system ms: ${progress.cpuUserMs}/${progress.cpuSystemMs} (fd child excluded)`,
+      `- fd pid: ${progress.fdPid ?? "none"}`,
+      `- last fd exit code: ${progress.fdExitCode ?? "unknown"}`,
+      `- last raw input at: ${progress.lastInputAt ?? "not yet observed"}`,
+      `- last compressed output at: ${progress.lastOutputAt ?? "not yet observed"}`,
+      `- error code: ${progress.errorCode ?? "none"}`,
+      "",
+      "> 心跳持续更新只能证明扩展仍在记录进度，不代表扫描或压缩一直有数据输出。",
+    );
+  }
 
   report.push("", "## fd/fzf 调用记录（开发者选项）");
   if (commandTracingEnabled()) {

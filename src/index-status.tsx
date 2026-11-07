@@ -2,14 +2,15 @@ import {
   Action,
   ActionPanel,
   Detail,
-  environment,
   Icon,
   launchCommand,
   LaunchType,
 } from "@raycast/api";
 import { useEffect, useState } from "react";
 import path from "node:path";
+import { stat } from "node:fs/promises";
 import {
+  indexDirectory,
   indexFilePath,
   readIndex,
   type IndexMetadata,
@@ -23,6 +24,7 @@ type IndexState =
 
 export default function IndexStatus() {
   const [state, setState] = useState<IndexState>({ status: "loading" });
+  const [indexBytes, setIndexBytes] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -32,6 +34,13 @@ export default function IndexStatus() {
         setState(
           metadata ? { status: "ready", metadata } : { status: "empty" },
         );
+        if (metadata) {
+          void stat(indexFilePath(metadata))
+            .then((info) => {
+              if (active) setIndexBytes(info.size);
+            })
+            .catch(() => undefined);
+        }
       })
       .catch((error: unknown) => {
         if (active) setState({ status: "error", message: String(error) });
@@ -41,7 +50,7 @@ export default function IndexStatus() {
     };
   }, []);
 
-  const directory = environment.supportPath;
+  const directory = indexDirectory;
   const activeFile =
     state.status === "ready"
       ? indexFilePath(state.metadata)
@@ -54,7 +63,7 @@ export default function IndexStatus() {
         ? "# No Index Yet\n\nPathSeek has not indexed anything. Nothing will be scanned automatically.\n\nChoose your folders through **Build Index**, then explicitly build your first index."
         : state.status === "error"
           ? `# Index Error\n\n${state.message}\n\nCheck the index files, then use **Build Index** to recover.`
-          : `# Index Status\n\n- **Indexed paths:** ${state.metadata.count.toLocaleString()}\n- **Last built:** ${new Date(state.metadata.createdAt).toLocaleString()}\n- **Index file:** \`${state.metadata.filename}\`\n- **Format:** ${state.metadata.version === 2 ? "v2 self-describing" : "v1 legacy"}\n- **Search roots:**\n${state.metadata.roots.map((root) => `  - \`${root}\``).join("\n")}\n\nThis index is reused until you manually run Build Index. **No automatic refresh or background scanning.**`;
+          : `# Index Status\n\n- **Indexed paths:** ${state.metadata.count.toLocaleString()}\n- **Index size:** ${indexBytes === null ? "Reading…" : (indexBytes / (1024 * 1024)).toFixed(2) + " MiB (" + indexBytes.toLocaleString() + " bytes)"}\n- **Bytes per path:** ${indexBytes === null || !state.metadata.count ? "N/A" : (indexBytes / state.metadata.count).toFixed(2)}\n- **Last built:** ${new Date(state.metadata.createdAt).toLocaleString()}\n- **Index file:** \`${state.metadata.filename}\`\n- **Format:** ${state.metadata.version === 3 ? "v3 prefix + Brotli (compressed)" : state.metadata.version === 2 ? "v2 self-describing" : "v1 legacy"}\n- **Search roots:**\n${state.metadata.roots.map((root) => `  - \`${root}\``).join("\n")}\n\nThis index is reused until you manually run Build Index. **No automatic refresh or background scanning.**`;
 
   return (
     <Detail

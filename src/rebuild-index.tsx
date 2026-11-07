@@ -8,12 +8,23 @@ import {
   Toast,
   useNavigation,
 } from "@raycast/api";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   getConfiguredIndexRoots,
+  getConfiguredSymlinkDirectory,
   saveConfiguredIndexRoots,
+  saveConfiguredSymlinkDirectory,
 } from "./lib/index-roots";
-import { readIndex, rebuildIndex, type IndexMetadata } from "./lib/index-store";
+import {
+  indexDirectory,
+  readIndex,
+  rebuildIndex,
+  type IndexMetadata,
+} from "./lib/index-store";
+import {
+  readIndexBuildProgress,
+  type IndexBuildProgress,
+} from "./lib/index-progress";
 import {
   getMissingBinary,
   missingBinaryMessage,
@@ -25,21 +36,33 @@ type Mode = "loading" | "configure" | "ready" | "building";
 
 function ChooseFolders({
   initialRoots,
+  initialSymlinkDirectory,
   actionTitle,
   onSave,
 }: {
   initialRoots: string[];
+  initialSymlinkDirectory: string | null;
   actionTitle: string;
-  onSave: (roots: string[]) => void | Promise<void>;
+  onSave: (
+    roots: string[],
+    symlinkDirectory: string | null,
+  ) => void | Promise<void>;
 }) {
   const [saving, setSaving] = useState(false);
 
-  async function submit(values: { folders: string[] }) {
+  async function submit(values: {
+    folders: string[];
+    symlinkDirectory?: string[];
+  }) {
     if (saving) return;
     setSaving(true);
     try {
+      // 先验证普通索引根目录，再持久化选定的快捷链接目录。
       const roots = await saveConfiguredIndexRoots(values.folders);
-      await onSave(roots);
+      const symlinkDirectory = await saveConfiguredSymlinkDirectory(
+        values.symlinkDirectory?.[0] ?? null,
+      );
+      await onSave(roots, symlinkDirectory);
     } catch (error) {
       await showToast({
         style: Toast.Style.Failure,
@@ -64,7 +87,7 @@ function ChooseFolders({
         </ActionPanel>
       }
     >
-      <Form.Description text="Requires fd and fzf (Homebrew: brew install fd fzf). Select the folders to search. Only pressing Build Index runs a scan." />
+      <Form.Description text="Choose normal index folders and, optionally, ONE folder containing symlink shortcuts. Only direct directory symlinks in that folder are expanded. Other symlinks are never followed." />
       <Form.FilePicker
         id="folders"
         title="Index Folders"
@@ -73,24 +96,36 @@ function ChooseFolders({
         canChooseDirectories
         canChooseFiles={false}
       />
+      <Form.FilePicker
+        id="symlinkDirectory"
+        title="Symlink Shortcut Folder (Optional)"
+        defaultValue={initialSymlinkDirectory ? [initialSymlinkDirectory] : []}
+        canChooseDirectories
+        canChooseFiles={false}
+        allowMultipleSelection={false}
+        info="Only direct directory symlinks inside this folder are expanded. The search results preserve the shortcut path."
+      />
     </Form>
   );
 }
 
 function ChangeFolders({
   roots,
+  symlinkDirectory,
   onSave,
 }: {
   roots: string[];
-  onSave: (paths: string[]) => void;
+  symlinkDirectory: string | null;
+  onSave: (paths: string[], directory: string | null) => void;
 }) {
   const { pop } = useNavigation();
   return (
     <ChooseFolders
       initialRoots={roots}
+      initialSymlinkDirectory={symlinkDirectory}
       actionTitle="Save Selected Folders"
-      onSave={(paths) => {
-        onSave(paths);
+      onSave={(paths, directory) => {
+        onSave(paths, directory);
         pop();
       }}
     />
@@ -100,8 +135,31 @@ function ChangeFolders({
 export default function RebuildIndex() {
   const [mode, setMode] = useState<Mode>("loading");
   const [roots, setRoots] = useState<string[]>([]);
+  const [symlinkDirectory, setSymlinkDirectory] = useState<string | null>(null);
   const [current, setCurrent] = useState<IndexMetadata | null>(null);
   const [error, setError] = useState<string>();
+  const [progress, setProgress] = useState<IndexBuildProgress | null>(null);
+  const buildController = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => buildController.current?.abort();
+  }, []);
+
+  useEffect(() => {
+    if (mode !== "building") return;
+    let active = true;
+    const refresh = () => {
+      void readIndexBuildProgress(indexDirectory).then((value) => {
+        if (active) setProgress(value);
+      });
+    };
+    refresh();
+    const timer = setInterval(refresh, 1500);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [mode]);
 
   useEffect(() => {
     let mounted = true;
@@ -109,9 +167,11 @@ export default function RebuildIndex() {
       try {
         const metadata = await readIndex();
         const configured = await getConfiguredIndexRoots(metadata?.roots);
+        const selectedLinks = await getConfiguredSymlinkDirectory();
         if (!mounted) return;
         setCurrent(metadata);
         setRoots(configured);
+        setSymlinkDirectory(selectedLinks);
         // Missing index always gets the folder picker, even if a prior selection was saved.
         setMode(metadata && configured.length ? "ready" : "configure");
       } catch (failure) {
@@ -129,10 +189,13 @@ export default function RebuildIndex() {
 
   async function buildIndex(selectedRoots: string[]) {
     setError(undefined);
+    setProgress(null);
     setMode("building");
+    const controller = new AbortController();
+    buildController.current = controller;
     try {
-      // ONLY this user-initiated action invokes fd.
-      const metadata = await rebuildIndex(selectedRoots);
+      // 仅用户主动触发，退出页面或点取消会停止 fd/压缩管道。
+      const metadata = await rebuildIndex(selectedRoots, controller.signal);
       setCurrent(metadata);
       await showToast({
         style: Toast.Style.Success,
@@ -140,13 +203,23 @@ export default function RebuildIndex() {
         message: metadata.count.toLocaleString() + " paths indexed",
       });
     } catch (failure) {
-      setError(String(failure));
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Index Build Failed",
-        message: String(failure),
-      });
+      if (controller.signal.aborted) {
+        await showToast({
+          style: Toast.Style.Failure,
+          title: "Index Build Cancelled",
+          message: "The previous published index was preserved.",
+        });
+      } else {
+        setError(String(failure));
+        await showToast({
+          style: Toast.Style.Failure,
+          title: "Index Build Failed",
+          message: String(failure),
+        });
+      }
     } finally {
+      if (buildController.current === controller)
+        buildController.current = null;
       setMode("ready");
     }
   }
@@ -155,9 +228,11 @@ export default function RebuildIndex() {
     return (
       <ChooseFolders
         initialRoots={roots}
+        initialSymlinkDirectory={symlinkDirectory}
         actionTitle="Choose Folders and Build Index"
-        onSave={(chosen) => {
+        onSave={(chosen, directory) => {
           setRoots(chosen);
+          setSymlinkDirectory(directory);
           void buildIndex(chosen);
         }}
       />
@@ -165,12 +240,33 @@ export default function RebuildIndex() {
   }
 
   const missingBinary = getMissingBinary(error);
+  const mib = (bytes: number) => (bytes / (1024 * 1024)).toFixed(2) + " MiB";
+  const activeSeconds = progress
+    ? Math.max(0.001, progress.elapsedMs / 1000)
+    : 0;
+  const progressMarkdown = progress
+    ? [
+        `**Phase:** ${progress.phase} · root ${progress.rootNumber}/${progress.rootCount}`,
+        `**Paths received:** ${progress.pathCount.toLocaleString()}`,
+        `**Uncompressed path input:** ${mib(progress.inputBytes)}`,
+        `**Compressed bytes emitted:** ${mib(progress.compressedBytes)}`,
+        `**Input rate (whole-build average):** ${mib(progress.inputBytes / activeSeconds)}/s`,
+        `**Elapsed:** ${(progress.elapsedMs / 1000).toFixed(1)} s`,
+        `**Compression quality:** ${progress.compressionQuality}`,
+        `**Extension CPU time:** ${(progress.cpuUserMs / 1000).toFixed(1)} s user + ${(progress.cpuSystemMs / 1000).toFixed(1)} s system (excludes fd process)`,
+        `**Selective symlink targets:** ${progress.selectiveSymlinkTargets ?? 0}, skipped: ${progress.selectiveSymlinkSkipped ?? 0} · **Include hidden:** ${progress.includeHidden ? "yes" : "no"}`,
+        `**Last scanner output:** ${progress.lastInputAt ?? "not yet observed"}`,
+        `**Last compressed output:** ${progress.lastOutputAt ?? "not yet observed"}`,
+        "",
+        "The compressed file size is **not** the volume of paths already scanned. The final index is published only after the build finishes.",
+      ].join("\n\n")
+    : "Preparing the rebuild and its progress recorder…";
 
   const markdown =
     mode === "loading"
       ? "# Build Index\n\nReading saved folders. No scan will start automatically."
       : mode === "building"
-        ? "# Building Index\n\nRunning fd on your selected folders. The previous index stays available until the new one is complete."
+        ? "# Building Index\n\n" + progressMarkdown
         : [
             "# Build Index",
             "",
@@ -189,6 +285,10 @@ export default function RebuildIndex() {
                 "** indexed paths."
               : "No index exists. Select folders and explicitly build your first index.",
             "",
+            "**Selective symlink directory:** " +
+              (symlinkDirectory ?? "None") +
+              "\n\nOnly direct directory links inside that folder are traversed. All other symlinks are not followed.",
+            "",
             "Use **Cmd+K → Change Indexed Folders** to choose different directories. Saving a new selection does not automatically rebuild.",
             ...(error
               ? [
@@ -204,7 +304,15 @@ export default function RebuildIndex() {
       isLoading={mode === "loading" || mode === "building"}
       markdown={markdown}
       actions={
-        mode === "ready" ? (
+        mode === "building" ? (
+          <ActionPanel>
+            <Action
+              title="Cancel Index Build"
+              icon={Icon.XMarkCircle}
+              onAction={() => buildController.current?.abort()}
+            />
+          </ActionPanel>
+        ) : mode === "ready" ? (
           <ActionPanel>
             <Action
               title="Rebuild Index Now"
@@ -214,7 +322,16 @@ export default function RebuildIndex() {
             <Action.Push
               title="Change Indexed Folders"
               icon={Icon.Folder}
-              target={<ChangeFolders roots={roots} onSave={setRoots} />}
+              target={
+                <ChangeFolders
+                  roots={roots}
+                  symlinkDirectory={symlinkDirectory}
+                  onSave={(paths, directory) => {
+                    setRoots(paths);
+                    setSymlinkDirectory(directory);
+                  }}
+                />
+              }
             />
             {missingBinary && (
               <>

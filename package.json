@@ -24,20 +24,37 @@
       "required": false
     },
     {
-      "name": "followSymlinks",
-      "title": "Follow Symbolic Links",
-      "description": "Follow symlinked directories (can cause extensive traversal).",
-      "type": "checkbox",
-      "label": "Follow symlinked directories",
-      "default": false,
-      "required": false
-    },
-    {
       "name": "excludePatterns",
       "title": "Exclude Patterns",
       "description": "Optional fd glob patterns to exclude, separated by commas.",
       "type": "textfield",
       "default": ".git,node_modules",
+      "required": false
+    },
+    {
+      "name": "compressionQuality",
+      "title": "Index Compression Level",
+      "description": "Higher levels may be substantially slower. Index size is workload-dependent; use benchmark tests to compare. Applies on next manual rebuild.",
+      "type": "dropdown",
+      "data": [
+        {
+          "title": "Balanced (7, recommended)",
+          "value": "7"
+        },
+        {
+          "title": "Fast (5)",
+          "value": "5"
+        },
+        {
+          "title": "High (9)",
+          "value": "9"
+        },
+        {
+          "title": "Maximum (11, potentially extremely slow)",
+          "value": "11"
+        }
+      ],
+      "default": "7",
       "required": false
     },
     {
@@ -128,6 +145,10 @@
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "lint:code": "eslint src",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx}\""
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
+    "benchmark:index": "node --experimental-strip-types scripts/benchmark-index.mjs",
+    "convert:index": "node --experimental-strip-types scripts/convert-index.mjs",
+    "benchmark:quality": "node --experimental-strip-types scripts/benchmark-compression.mjs",
+    "benchmark:search": "node --experimental-strip-types scripts/benchmark-search.mjs"
   }
 }

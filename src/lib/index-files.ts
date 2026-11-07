@@ -5,16 +5,24 @@ import type { FileHandle } from "node:fs/promises";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Transform } from "node:stream";
+import {
+  createBrotliCompress,
+  createBrotliDecompress,
+  constants as zlibConstants,
+} from "node:zlib";
+import { PathPrefixEncoder, PathPrefixDecoder } from "./index-codec.ts";
 
 export const ACTIVE_INDEX_FILENAME = "index.nul";
 export const LEGACY_INDEX_REGEX = /^index-[a-f0-9-]+\.nul$/;
 export const LEGACY_GRACE_MS = 24 * 60 * 60 * 1000;
-const MAGIC = Buffer.from("PSIDX002", "ascii");
+const MAGIC_V2 = Buffer.from("PSIDX002", "ascii");
+const MAGIC_V3 = Buffer.from("PSIDX003", "ascii");
 const PREFIX_SIZE = 12;
 const MAX_HEADER_BYTES = 64 * 1024;
+const STREAMED_DATA_OFFSET = 64 * 1024;
 
 export type SavedIndexMetadata = {
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   filename: string;
   createdAt: string;
   count: number;
@@ -28,7 +36,7 @@ function validateMetadata(raw: unknown): SavedIndexMetadata {
     !raw ||
     typeof raw !== "object" ||
     !("version" in raw) ||
-    raw.version !== 2 ||
+    (raw.version !== 2 && raw.version !== 3) ||
     !("count" in raw) ||
     !Number.isSafeInteger(raw.count) ||
     (raw.count as number) < 0 ||
@@ -42,11 +50,18 @@ function validateMetadata(raw: unknown): SavedIndexMetadata {
   }
   const payload = raw as Record<string, unknown>;
   return {
-    version: 2,
+    version: raw.version as 2 | 3,
     filename: ACTIVE_INDEX_FILENAME,
     createdAt: payload.createdAt as string,
     count: payload.count as number,
     roots: payload.roots as string[],
+    dataOffset:
+      typeof payload.dataOffset === "number" &&
+      Number.isSafeInteger(payload.dataOffset) &&
+      payload.dataOffset >= PREFIX_SIZE &&
+      payload.dataOffset <= MAX_HEADER_BYTES
+        ? payload.dataOffset
+        : undefined,
   };
 }
 
@@ -54,7 +69,8 @@ function validateMetadata(raw: unknown): SavedIndexMetadata {
  * Serialize metadata and NUL-delimited file paths into ONE self-contained
  * index file. It is staged and validated before an atomic rename.
  *
- * [8B ASCII MAGIC][4B little-endian JSON length][JSON][path\0path\0...]
+ * v3: [8B MAGIC][4B JSON length][JSON][Brotli(prefix-coded NUL paths)].
+ * v2 is retained for reading older indexes. Path data is decoded as a stream.
  * The first 12+N bytes MUST be skipped before feeding the path data to fzf.
  */
 export async function prepareIndex(
@@ -63,7 +79,7 @@ export async function prepareIndex(
   metadata: Omit<SavedIndexMetadata, "filename" | "dataOffset">,
 ): Promise<SavedIndexMetadata> {
   const rawMetadata = {
-    version: 2,
+    version: 3,
     createdAt: metadata.createdAt,
     count: metadata.count,
     roots: metadata.roots,
@@ -72,8 +88,8 @@ export async function prepareIndex(
   if (json.length > MAX_HEADER_BYTES)
     throw new Error("Index metadata exceeds header size limit");
   const prefix = Buffer.alloc(PREFIX_SIZE);
-  MAGIC.copy(prefix);
-  prefix.writeUInt32LE(json.length, MAGIC.length);
+  MAGIC_V3.copy(prefix);
+  prefix.writeUInt32LE(json.length, MAGIC_V3.length);
   await writeFile(stagedPath, Buffer.concat([prefix, json]), { flag: "wx" });
   let seenPaths = 0;
   let lastByte: number | undefined;
@@ -87,6 +103,13 @@ export async function prepareIndex(
   await pipeline(
     createReadStream(rawPathsFile),
     counter,
+    new PathPrefixEncoder(),
+    createBrotliCompress({
+      params: {
+        [zlibConstants.BROTLI_PARAM_QUALITY]: 11,
+        [zlibConstants.BROTLI_PARAM_LGWIN]: 24,
+      },
+    }),
     createWriteStream(stagedPath, { flags: "a" }),
   );
   if (seenPaths !== metadata.count || (seenPaths > 0 && lastByte !== 0)) {
@@ -102,13 +125,58 @@ export async function prepareIndex(
     throw new Error("Index metadata verification failed");
   }
   const info = await stat(stagedPath);
-  if (
-    info.size !==
-    (await stat(rawPathsFile)).size + PREFIX_SIZE + json.length
-  ) {
-    throw new Error("Index payload copy incomplete");
+  if (info.size <= PREFIX_SIZE + json.length && metadata.count > 0) {
+    throw new Error("Compressed index payload missing");
   }
   return parsed;
+}
+
+/**
+ * 为流式重建预留固定大小头部。压缩结果直接追加到 staged 文件，
+ * 整个构建过程中不产生完整的未压缩路径临时文件。
+ */
+export async function createStreamingIndexStage(
+  stagedPath: string,
+): Promise<void> {
+  await writeFile(stagedPath, Buffer.alloc(STREAMED_DATA_OFFSET), {
+    flag: "wx",
+  });
+}
+
+export async function finalizeStreamingIndexStage(
+  stagedPath: string,
+  metadata: Omit<SavedIndexMetadata, "filename" | "dataOffset">,
+): Promise<SavedIndexMetadata> {
+  const json = Buffer.from(
+    JSON.stringify({
+      version: 3,
+      createdAt: metadata.createdAt,
+      count: metadata.count,
+      roots: metadata.roots,
+      dataOffset: STREAMED_DATA_OFFSET,
+    }),
+    "utf8",
+  );
+  if (PREFIX_SIZE + json.length > STREAMED_DATA_OFFSET)
+    throw new Error("Index metadata exceeds reserved header");
+  const prefix = Buffer.alloc(PREFIX_SIZE);
+  MAGIC_V3.copy(prefix);
+  prefix.writeUInt32LE(json.length, MAGIC_V3.length);
+  const handle = await open(stagedPath, "r+");
+  try {
+    if ((await handle.stat()).size <= STREAMED_DATA_OFFSET)
+      throw new Error("Missing compressed index payload");
+    await handle.write(
+      Buffer.concat([prefix, json]),
+      0,
+      PREFIX_SIZE + json.length,
+      0,
+    );
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+  return readIndexHeader(stagedPath);
 }
 
 async function readHeader(handle: FileHandle): Promise<SavedIndexMetadata> {
@@ -116,11 +184,12 @@ async function readHeader(handle: FileHandle): Promise<SavedIndexMetadata> {
   const first = await handle.read(prefix, 0, PREFIX_SIZE, 0);
   if (
     first.bytesRead !== PREFIX_SIZE ||
-    !prefix.subarray(0, MAGIC.length).equals(MAGIC)
+    (!prefix.subarray(0, MAGIC_V2.length).equals(MAGIC_V2) &&
+      !prefix.subarray(0, MAGIC_V3.length).equals(MAGIC_V3))
   ) {
     throw new Error("Unsupported index format; run Rebuild Index");
   }
-  const length = prefix.readUInt32LE(MAGIC.length);
+  const length = prefix.readUInt32LE(MAGIC_V2.length);
   if (!length || length > MAX_HEADER_BYTES)
     throw new Error("Invalid index header length");
   const info = await handle.stat();
@@ -132,7 +201,15 @@ async function readHeader(handle: FileHandle): Promise<SavedIndexMetadata> {
   const metadata = validateMetadata(
     JSON.parse(json.toString("utf8")) as unknown,
   );
-  return { ...metadata, dataOffset: PREFIX_SIZE + length };
+  const expectedMagic = metadata.version === 3 ? MAGIC_V3 : MAGIC_V2;
+  if (!prefix.subarray(0, expectedMagic.length).equals(expectedMagic)) {
+    throw new Error("Index header magic and version mismatch");
+  }
+  const offset = metadata.dataOffset ?? PREFIX_SIZE + length;
+  if (offset < PREFIX_SIZE + length || offset > info.size) {
+    throw new Error("Invalid index payload offset");
+  }
+  return { ...metadata, dataOffset: offset };
 }
 
 export async function readIndexHeader(
@@ -154,16 +231,23 @@ export async function readIndexHeader(
  */
 export async function openIndexDataStream(
   indexPath: string,
-): Promise<ReadStream> {
+): Promise<ReadStream | PathPrefixDecoder> {
   const handle = await open(indexPath, "r");
   try {
-    let offset = 0;
-    if (path.basename(indexPath) === ACTIVE_INDEX_FILENAME) {
-      offset = (await readHeader(handle)).dataOffset ?? 0;
-    }
-    // FileHandle-created stream keeps the same inode after atomic rename,
-    // even if new builds publish a file with a differently sized header.
-    return handle.createReadStream({ start: offset, autoClose: true });
+    const header =
+      path.basename(indexPath) === ACTIVE_INDEX_FILENAME
+        ? await readHeader(handle)
+        : null;
+    const offset = header?.dataOffset ?? 0;
+    // 使用同一个 fd，原子替换索引时读者继续访问原快照。
+    const source = handle.createReadStream({ start: offset, autoClose: true });
+    if (header?.version !== 3) return source;
+    const decompressor = createBrotliDecompress();
+    const decoder = new PathPrefixDecoder();
+    // pipeline 双向传播错误与提前销毁，查询取消时会关闭底层 fd。
+    // 调用方通过 decoder 的 error/close 观察失败；Promise 仅防止未处理拒绝。
+    void pipeline(source, decompressor, decoder).catch(() => undefined);
+    return decoder;
   } catch (error) {
     await handle.close();
     throw error;

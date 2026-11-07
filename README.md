@@ -10,6 +10,7 @@
 
 - **Open / Save navigation:** Launch **Find in Open/Save** with your assigned hotkey, search, and paste a selected file or folder path into the original dialog using Raycast's `Action.Paste`. Some apps require opening **Go to Folder** with `⌘⇧G` first. PathSeek never presses Open or Save for you.
 - **Manual indexing:** Choose which folders to index and explicitly build or rebuild the persistent index with `fd`. Installation, opening Raycast, and searching never trigger a file scan.
+- **Selective symlink shortcuts:** In **Build Index**, optionally choose one folder containing directory symlink shortcuts. Only its immediate directory symlinks are expanded into searchable paths; their alias paths are preserved. Other symlinks are never followed, and there is no global follow switch.
 - **Search in Raycast:** Search indexed filenames, folders, and paths with `fzf`. Open results, reveal them in Finder, use Quick Look, or copy absolute paths.
 
 ## Install and use

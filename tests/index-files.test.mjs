@@ -9,6 +9,8 @@ import {
   cleanupStaleBuildTemps,
   openIndexDataStream,
   prepareIndex,
+  createStreamingIndexStage,
+  finalizeStreamingIndexStage,
   publishIndex,
   readIndexHeader,
 } from "../src/lib/index-files.ts";
@@ -41,11 +43,11 @@ async function streamText(stream) {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-test("v2 stores metadata and paths in one atomically published file", async () => {
+test("v3 stores compressed metadata and paths in one atomically published file", async () => {
   await withDirectory(async (dir) => {
     const { staged, metadata } = await stage(dir, "first");
     assert.equal(metadata.filename, ACTIVE_INDEX_FILENAME);
-    assert.equal(metadata.version, 2);
+    assert.equal(metadata.version, 3);
     assert.ok(metadata.dataOffset > 12);
     await publishIndex(staged, dir);
     const saved = await readIndexHeader(path.join(dir, ACTIVE_INDEX_FILENAME));
@@ -112,7 +114,7 @@ test("cleanup preserves current index and young UUID generations", async () => {
     const past = new Date(Date.now() - 3 * 24 * 3600_000);
     await utimes(old, past, past);
     assert.equal(await cleanupLegacyIndexes(dir), 1);
-    assert.equal(await readIndexHeader(active).then((m) => m.version), 2);
+    assert.equal(await readIndexHeader(active).then((m) => m.version), 3);
     assert.equal(await readFile(recent, "utf8"), "recent\0");
     assert.equal(await cleanupLegacyIndexes(dir, Date.now() + 4 * 24 * 3600_000), 1);
     assert.equal((await readdir(dir)).includes(ACTIVE_INDEX_FILENAME), true);
@@ -153,7 +155,34 @@ test("stale-temp maintenance removes only old recognized build artifacts", async
       (await readdir(dir)).filter((name) => name.endsWith(".tmp")).sort(),
       ["first.paths.tmp", "index-33333333-3333-4333-8333-333333333333.paths.tmp", "user-notes.tmp"],
     );
-    assert.equal((await readIndexHeader(active)).version, 2);
+    assert.equal((await readIndexHeader(active)).version, 3);
     assert.equal(await cleanupStaleBuildTemps(dir), 0);
+  });
+});
+
+test("streaming v3 index publishes without a raw-path temporary file", async () => {
+  await withDirectory(async (dir) => {
+    const staged = path.join(dir, "index-stage.nul.tmp");
+    await createStreamingIndexStage(staged);
+    const { createWriteStream } = await import("node:fs");
+    const { pipeline } = await import("node:stream/promises");
+    const { Readable } = await import("node:stream");
+    const { createBrotliCompress, constants } = await import("node:zlib");
+    const { PathPrefixEncoder } = await import("../src/lib/index-codec.ts");
+    const paths = Buffer.from("/first/中文.txt\0/first/a\nb.txt\0");
+    await pipeline(
+      Readable.from([paths]),
+      new PathPrefixEncoder(),
+      createBrotliCompress({ params: {
+        [constants.BROTLI_PARAM_QUALITY]: 11,
+        [constants.BROTLI_PARAM_LGWIN]: 24,
+      } }),
+      createWriteStream(staged, { flags: "a" }),
+    );
+    const metadata = await finalizeStreamingIndexStage(staged, meta(["/first"], 2));
+    assert.equal(metadata.version, 3);
+    assert.equal(metadata.dataOffset, 65536);
+    await publishIndex(staged, dir);
+    assert.equal(await streamText(await openIndexDataStream(path.join(dir, ACTIVE_INDEX_FILENAME))), paths.toString());
   });
 });
