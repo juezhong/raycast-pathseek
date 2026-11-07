@@ -194,12 +194,7 @@ async function runFd(
 
   try {
     await Promise.all([
-      pipeline(
-        child.stdout,
-        meter,
-        output,
-        { end: false },
-      ),
+      pipeline(child.stdout, meter, output, { end: false }),
       completed,
     ]);
     await trace?.finish("success", count, exitCode);
@@ -283,12 +278,7 @@ export async function rebuildIndex(
       // 防止扫描尚未结束时编码管线提前失败产生 unhandled rejection。
       void writer.catch(() => undefined);
       for (const root of roots) {
-        total += await runFd(
-          fd,
-          [...args, ".", root],
-          input,
-          "manual-rebuild",
-        );
+        total += await runFd(fd, [...args, ".", root], input, "manual-rebuild");
       }
       input.end();
       await writer;
@@ -301,7 +291,10 @@ export async function rebuildIndex(
         roots,
       };
 
-      const stagedMetadata = await finalizeStreamingIndexStage(stagedTemp, metadata);
+      const stagedMetadata = await finalizeStreamingIndexStage(
+        stagedTemp,
+        metadata,
+      );
       await publishIndex(stagedTemp, indexDirectory);
 
       try {

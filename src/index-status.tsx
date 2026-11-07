@@ -36,7 +36,9 @@ export default function IndexStatus() {
         );
         if (metadata) {
           void stat(indexFilePath(metadata))
-            .then((info) => { if (active) setIndexBytes(info.size); })
+            .then((info) => {
+              if (active) setIndexBytes(info.size);
+            })
             .catch(() => undefined);
         }
       })

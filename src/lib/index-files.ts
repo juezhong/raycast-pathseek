@@ -5,7 +5,11 @@ import type { FileHandle } from "node:fs/promises";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Transform } from "node:stream";
-import { createBrotliCompress, createBrotliDecompress, constants as zlibConstants } from "node:zlib";
+import {
+  createBrotliCompress,
+  createBrotliDecompress,
+  constants as zlibConstants,
+} from "node:zlib";
 import { PathPrefixEncoder, PathPrefixDecoder } from "./index-codec.ts";
 
 export const ACTIVE_INDEX_FILENAME = "index.nul";
@@ -51,10 +55,13 @@ function validateMetadata(raw: unknown): SavedIndexMetadata {
     createdAt: payload.createdAt as string,
     count: payload.count as number,
     roots: payload.roots as string[],
-    dataOffset: typeof payload.dataOffset === "number" &&
+    dataOffset:
+      typeof payload.dataOffset === "number" &&
       Number.isSafeInteger(payload.dataOffset) &&
       payload.dataOffset >= PREFIX_SIZE &&
-      payload.dataOffset <= MAX_HEADER_BYTES ? payload.dataOffset : undefined,
+      payload.dataOffset <= MAX_HEADER_BYTES
+        ? payload.dataOffset
+        : undefined,
   };
 }
 
@@ -128,21 +135,28 @@ export async function prepareIndex(
  * 为流式重建预留固定大小头部。压缩结果直接追加到 staged 文件，
  * 整个构建过程中不产生完整的未压缩路径临时文件。
  */
-export async function createStreamingIndexStage(stagedPath: string): Promise<void> {
-  await writeFile(stagedPath, Buffer.alloc(STREAMED_DATA_OFFSET), { flag: "wx" });
+export async function createStreamingIndexStage(
+  stagedPath: string,
+): Promise<void> {
+  await writeFile(stagedPath, Buffer.alloc(STREAMED_DATA_OFFSET), {
+    flag: "wx",
+  });
 }
 
 export async function finalizeStreamingIndexStage(
   stagedPath: string,
   metadata: Omit<SavedIndexMetadata, "filename" | "dataOffset">,
 ): Promise<SavedIndexMetadata> {
-  const json = Buffer.from(JSON.stringify({
-    version: 3,
-    createdAt: metadata.createdAt,
-    count: metadata.count,
-    roots: metadata.roots,
-    dataOffset: STREAMED_DATA_OFFSET,
-  }), "utf8");
+  const json = Buffer.from(
+    JSON.stringify({
+      version: 3,
+      createdAt: metadata.createdAt,
+      count: metadata.count,
+      roots: metadata.roots,
+      dataOffset: STREAMED_DATA_OFFSET,
+    }),
+    "utf8",
+  );
   if (PREFIX_SIZE + json.length > STREAMED_DATA_OFFSET)
     throw new Error("Index metadata exceeds reserved header");
   const prefix = Buffer.alloc(PREFIX_SIZE);
@@ -152,7 +166,12 @@ export async function finalizeStreamingIndexStage(
   try {
     if ((await handle.stat()).size <= STREAMED_DATA_OFFSET)
       throw new Error("Missing compressed index payload");
-    await handle.write(Buffer.concat([prefix, json]), 0, PREFIX_SIZE + json.length, 0);
+    await handle.write(
+      Buffer.concat([prefix, json]),
+      0,
+      PREFIX_SIZE + json.length,
+      0,
+    );
     await handle.sync();
   } finally {
     await handle.close();
@@ -165,8 +184,8 @@ async function readHeader(handle: FileHandle): Promise<SavedIndexMetadata> {
   const first = await handle.read(prefix, 0, PREFIX_SIZE, 0);
   if (
     first.bytesRead !== PREFIX_SIZE ||
-    !prefix.subarray(0, MAGIC_V2.length).equals(MAGIC_V2) &&
-    !prefix.subarray(0, MAGIC_V3.length).equals(MAGIC_V3)
+    (!prefix.subarray(0, MAGIC_V2.length).equals(MAGIC_V2) &&
+      !prefix.subarray(0, MAGIC_V3.length).equals(MAGIC_V3))
   ) {
     throw new Error("Unsupported index format; run Rebuild Index");
   }
@@ -215,9 +234,10 @@ export async function openIndexDataStream(
 ): Promise<ReadStream | PathPrefixDecoder> {
   const handle = await open(indexPath, "r");
   try {
-    const header = path.basename(indexPath) === ACTIVE_INDEX_FILENAME
-      ? await readHeader(handle)
-      : null;
+    const header =
+      path.basename(indexPath) === ACTIVE_INDEX_FILENAME
+        ? await readHeader(handle)
+        : null;
     const offset = header?.dataOffset ?? 0;
     // 使用同一个 fd，原子替换索引时读者继续访问原快照。
     const source = handle.createReadStream({ start: offset, autoClose: true });

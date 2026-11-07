@@ -22,25 +22,40 @@ export class PathPrefixEncoder extends Transform {
 
   private writePath(part: Buffer): void {
     const current = this.fragmentSize
-      ? Buffer.concat([...this.fragments, part], this.fragmentSize + part.length)
+      ? Buffer.concat(
+          [...this.fragments, part],
+          this.fragmentSize + part.length,
+        )
       : Buffer.from(part);
-    if (current.length > MAX_PATH_BYTES) throw new Error("Index path exceeds size limit");
+    if (current.length > MAX_PATH_BYTES)
+      throw new Error("Index path exceeds size limit");
     let prefix = 0;
     while (
       prefix < this.previous.length &&
       prefix < current.length &&
       this.previous[prefix] === current[prefix]
-    ) prefix++;
-    this.push(Buffer.concat([encodeLength(prefix), current.subarray(prefix), NUL]));
+    )
+      prefix++;
+    this.push(
+      Buffer.concat([encodeLength(prefix), current.subarray(prefix), NUL]),
+    );
     this.previous = current;
     this.fragments = [];
     this.fragmentSize = 0;
   }
 
-  override _transform(chunk: Buffer, _encoding: BufferEncoding, callback: TransformCallback): void {
+  override _transform(
+    chunk: Buffer,
+    _encoding: BufferEncoding,
+    callback: TransformCallback,
+  ): void {
     try {
       let start = 0;
-      for (let end = chunk.indexOf(0, start); end !== -1; end = chunk.indexOf(0, start)) {
+      for (
+        let end = chunk.indexOf(0, start);
+        end !== -1;
+        end = chunk.indexOf(0, start)
+      ) {
         this.writePath(chunk.subarray(start, end));
         start = end + 1;
       }
@@ -48,14 +63,19 @@ export class PathPrefixEncoder extends Transform {
         const tail = chunk.subarray(start);
         this.fragments.push(Buffer.from(tail));
         this.fragmentSize += tail.length;
-        if (this.fragmentSize > MAX_PATH_BYTES) throw new Error("Index path exceeds size limit");
+        if (this.fragmentSize > MAX_PATH_BYTES)
+          throw new Error("Index path exceeds size limit");
       }
       callback();
-    } catch (error) { callback(error as Error); }
+    } catch (error) {
+      callback(error as Error);
+    }
   }
 
   override _flush(callback: TransformCallback): void {
-    callback(this.fragmentSize ? new Error("Unterminated index path") : undefined);
+    callback(
+      this.fragmentSize ? new Error("Unterminated index path") : undefined,
+    );
   }
 }
 
@@ -69,10 +89,17 @@ export class PathPrefixDecoder extends Transform {
 
   private emitPath(part: Buffer): void {
     const suffix = this.fragmentSize
-      ? Buffer.concat([...this.fragments, part], this.fragmentSize + part.length)
+      ? Buffer.concat(
+          [...this.fragments, part],
+          this.fragmentSize + part.length,
+        )
       : part;
-    const current = Buffer.concat([this.previous.subarray(0, this.prefix), suffix]);
-    if (current.length > MAX_PATH_BYTES) throw new Error("Index path exceeds size limit");
+    const current = Buffer.concat([
+      this.previous.subarray(0, this.prefix),
+      suffix,
+    ]);
+    if (current.length > MAX_PATH_BYTES)
+      throw new Error("Index path exceeds size limit");
     this.push(Buffer.concat([current, NUL]));
     this.previous = current;
     this.prefix = 0;
@@ -82,19 +109,25 @@ export class PathPrefixDecoder extends Transform {
     this.fragmentSize = 0;
   }
 
-  override _transform(chunk: Buffer, _encoding: BufferEncoding, callback: TransformCallback): void {
+  override _transform(
+    chunk: Buffer,
+    _encoding: BufferEncoding,
+    callback: TransformCallback,
+  ): void {
     try {
       let offset = 0;
       while (offset < chunk.length) {
         if (!this.suffixMode) {
           const byte = chunk[offset++];
           this.prefix += (byte & 0x7f) * 2 ** this.shift;
-          if (this.prefix > MAX_PATH_BYTES) throw new Error("Invalid path prefix length");
+          if (this.prefix > MAX_PATH_BYTES)
+            throw new Error("Invalid path prefix length");
           if (byte & 0x80) {
             this.shift += 7;
             if (this.shift > 21) throw new Error("Invalid path prefix varint");
           } else {
-            if (this.prefix > this.previous.length) throw new Error("Path prefix exceeds previous path");
+            if (this.prefix > this.previous.length)
+              throw new Error("Path prefix exceeds previous path");
             this.suffixMode = true;
           }
         } else {
@@ -103,7 +136,8 @@ export class PathPrefixDecoder extends Transform {
             const rest = chunk.subarray(offset);
             this.fragments.push(Buffer.from(rest));
             this.fragmentSize += rest.length;
-            if (this.prefix + this.fragmentSize > MAX_PATH_BYTES) throw new Error("Index path exceeds size limit");
+            if (this.prefix + this.fragmentSize > MAX_PATH_BYTES)
+              throw new Error("Index path exceeds size limit");
             break;
           }
           this.emitPath(chunk.subarray(offset, end));
@@ -111,11 +145,16 @@ export class PathPrefixDecoder extends Transform {
         }
       }
       callback();
-    } catch (error) { callback(error as Error); }
+    } catch (error) {
+      callback(error as Error);
+    }
   }
 
   override _flush(callback: TransformCallback): void {
-    callback(this.suffixMode || this.shift !== 0 || this.prefix !== 0
-      ? new Error("Incomplete prefix-encoded index") : undefined);
+    callback(
+      this.suffixMode || this.shift !== 0 || this.prefix !== 0
+        ? new Error("Incomplete prefix-encoded index")
+        : undefined,
+    );
   }
 }

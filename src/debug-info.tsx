@@ -76,7 +76,11 @@ async function collectDiagnostics(): Promise<Diagnostics> {
       activeStatus = "not checked";
     } else {
       metadataStatus =
-        metadata.version === 3 ? "v3 compressed prefix + Brotli" : metadata.version === 2 ? "v2 embedded header" : "v1 legacy index.json";
+        metadata.version === 3
+          ? "v3 compressed prefix + Brotli"
+          : metadata.version === 2
+            ? "v2 embedded header"
+            : "v1 legacy index.json";
       declaredCount = String(metadata.count);
       rootCount = String(metadata.roots.length);
       createdAt = metadata.createdAt;
