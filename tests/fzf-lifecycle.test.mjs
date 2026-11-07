@@ -307,3 +307,20 @@ test("common Chinese initials are not lost behind 150 loosely matching Latin fil
     }
   });
 });
+
+test("pinyin search still surfaces Chinese among 300 shorter prefix matches", async () => {
+  await fixture(async (dir) => {
+    const target = "/docs/第二次.txt";
+    const entries = [
+      ...Array.from({ length: 300 }, (_, n) => "/docs/dec" + n + ".c"),
+      target,
+    ];
+    const raw = path.join(dir, "short-rank-input");
+    const staged = path.join(dir, "short-rank-stage.tmp");
+    await writeFile(raw, entries.join(String.fromCharCode(0)) + String.fromCharCode(0));
+    await prepareIndex(raw, staged, { version: 3, count: entries.length, createdAt: new Date().toISOString(), roots: ["/docs"] });
+    await publishIndex(staged, dir);
+    const result = await runFzfFilter("fzf", path.join(dir, "index.nul"), "dec");
+    assert.ok(result.paths.includes(target), "Chinese matches must be visible even when 300 short ASCII prefixes rank higher");
+  });
+});
