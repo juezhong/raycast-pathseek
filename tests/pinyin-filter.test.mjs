@@ -219,3 +219,32 @@ test("batched output preserves separately anchored original and Chinese alias re
   assert.ok(records.includes("driver.c\t" + entries[2]));
   assert.deepEqual(new Set(records.map(originalPathFromPinyinResult)), new Set(entries));
 });
+
+
+test("opt-in pipeline diagnostics count records without changing emitted bytes", async () => {
+  const entries = ["/docs/driver.c", "/docs/第一次.txt", "/docs/very-long-driver.c"];
+  const data = Buffer.from(entries.join("\0") + "\0");
+  const baseline = [];
+  for await (const chunk of Readable.from([data]).pipe(createPinyinFilterInput())) {
+    baseline.push(chunk);
+  }
+  const diagnostics = {
+    inputRecords: 0,
+    outputRecords: 0,
+    outputBytes: 0,
+    outputChunks: 0,
+    transformMs: 0,
+  };
+  const profiled = [];
+  for await (const chunk of Readable.from([data]).pipe(
+    createPinyinFilterInput(true, [], undefined, "", diagnostics),
+  )) {
+    profiled.push(chunk);
+  }
+  assert.deepEqual(Buffer.concat(profiled), Buffer.concat(baseline));
+  assert.equal(diagnostics.inputRecords, entries.length);
+  assert.equal(diagnostics.outputRecords, entries.length);
+  assert.equal(diagnostics.outputBytes, Buffer.concat(profiled).length);
+  assert.ok(diagnostics.outputChunks > 0);
+  assert.ok(diagnostics.transformMs >= 0);
+});
