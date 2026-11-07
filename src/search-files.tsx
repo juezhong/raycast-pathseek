@@ -181,7 +181,7 @@ export function SearchFilesView({
           if (!controller.signal.aborted) {
             setActiveScope({
               expression,
-              folder: hint === "/" ? "/" : hint.replace(/\\/+$/u, ""),
+              folder: hint === "/" ? "/" : hint.replace(/\/+$/u, ""),
             });
           }
           return;
