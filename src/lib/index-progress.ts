@@ -14,6 +14,8 @@ export type IndexBuildProgress = {
   inputBytes: number;
   pathCount: number;
   compressedBytes: number;
+  lastInputAt?: string;
+  lastOutputAt?: string;
   rootNumber: number;
   rootCount: number;
   compressionQuality: number;
@@ -140,9 +142,11 @@ export async function beginIndexBuildProgress(
     input(bytes: number, paths: number): void {
       progress.inputBytes += bytes;
       progress.pathCount += paths;
+      if (bytes > 0) progress.lastInputAt = new Date().toISOString();
     },
     output(bytes: number): void {
       progress.compressedBytes += bytes;
+      if (bytes > 0) progress.lastOutputAt = new Date().toISOString();
     },
     root(number: number): void { progress.rootNumber = number; },
     fdStarted(pid?: number): void { progress.fdPid = pid; },
