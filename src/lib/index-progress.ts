@@ -58,8 +58,8 @@ export async function readIndexBuildProgress(
       !("phase" in data) ||
       !["scanning", "finalizing", "published", "failed"].includes(String(data.phase)) ||
       !("updatedAt" in data) || typeof data.updatedAt !== "string" ||
-      !("inputBytes" in data) || !Number.isSafeInteger(data.inputBytes) ||
-      !("pathCount" in data) || !Number.isSafeInteger(data.pathCount)
+      !("inputBytes" in data) || typeof data.inputBytes !== "number" || !Number.isSafeInteger(data.inputBytes) ||
+      !("pathCount" in data) || typeof data.pathCount !== "number" || !Number.isSafeInteger(data.pathCount)
     ) return null;
     return data as IndexBuildProgress;
   } catch (error) {
