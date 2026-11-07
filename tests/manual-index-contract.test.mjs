@@ -96,3 +96,18 @@ test("development and locally imported commands share the Raycast supportPath in
   assert.match(locations, /OLD_DEVELOPMENT_INDEX_FOLDER = "index-development-v3"/);
   assert.match(locations, /readIndexAt\(supportPath, supportPath, false\)/);
 });
+
+test("build cancellation and temporary cleanup never delete Raycast configuration", async () => {
+  const roots = await source("lib/index-roots.ts");
+  const store = await source("lib/index-store.ts");
+  const rebuild = await source("rebuild-index.tsx");
+  assert.match(roots, /configured-index-roots-v1/);
+  assert.match(roots, /configured-selective-symlink-folder-v1/);
+  assert.match(roots, /LocalStorage\.setItem\(ROOTS_KEY/);
+  assert.match(roots, /LocalStorage\.setItem\(SYMLINK_DIRECTORY_KEY/);
+  assert.doesNotMatch(roots, /LocalStorage\.(?:clear|removeItem)\(/);
+  assert.doesNotMatch(store, /LocalStorage\.(?:clear|removeItem|setItem)\(/);
+  assert.match(rebuild, /buildController\.current\?\.abort\(\)/);
+  assert.match(store, /cleanupStaleBuildTemps\(indexDirectory, Date\.now\(\), 0\)/);
+  assert.match(store, /rm\(stagedTemp, \{ force: true \}\)/);
+});
