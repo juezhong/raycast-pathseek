@@ -76,6 +76,7 @@ test("standalone benchmark builds, searches and removes only its temporary index
     assert.deepEqual(output.comparison.modes, [
       "basename-only",
       "consecutive-parent-path",
+      "pinyin-parent-path",
     ]);
     assert.equal(output.indexedPaths, output.decodedPaths);
     assert.equal(output.decodeStats.runs, 3);
@@ -85,7 +86,8 @@ test("standalone benchmark builds, searches and removes only its temporary index
     assert.ok(output.indexedPaths < 500, "Nested symlink traversal would expand the index unexpectedly");
     assert.ok(output.uncompressedBytes > 0);
     assert.ok(output.compressedBytes > 0);
-    assert.equal(output.queries.length, 5);
+    assert.equal(output.queries.length, 6);
+    assert.equal(output.queries[5].kind, "compare-pinyin-parent-path");
     assert.equal(output.queries[3].kind, "compare-leaf-fuzzy");
     assert.equal(output.queries[4].kind, "compare-direct-parent-fuzzy");
     assert.ok(output.queries[3].resultCount > 0);

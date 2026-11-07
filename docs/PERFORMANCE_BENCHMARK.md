@@ -30,7 +30,7 @@ npm run benchmark:standalone -- "$HOME" \
 | `buildMs` / `buildCpu` | 本次冷启动索引构建耗时与 Node CPU |
 | `decodeStats.p50Ms/p95Ms` | 压缩索引读取/解码延迟 |
 | `queries[].kind/p50Ms/p95Ms/resultCount/limitReached` | 搜索类型、各 5 轮分位延迟、结果数及上限 |
-| `compareRequested` / `comparison` | 同一新建索引中名称搜索与直接父目录路径搜索对照；**不是两次 Git 版本之间的对比** |
+| `compareRequested` / `comparison` | 同一新建索引中名称搜索、连续父目录路径搜索和固定 `dyc/dec` 拼音路径负载；**不是两次 Git 版本之间的对比** |
 | `nodeRss.sampledPeakBytes` | 仅 Node 进程的 50ms 采样峰值 |
 | `processTreeRss.peakCombinedRssBytes` | Node + 其子进程同一采样时点的合计 RSS 峰值 |
 | `processTreeRss.peakFdRssBytes / peakFzfRssBytes` | 观测到的 fd/fzf 单类进程合计峰值 |

@@ -392,6 +392,16 @@ async function run() {
         { kind: "compare-direct-parent-fuzzy", query: counters.sampledPathQuery, timings: [], count: 0, limited: false },
       );
     }
+    if (args.compare) {
+      // 固定拼音路径负载，即使无匹配结果也完整走一遍路径/拼音查询管线。
+      tests.push({
+        kind: "compare-pinyin-parent-path",
+        query: "dyc/dec",
+        timings: [],
+        count: 0,
+        limited: false,
+      });
+    }
     const searchCpuStart = process.cpuUsage();
     // 第一轮为预热，不计入统计。之后交错测试三种负载，避免顺序偏差。
     for (let round = 0; round <= args.runs; round++) {
@@ -434,8 +444,8 @@ async function run() {
       comparison: args.compare
         ? {
             available: Boolean(counters.sampledPathQuery),
-            modes: ["basename-only", "consecutive-parent-path"],
-            note: "Same indexed fixture and sampled target, different matching scopes; not an old-version/new-version comparison.",
+            modes: ["basename-only", "consecutive-parent-path", "pinyin-parent-path"],
+            note: "Same indexed fixture: compare basename, consecutive-parent path, and a fixed pinyin path workload; not an old-version/new-version comparison.",
           }
         : undefined,
       indexedPaths: counters.paths,
