@@ -16,7 +16,12 @@ export type FzfOutputState = {
 };
 
 export function createFzfOutputState(): FzfOutputState {
-  return { pending: Buffer.alloc(0), resultBytes: 0, results: [], limitReached: false };
+  return {
+    pending: Buffer.alloc(0),
+    resultBytes: 0,
+    results: [],
+    limitReached: false,
+  };
 }
 
 export function appendFzfOutputChunk(
@@ -25,7 +30,9 @@ export function appendFzfOutputChunk(
   maxResults = MAX_FZF_RESULTS,
 ): void {
   if (state.limitReached || !chunk.length) return;
-  const data = state.pending.length ? Buffer.concat([state.pending, chunk]) : chunk;
+  const data = state.pending.length
+    ? Buffer.concat([state.pending, chunk])
+    : chunk;
   let offset = 0;
 
   while (offset < data.length) {
