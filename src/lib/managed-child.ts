@@ -5,6 +5,7 @@ import type { ChildProcess } from "node:child_process";
  * SIGKILL、系统崩溃等不可捕获终止无法由 JavaScript 保证清理。
  */
 const children = new Set<ChildProcess>();
+const exited = new WeakSet<ChildProcess>();
 process.once("exit", () => {
   for (const child of children) {
     try {
@@ -19,7 +20,8 @@ process.once("exit", () => {
 
 export function registerChild(child: ChildProcess): void {
   children.add(child);
-  child.once("close", () => children.delete(child));
+  child.once("exit", () => exited.add(child));
+  child.once("close", () => { exited.add(child); children.delete(child); });
 }
 
 /** 请求退出，并在宽限期后升级到 SIGKILL；定时器不会阻止 Node 退出。 */
@@ -27,7 +29,7 @@ export function terminateChild(
   child: ChildProcess,
   graceMs = 1500,
 ): void {
-  if (child.exitCode !== null || child.signalCode !== null) return;
+  if (exited.has(child)) return;
   try {
     child.kill("SIGTERM");
   } catch {
@@ -35,7 +37,7 @@ export function terminateChild(
   }
 
   const timer = setTimeout(() => {
-    if (child.exitCode !== null || child.signalCode !== null) return;
+    if (exited.has(child)) return;
     try {
       child.kill("SIGKILL");
     } catch {
