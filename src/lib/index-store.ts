@@ -2,11 +2,13 @@ import { environment, getPreferenceValues } from "@raycast/api";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { createWriteStream, constants } from "node:fs";
-import { access, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
-import { Transform } from "node:stream";
+import { Transform, PassThrough, type Writable } from "node:stream";
+import { createBrotliCompress, constants as zlibConstants } from "node:zlib";
+import { PathPrefixEncoder } from "./index-codec";
 import lockfile from "proper-lockfile";
 import { beginCommandTrace } from "./command-trace";
 import { getConfiguredIndexRoots } from "./index-roots";
@@ -15,7 +17,8 @@ import {
   ACTIVE_INDEX_FILENAME,
   cleanupLegacyIndexes,
   cleanupStaleBuildTemps,
-  prepareIndex,
+  createStreamingIndexStage,
+  finalizeStreamingIndexStage,
   publishIndex,
   readIndexHeader,
   type SavedIndexMetadata,
@@ -145,7 +148,7 @@ export async function readIndex(): Promise<IndexMetadata | null> {
 async function runFd(
   fdPath: string,
   args: string[],
-  outputPath: string,
+  output: Writable,
   reason: "manual-rebuild",
 ): Promise<number> {
   // Show effective flags without exposing directory names or exclude patterns.
@@ -191,7 +194,8 @@ async function runFd(
       pipeline(
         child.stdout,
         meter,
-        createWriteStream(outputPath, { flags: "a" }),
+        output,
+        { end: false },
       ),
       completed,
     ]);
@@ -245,7 +249,6 @@ export async function rebuildIndex(
 
     const fd = await findBinary("fd", prefs.fdBinary);
     const id = randomUUID();
-    const rawTemp = path.join(indexDirectory, "index-" + id + ".paths.tmp");
     const stagedTemp = path.join(indexDirectory, "index-" + id + ".nul.tmp");
     const args = ["--absolute-path", "--print0"];
     if (prefs.includeHidden) args.push("--hidden");
@@ -258,16 +261,34 @@ export async function rebuildIndex(
     }
 
     let total = 0;
+    const input = new PassThrough({ highWaterMark: 1024 * 1024 });
+    let writer: Promise<void> | undefined;
     try {
-      await writeFile(rawTemp, "", { flag: "wx" });
+      await createStreamingIndexStage(stagedTemp);
+      // 仅保存压缩数据，不落盘存储整个家目录的原始路径列表。
+      writer = pipeline(
+        input,
+        new PathPrefixEncoder(),
+        createBrotliCompress({
+          params: {
+            [zlibConstants.BROTLI_PARAM_QUALITY]: 11,
+            [zlibConstants.BROTLI_PARAM_LGWIN]: 24,
+          },
+        }),
+        createWriteStream(stagedTemp, { flags: "a" }),
+      );
+      // 防止扫描尚未结束时编码管线提前失败产生 unhandled rejection。
+      void writer.catch(() => undefined);
       for (const root of roots) {
         total += await runFd(
           fd,
           [...args, ".", root],
-          rawTemp,
+          input,
           "manual-rebuild",
         );
       }
+      input.end();
+      await writer;
 
       const metadata: IndexMetadata = {
         version: 3,
@@ -277,23 +298,21 @@ export async function rebuildIndex(
         roots,
       };
 
-      // Write metadata and NUL paths into ONE staged file. A single rename
-      // makes both available together. No index.json second-phase commit.
-      const stagedMetadata = await prepareIndex(rawTemp, stagedTemp, metadata);
+      const stagedMetadata = await finalizeStreamingIndexStage(stagedTemp, metadata);
       await publishIndex(stagedTemp, indexDirectory);
 
-      // Cleanup failures must not turn a published index into a failed build.
       try {
         await cleanupLegacyIndexes(indexDirectory);
       } catch (error) {
         console.warn("Legacy index cleanup deferred:", error);
       }
       return stagedMetadata;
+    } catch (error) {
+      input.destroy();
+      await writer?.catch(() => undefined);
+      throw error;
     } finally {
-      await Promise.all([
-        rm(rawTemp, { force: true }).catch(() => undefined),
-        rm(stagedTemp, { force: true }).catch(() => undefined),
-      ]);
+      await rm(stagedTemp, { force: true }).catch(() => undefined);
     }
   } finally {
     await release();
