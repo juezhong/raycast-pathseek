@@ -54,6 +54,7 @@ export function createPinyinFilterInput(
   enablePinyin = true,
   directoryPatterns: readonly string[] = [],
   nativePathNameQuery?: string,
+  filenameQuery = "",
 ): Transform {
   let pending = Buffer.alloc(0);
   // 同一个父目录会被大量文件复用，限制为 2048 项的单次搜索缓存。
@@ -78,6 +79,7 @@ export function createPinyinFilterInput(
   const matchesName = nativePathNameQuery
     ? compileFuzzyTargetNameMatcher(nativePathNameQuery, pinyinAlias)
     : undefined;
+  const anchoredQuery = /[\^$]/u.test(filenameQuery);
   const segmentQueries =
     nativePathNameQuery !== undefined
       ? [...directoryPatterns, nativePathNameQuery]
@@ -147,12 +149,23 @@ export function createPinyinFilterInput(
             continue;
           }
           const matchField = Buffer.from(projectPath(filepath, filename), "utf8");
-          if (
-            matchField.length + TAB.length + record.length >
-            MAX_FZF_PATH_BYTES
-          )
+          if (matchField.length + TAB.length + record.length > MAX_FZF_PATH_BYTES)
             throw new Error("Search record exceeds size limit");
-          this.push(Buffer.concat([matchField, TAB, record, NUL]));
+          const emit = (field: Buffer) => {
+            if (field.length + TAB.length + record.length > MAX_FZF_PATH_BYTES)
+              throw new Error("Search record exceeds size limit");
+            this.push(Buffer.concat([field, TAB, record, NUL]));
+          };
+          if (anchoredQuery && !segmentQueries) {
+            // 前后锚点必须作用于真实名称；拼音候选独立参与同一个 fzf 查询。
+            emit(Buffer.from(filename.replaceAll("\t", " "), "utf8"));
+            if (enablePinyin) {
+              const aliases = pinyinAlias(filename).split(" ").filter(Boolean);
+              for (const alias of aliases) emit(Buffer.from(alias, "utf8"));
+            }
+          } else {
+            emit(matchField);
+          }
           offset = end + 1;
         }
         callback();

@@ -12,6 +12,7 @@ export type FzfOutputState = {
   pending: Buffer;
   resultBytes: number;
   results: string[];
+  seen: Set<string>;
   limitReached: boolean;
 };
 
@@ -20,6 +21,7 @@ export function createFzfOutputState(): FzfOutputState {
     pending: Buffer.alloc(0),
     resultBytes: 0,
     results: [],
+    seen: new Set<string>(),
     limitReached: false,
   };
 }
@@ -42,10 +44,16 @@ export function appendFzfOutputChunk(
       throw new Error("fzf output path exceeds size limit");
     const nameBytes = boundary - offset;
     if (nameBytes) {
-      if (state.resultBytes + nameBytes > MAX_FZF_TOTAL_BYTES)
-        throw new Error("fzf results exceed memory size limit");
-      state.results.push(data.subarray(offset, boundary).toString("utf8"));
-      state.resultBytes += nameBytes;
+      const value = data.subarray(offset, boundary).toString("utf8");
+      const divider = value.indexOf("\t");
+      const key = divider < 0 ? value : value.slice(divider + 1);
+      if (!state.seen.has(key)) {
+        if (state.resultBytes + nameBytes > MAX_FZF_TOTAL_BYTES)
+          throw new Error("fzf results exceed memory size limit");
+        state.seen.add(key);
+        state.results.push(value);
+        state.resultBytes += nameBytes;
+      }
     }
     offset = boundary + 1;
 

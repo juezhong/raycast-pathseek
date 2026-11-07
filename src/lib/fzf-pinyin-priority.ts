@@ -17,6 +17,7 @@ export type PinyinPriorityOutput = {
   chinese: string[];
   totalBytes: number;
   scanned: number;
+  seen: Set<string>;
   limitReached: boolean;
 };
 
@@ -28,6 +29,7 @@ export function createPinyinPriorityOutput(): PinyinPriorityOutput {
     chinese: [],
     totalBytes: 0,
     scanned: 0,
+    seen: new Set<string>(),
     limitReached: false,
   };
 }
@@ -73,12 +75,23 @@ export function appendPinyinPriorityChunk(
     if (!bytes.length) continue;
 
     state.scanned++;
+    const value = bytes.toString("utf8");
+    const divider = value.indexOf("\t");
+    const key = divider < 0 ? value : value.slice(divider + 1);
+    if (state.seen.has(key)) {
+      if (state.scanned >= MAX_PINYIN_OUTPUT_SCAN) {
+        state.limitReached = true;
+        state.pending = Buffer.alloc(0);
+        return;
+      }
+      continue;
+    }
+    state.seen.add(key);
     const shouldRetain =
       state.primary.length < plainLimit ||
       state.fallback.length < PINYIN_RESERVED_RESULTS ||
       state.chinese.length < PINYIN_RESERVED_RESULTS;
     if (shouldRetain) {
-      const value = bytes.toString("utf8");
       if (state.primary.length < plainLimit) add(state, state.primary, value);
       else {
         if (state.fallback.length < PINYIN_RESERVED_RESULTS)

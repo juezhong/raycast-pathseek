@@ -45,6 +45,7 @@ export async function runFzfFilter(
     true,
     pathQuery?.directoryPatterns ?? [],
     nativePath ? pathQuery!.nameQuery : undefined,
+    nameQuery,
   );
   const source = augmented;
   if (signal?.aborted) {

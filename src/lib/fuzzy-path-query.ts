@@ -147,11 +147,12 @@ function compileSegment(pattern: string): SegmentMatcher {
     if (evaluate(comparable)) return true;
     if (!/\p{Script=Han}/u.test(name)) return false;
     const alias = getAlias(name);
-    return alias
-      ? evaluate(
-          ignoreCase ? (name + " " + alias).toLowerCase() : name + " " + alias,
-        )
-      : false;
+    if (!alias) return false;
+    const comparableAlias = ignoreCase ? alias.toLowerCase() : alias;
+    return (
+      evaluate(ignoreCase ? (name + " " + alias).toLowerCase() : name + " " + alias) ||
+      comparableAlias.split(" ").some((reading) => evaluate(reading))
+    );
   };
 }
 
