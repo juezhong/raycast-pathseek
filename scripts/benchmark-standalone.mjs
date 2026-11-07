@@ -162,6 +162,13 @@ async function run() {
     ? await discoverSelectiveSymlinks(args.shortcuts, args.hidden)
     : { targets: [], linksSkipped: 0 };
   const temporary = await mkdtemp(path.join(os.tmpdir(), "pathseek-benchmark-"));
+  // 仅在用户显式运行 benchmark 时采样；不修改插件搜索组件，也不常驻。
+  const rssAtStart = process.memoryUsage.rss();
+  let sampledPeakRss = rssAtStart;
+  const rssSampler = setInterval(() => {
+    sampledPeakRss = Math.max(sampledPeakRss, process.memoryUsage.rss());
+  }, 50);
+  rssSampler.unref();
   const controller = new AbortController();
   const abort = () => controller.abort();
   process.once("SIGINT", abort);
@@ -282,6 +289,13 @@ async function run() {
       ),
       buildMs,
       buildCpu,
+      nodeRss: {
+        atStartBytes: rssAtStart,
+        afterBenchmarkBytes: process.memoryUsage.rss(),
+        sampledPeakBytes: Math.max(sampledPeakRss, process.memoryUsage.rss()),
+        sampleIntervalMs: 50,
+        scope: "Benchmark Node process only; excludes fd/fzf and Raycast",
+      },
       decodedPaths: decoded.paths,
       decodeMs: decodeStats.p50Ms,
       decodeStats,
@@ -293,6 +307,7 @@ async function run() {
       note: "Build/decode/search CPU times only include the Node process, not fd/fzf. No path or query text is emitted.",
     };
   } finally {
+    clearInterval(rssSampler);
     process.off("SIGINT", abort);
     process.off("SIGTERM", abort);
     // 仅删除 mkdtemp 本次创建的临时目录；绝不操作 Raycast 正式索引。

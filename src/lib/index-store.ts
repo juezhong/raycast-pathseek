@@ -422,7 +422,10 @@ export async function rebuildIndex(
       } catch (error) {
         console.warn("Legacy index cleanup deferred:", error);
       }
-      await progress.finish("published");
+      // 原子发布已提交，进度日志失败不得把成功的构建误报为失败。
+      await progress.finish("published").catch(() => {
+        console.warn("Index published, but progress status could not be saved");
+      });
       return stagedMetadata;
     } catch (error) {
       input.destroy();

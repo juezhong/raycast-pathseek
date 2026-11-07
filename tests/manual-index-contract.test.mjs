@@ -67,3 +67,22 @@ test("global follow-symlinks preference is absent and only selected shortcuts ar
   assert.match(ui, /id="symlinkDirectory"/);
   assert.match(ui, /allowMultipleSelection=\{false\}/);
 });
+
+test("search and rebuild commands release work on unmount instead of keeping background workers", async () => {
+  const search = await source("search-files.tsx");
+  const rebuild = await source("rebuild-index.tsx");
+  const runner = await source("lib/fzf-runner.ts");
+
+  assert.match(search, /const controller = new AbortController\(\)/);
+  assert.match(search, /clearTimeout\(timer\)/);
+  assert.match(search, /controller\.abort\(\)/);
+  assert.doesNotMatch(search, /setInterval\s*\(/);
+
+  assert.match(rebuild, /buildController\.current\?\.abort\(\)/);
+  assert.match(rebuild, /title="Cancel Index Build"/);
+  assert.match(rebuild, /clearInterval\(timer\)/);
+
+  assert.match(runner, /child\.once\("close"/);
+  assert.match(runner, /inputClosed\.then/);
+  assert.doesNotMatch(runner, /setInterval\s*\(/);
+});
