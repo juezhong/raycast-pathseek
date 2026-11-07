@@ -23,14 +23,34 @@ import {
   discoverSelectiveSymlinks,
 } from "../src/lib/selective-symlinks.ts";
 
+function summarizeTimes(values) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const percentile = (p) => sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)];
+  return {
+    runs: sorted.length,
+    minMs: Number(sorted[0].toFixed(2)),
+    p50Ms: Number(percentile(0.5).toFixed(2)),
+    p95Ms: Number(percentile(0.95).toFixed(2)),
+    maxMs: Number(sorted.at(-1).toFixed(2)),
+  };
+}
+
+function usageDelta(cpu) {
+  return {
+    userMs: Math.round(cpu.user / 1000),
+    systemMs: Math.round(cpu.system / 1000),
+  };
+}
+
 function options(argv) {
   if (!argv.length || argv[0].startsWith("--")) {
-    throw new Error("Usage: npm run benchmark:standalone -- \"$HOME\" [--shortcuts \"$HOME/Symlinks\"] [--hidden] [--quality 7]");
+    throw new Error("Usage: npm run benchmark:standalone -- \"$HOME\" [--shortcuts \"$HOME/Symlinks\"] [--hidden] [--quality 7] [--runs 5]");
   }
   const root = path.resolve(argv[0]);
   let shortcuts = null;
   let hidden = false;
   let quality = 7;
+  let runs = 5;
   for (let i = 1; i < argv.length; i++) {
     if (argv[i] === "--shortcuts" && i + 1 < argv.length) {
       shortcuts = path.resolve(argv[++i]);
@@ -38,6 +58,8 @@ function options(argv) {
       hidden = true;
     } else if (argv[i] === "--quality" && i + 1 < argv.length) {
       quality = Number(argv[++i]);
+    } else if (argv[i] === "--runs" && i + 1 < argv.length) {
+      runs = Number(argv[++i]);
     } else {
       throw new Error("Unknown or incomplete benchmark option");
     }
@@ -45,7 +67,10 @@ function options(argv) {
   if (![5, 7, 9, 11].includes(quality)) {
     throw new Error("Compression quality must be 5, 7, 9, or 11");
   }
-  return { root, shortcuts, hidden, quality };
+  if (!Number.isInteger(runs) || runs < 1 || runs > 10) {
+    throw new Error("Repeat count must be an integer between 1 and 10");
+  }
+  return { root, shortcuts, hidden, quality, runs };
 }
 
 async function scanFd(root, sink, counters, signal, shortcut) {
@@ -164,6 +189,7 @@ async function run() {
 
     const counters = { paths: 0, rawBytes: 0, sample: "", hidden: args.hidden };
     const started = performance.now();
+    const buildCpuStart = process.cpuUsage();
     try {
       await scanFd(args.root, input, counters, controller.signal);
       for (const alias of discovery.targets) {
@@ -180,6 +206,7 @@ async function run() {
       controller.signal.removeEventListener("abort", onAbort);
     }
     const buildMs = Number((performance.now() - started).toFixed(1));
+    const buildCpu = usageDelta(process.cpuUsage(buildCpuStart));
     await finalizeStreamingIndexStage(stage, {
       version: 3,
       count: counters.paths,
@@ -189,32 +216,50 @@ async function run() {
     await publishIndex(stage, temporary);
     const indexBytes = (await stat(index)).size;
 
+    const decodeCpuStart = process.cpuUsage();
     const decoded = await measureDecode(index);
+    const decodeCpu = usageDelta(process.cpuUsage(decodeCpuStart));
     if (decoded.paths !== counters.paths || decoded.rawBytes !== counters.rawBytes) {
       throw new Error("Compressed index round-trip verification failed");
     }
 
     const tests = [
-      { kind: "short", query: "a" },
-      { kind: "sampled-filename", query: counters.sample || "src" },
-      { kind: "no-match-control", query: "pathseek_absent_" + randomUUID().replaceAll("-", "") },
+      { kind: "frequent-early-limit", query: "a", timings: [], count: 0, limited: false },
+      { kind: "sampled-existing-filename", query: counters.sample || "src", timings: [], count: 0, limited: false },
+      { kind: "full-scan-no-match", query: "pathseek_absent_" + randomUUID().replaceAll("-", ""), timings: [], count: 0, limited: false },
     ];
-    const measurements = [];
-    for (const entry of tests) {
-      if (controller.signal.aborted) throw new Error("Benchmark cancelled");
-      const startedQuery = performance.now();
-      const result = await runFzfFilter("fzf", index, entry.query, controller.signal);
-      measurements.push({
-        kind: entry.kind,
-        elapsedMs: Number((performance.now() - startedQuery).toFixed(1)),
-        resultCount: result.paths.length,
-        limitReached: result.limited,
-      });
+    const searchCpuStart = process.cpuUsage();
+    // 第一轮为预热，不计入统计。之后交错测试三种负载，避免顺序偏差。
+    for (let round = 0; round <= args.runs; round++) {
+      for (const entry of tests) {
+        if (controller.signal.aborted) throw new Error("Benchmark cancelled");
+        const startedQuery = performance.now();
+        const result = await runFzfFilter("fzf", index, entry.query, controller.signal);
+        const elapsed = performance.now() - startedQuery;
+        if (round > 0) entry.timings.push(elapsed);
+        entry.count = result.paths.length;
+        entry.limited = result.limited;
+        if (result.cancelled) throw new Error("Search cancelled");
+      }
     }
+    const searchCpu = usageDelta(process.cpuUsage(searchCpuStart));
+    const measurements = tests.map((entry) => ({
+      kind: entry.kind,
+      ...summarizeTimes(entry.timings),
+      resultCount: entry.count,
+      limitReached: entry.limited,
+    }));
+    if (tests[2].count !== 0) throw new Error("No-match control unexpectedly matched");
 
-    const cpu = process.cpuUsage();
     return {
+      benchmarkVersion: 2,
       formatVersion: 3,
+      host: {
+        platform: process.platform,
+        architecture: process.arch,
+        node: process.version,
+        availableParallelism: os.availableParallelism(),
+      },
       scanRoots: 1 + discovery.targets.length,
       symlinkTargets: discovery.targets.length,
       symlinkLinksSkipped: discovery.linksSkipped,
@@ -227,12 +272,15 @@ async function run() {
         (100 * (1 - indexBytes / Math.max(1, counters.rawBytes))).toFixed(2),
       ),
       buildMs,
+      buildCpu,
       decodedPaths: decoded.paths,
       decodeMs: decoded.elapsedMs,
-      processCpuUserMs: Math.round(cpu.user / 1000),
-      processCpuSystemMs: Math.round(cpu.system / 1000),
+      decodeCpu,
+      searchCpu,
+      warmupRounds: 1,
+      measuredRounds: args.runs,
       queries: measurements,
-      note: "All search patterns are generated automatically. No query text or file paths are printed.",
+      note: "Build/decode/search CPU times only include the Node process, not fd/fzf. No path or query text is emitted.",
     };
   } finally {
     process.off("SIGINT", abort);
