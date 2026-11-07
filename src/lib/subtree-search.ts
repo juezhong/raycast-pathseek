@@ -37,12 +37,17 @@ export function parseSubtreeQuery(input: string): SubtreeQuery | null {
     directoryPatterns.length > 16 ||
     directoryPatterns.some((s) => !s || s.length > 128)
   ) {
-    throw new Error("Subtree directory query needs 1 to 16 non-empty levels (max 128 characters each)");
+    throw new Error(
+      "Subtree directory query needs 1 to 16 non-empty levels (max 128 characters each)",
+    );
   }
   const nameQuery = match[3].trimStart();
   if (nameQuery.startsWith("/"))
-    throw new Error("Subtree search cannot start with an empty directory level (///)");
-  if (nameQuery.length > 512) throw new Error("Subtree filename query is too long");
+    throw new Error(
+      "Subtree search cannot start with an empty directory level (///)",
+    );
+  if (nameQuery.length > 512)
+    throw new Error("Subtree filename query is too long");
 
   return {
     directoryPatterns,
@@ -53,7 +58,10 @@ export function parseSubtreeQuery(input: string): SubtreeQuery | null {
 }
 
 /** 前缀边界必须完整：/foo 不能命中 /foobar。 */
-export function isPathInsideDirectory(filepath: string, directory: string): boolean {
+export function isPathInsideDirectory(
+  filepath: string,
+  directory: string,
+): boolean {
   const normalized = directory === "/" ? "/" : directory.replace(/\/+$/u, "");
   const prefix = normalized === "/" ? "/" : normalized + "/";
   return filepath.startsWith(prefix) && filepath.length > prefix.length;
@@ -84,7 +92,8 @@ export async function findIndexedDirectoryChoices(
   signal?: AbortSignal,
   maxChoices = MAX_DIRECTORY_CHOICES,
 ): Promise<DirectoryChoices> {
-  if (maxChoices < 1) throw new Error("Directory choice limit must be positive");
+  if (maxChoices < 1)
+    throw new Error("Directory choice limit must be positive");
   throwIfAborted(signal);
   const match = compileFuzzyParentPathMatcher(directoryPatterns, pinyinAlias);
   const found = new Set<string>();
@@ -101,7 +110,9 @@ export async function findIndexedDirectoryChoices(
           const tail = chunk.subarray(offset);
           if (pending.length + tail.length > MAX_FZF_PATH_BYTES)
             throw new Error("Index path exceeds size limit");
-          pending = pending.length ? Buffer.concat([pending, tail]) : Buffer.from(tail);
+          pending = pending.length
+            ? Buffer.concat([pending, tail])
+            : Buffer.from(tail);
           break;
         }
         const part = chunk.subarray(offset, end);
@@ -113,8 +124,12 @@ export async function findIndexedDirectoryChoices(
         pending = Buffer.alloc(0);
         offset = end + 1;
 
-        const normalized = record.endsWith("/") ? record.replace(/\/+$/u, "") : record;
-        let directory = record.endsWith("/") ? normalized : path.dirname(normalized);
+        const normalized = record.endsWith("/")
+          ? record.replace(/\/+$/u, "")
+          : record;
+        let directory = record.endsWith("/")
+          ? normalized
+          : path.dirname(normalized);
         while (directory && directory !== "/" && directory !== ".") {
           if (checked.has(directory)) break;
           checked.add(directory);
@@ -125,7 +140,10 @@ export async function findIndexedDirectoryChoices(
           if (match(directory + "/__pathseek_probe__")) {
             found.add(directory);
             if (found.size > maxChoices) {
-              return { paths: [...found].slice(0, maxChoices), truncated: true };
+              return {
+                paths: [...found].slice(0, maxChoices),
+                truncated: true,
+              };
             }
           }
           const parent = path.dirname(directory);
