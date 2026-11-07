@@ -135,7 +135,7 @@ PathSeek 继续使用原生 `fzf --extended --read0 --print0 --filter` 和 `--nt
 
 ### 含软链接目录的真实冷启动与搜索对比
 
-完整固定命令及字段说明见 [性能基准模板](docs/PERFORMANCE_BENCHMARK.md)。
+完整固定命令及字段说明见 [性能基准模板](docs/PERFORMANCE_BENCHMARK.md)。 本次路径模糊搜索的优化实测、不可回退语义及后续子树搜索方案记录在 [搜索设计与后续优化记录](docs/SEARCH_DESIGN_AND_FOLLOWUPS.md)。
 
 保留成熟的 `benchmark:standalone` 测试路径：每次在临时目录从零构建索引；`--shortcuts` 仅展开指定目录的直接目录软链接，不使用 `fd --follow`。扫描 HOME 及显式目标，使用流式索引压缩，且只删除本次创建的临时索引：
 
