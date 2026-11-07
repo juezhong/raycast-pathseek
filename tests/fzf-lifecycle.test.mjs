@@ -167,3 +167,26 @@ test("real fzf accepts Chinese pinyin initials, unordered terms, and native exte
     assert.ok(tabName.paths.includes(entries[3]));
   });
 });
+
+test("pinyin-mode cancellation closes the decoder and reaps the fzf child", async () => {
+  await fixture(async (dir, index) => {
+    const binary = path.join(dir, "fake-pinyin-fzf");
+    const pidFile = path.join(dir, "pinyin-child.pid");
+    await writeFile(
+      binary,
+      "#!/usr/bin/env node\\n" +
+        "const fs = require('node:fs');\\n" +
+        `fs.writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));\\n` +
+        "process.stdin.resume(); setInterval(() => {}, 1000);\\n",
+    );
+    await chmod(binary, 0o755);
+    const controller = new AbortController();
+    const task = runFzfFilter(binary, index, "dyc", controller.signal, 10_000);
+    const pid = await waitForPid(pidFile);
+    controller.abort();
+    const outcome = await task;
+    assert.equal(outcome.cancelled, true);
+    assert.deepEqual(outcome.paths, []);
+    assertGone(pid);
+  });
+});
