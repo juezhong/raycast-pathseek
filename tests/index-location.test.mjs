@@ -11,7 +11,11 @@ import {
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { prepareIndex, publishIndex } from "../src/lib/index-files.ts";
+import {
+  openIndexDataStream,
+  prepareIndex,
+  publishIndex,
+} from "../src/lib/index-files.ts";
 import {
   indexPathAt,
   legacyDevelopmentIndexDirectory,
@@ -67,6 +71,10 @@ test("existing development-v3 index is readable without moving or deleting it", 
     const metadata = await readStoredIndex(root);
     assert.equal(metadata?.legacyDevelopmentLocation, true);
     assert.equal(indexPathAt(root, metadata), path.join(old, "index.nul"));
+    const reader = await openIndexDataStream(indexPathAt(root, metadata));
+    const decoded = [];
+    for await (const chunk of reader) decoded.push(chunk);
+    assert.equal(Buffer.concat(decoded).toString("utf8"), "/old/driver.c\\0");
     assert.deepEqual(await readdir(root), ["index-development-v3"]);
     assert.deepEqual(await readFile(path.join(old, "index.nul")), oldData);
 
