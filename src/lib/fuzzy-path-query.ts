@@ -1,9 +1,6 @@
-import path from "node:path";
-
 /**
- * 单个 '/' 将查询拆成目录层级：前面的段匹配连续的父目录，
- * 最后一段交由原生 fzf 对真实文件/目录名称执行模糊过滤。
- * 不带 '/' 的原有名称搜索完全不受影响。
+ * '/' 是路径模式的唯一触发符。前面的片段按连续父目录层级匹配，
+ * 最后一个片段仍交由原生 fzf 对目标自身名称进行匹配。
  */
 export type FuzzyPathQuery = {
   directoryPatterns: string[];
@@ -30,43 +27,159 @@ export function parseFuzzyPathQuery(query: string): FuzzyPathQuery | null {
   return { directoryPatterns, nameQuery };
 }
 
-/** 模糊匹配只要求字符保持顺序，允许字符之间有间隔。 */
-function fuzzySubsequence(needle: string, haystack: string): boolean {
-  let offset = 0;
-  for (const letter of needle) {
-    const found = haystack.indexOf(letter, offset);
-    if (found < 0) return false;
-    offset = found + letter.length;
+type Predicate = (name: string) => boolean;
+
+/** 支持 fzf 对空格的转义，不会把不同目录段合并为一个搜索词。 */
+function tokenize(pattern: string): string[] {
+  const tokens: string[] = [];
+  let word = "";
+  for (let i = 0; i < pattern.length; i++) {
+    const char = pattern[i];
+    if (char === "\\" && i + 1 < pattern.length && /\s/u.test(pattern[i + 1])) {
+      word += pattern[++i];
+    } else if (/\s/u.test(char)) {
+      if (word) tokens.push(word);
+      word = "";
+    } else {
+      word += char;
+    }
+  }
+  if (word) tokens.push(word);
+  return tokens;
+}
+
+/** 与 fzf 模糊匹配的布尔条件一致：查询字符必须按顺序出现。 */
+function orderedMatch(needle: string, value: string): boolean {
+  let from = 0;
+  for (const char of needle) {
+    const index = value.indexOf(char, from);
+    if (index === -1) return false;
+    from = index + char.length;
   }
   return true;
 }
 
+const WORD_CHARACTER = /[\p{L}\p{N}]/u;
+
+function exactWordMatch(needle: string, value: string): boolean {
+  let start = value.indexOf(needle);
+  while (start !== -1) {
+    const end = start + needle.length;
+    const leading = start === 0 || !WORD_CHARACTER.test(value[start - 1]);
+    const trailing = end === value.length || !WORD_CHARACTER.test(value[end]);
+    if (leading && trailing) return true;
+    start = value.indexOf(needle, start + 1);
+  }
+  return false;
+}
+
+function compileTerm(input: string, ignoreCase: boolean): Predicate {
+  let term = input;
+  const inverse = term.startsWith("!");
+  if (inverse) term = term.slice(1);
+
+  let kind: "fuzzy" | "exact" | "word" | "prefix" | "suffix" | "equal";
+  if (term.startsWith("'")) {
+    term = term.slice(1);
+    kind = term.endsWith("'") ? "word" : "exact";
+    if (kind === "word") term = term.slice(0, -1);
+  } else if (term.startsWith("^")) {
+    term = term.slice(1);
+    kind = term.endsWith("$") ? "equal" : "prefix";
+    if (kind === "equal") term = term.slice(0, -1);
+  } else if (term.endsWith("$")) {
+    term = term.slice(0, -1);
+    kind = "suffix";
+  } else {
+    // fzf 中 !term 默认是反向精确包含，而不是反向模糊匹配。
+    kind = inverse ? "exact" : "fuzzy";
+  }
+
+  if (!term) return () => false;
+  const needle = ignoreCase ? term.toLowerCase() : term;
+
+  const positive: Predicate =
+    kind === "fuzzy" ? (name) => orderedMatch(needle, name) :
+    kind === "exact" ? (name) => name.includes(needle) :
+    kind === "word" ? (name) => exactWordMatch(needle, name) :
+    kind === "prefix" ? (name) => name.startsWith(needle) :
+    kind === "suffix" ? (name) => name.endsWith(needle) :
+    (name) => name === needle;
+
+  return inverse ? (name) => !positive(name) : positive;
+}
+
+type SegmentMatcher = (name: string, getAlias: (name: string) => string) => boolean;
+
 /**
- * 父目录的每一层分别匹配其自身名称或拼音；不跨目录拼接字符。
- * query a/b 指向直接位于某个 a* 目录下的 b* 项，允许省略更早的祖先层级。
- * 拼音查询采用和普通查询相同的动态拼音库，不写入额外索引。
+ * 每个目录段在搜索开始时只解析一次 Extended Search：
+ * 空格表示 AND；独立的 | 表示相邻条件之间的 OR。
+ * 大写字母触发 fzf Smart Case，不包含运算符的纯拉丁查询仍支持拼音。
  */
+function compileSegment(pattern: string): SegmentMatcher {
+  const ignoreCase = pattern === pattern.toLowerCase();
+  const tokens = tokenize(pattern);
+  const groups: Predicate[][] = [];
+  let alternative = false;
+  for (const token of tokens) {
+    if (token === "|") {
+      alternative = true;
+      continue;
+    }
+    const predicate = compileTerm(token, ignoreCase);
+    if (alternative && groups.length) groups[groups.length - 1].push(predicate);
+    else groups.push([predicate]);
+    alternative = false;
+  }
+  const evaluate = (name: string) =>
+    groups.every((alternatives) => alternatives.some((test) => test(name)));
+
+  const allowPinyin =
+    pattern.length <= 80 &&
+    /[a-z]/i.test(pattern) &&
+    /^[a-z0-9]+(?:\s+[a-z0-9]+)*$/i.test(pattern);
+
+  return (name, getAlias) => {
+    const comparable = ignoreCase ? name.toLowerCase() : name;
+    if (evaluate(comparable)) return true;
+    if (!allowPinyin) return false;
+    const alias = getAlias(name);
+    return alias
+      ? evaluate(ignoreCase ? (name + " " + alias).toLowerCase() : name + " " + alias)
+      : false;
+  };
+}
+
+/**
+ * 每次查询编译一次；每个索引文件仅检查最末尾的 N 个父目录。
+ * 不分割整个路径，也不启动额外的 fzf 子进程或读取目录。
+ */
+export function compileFuzzyParentPathMatcher(
+  directoryPatterns: readonly string[],
+  getAlias: (name: string) => string,
+): (filepath: string) => boolean {
+  const matchers = directoryPatterns.map(compileSegment);
+  return (filepath: string) => {
+    if (!matchers.length) return true;
+    let end = filepath.lastIndexOf("/");
+    if (end <= 0) return false;
+
+    for (let i = matchers.length - 1; i >= 0; i--) {
+      const begin = filepath.lastIndexOf("/", end - 1);
+      const dirname = filepath.slice(begin + 1, end);
+      if (!dirname || !matchers[i](dirname, getAlias)) return false;
+      end = begin;
+      if (end < 0 && i > 0) return false;
+    }
+    return true;
+  };
+}
+
+/** 测试与外部调用的便利入口；搜索热路径使用预编译版本。 */
 export function matchesFuzzyParentPath(
   filepath: string,
   directoryPatterns: readonly string[],
   getAlias: (name: string) => string,
 ): boolean {
-  if (!directoryPatterns.length) return true;
-
-  const parents = path.dirname(filepath).split(path.sep).filter(Boolean);
-  if (parents.length < directoryPatterns.length) return false;
-  const start = parents.length - directoryPatterns.length;
-
-  return directoryPatterns.every((pattern, index) => {
-    const name = parents[start + index].toLowerCase();
-    const tokens = pattern.toLowerCase().split(/\s+/u);
-    if (tokens.every((token) => fuzzySubsequence(token, name))) return true;
-
-    let alias: string | undefined;
-    return tokens.every((token) => {
-      if (fuzzySubsequence(token, name)) return true;
-      alias ??= getAlias(parents[start + index]).toLowerCase();
-      return fuzzySubsequence(token, alias);
-    });
-  });
+  return compileFuzzyParentPathMatcher(directoryPatterns, getAlias)(filepath);
 }
