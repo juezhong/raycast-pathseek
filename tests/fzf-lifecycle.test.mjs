@@ -190,3 +190,51 @@ test("pinyin-mode cancellation closes the decoder and reaps the fzf child", asyn
     assertGone(pid);
   });
 });
+
+test("basename-only fzf prevents parent-directory false positives while preserving full paths", async () => {
+  await fixture(async (dir) => {
+    const entries = [
+      "/data/2026/第一次.txt",
+      "/data/第一次/2026_report.txt",
+      "/data/current/2026第一次.txt",
+      "/data/2026/driver.pdf",
+      "/data/old/第一次.txt",
+      "/data/2026/archive/abc.c",
+      "/data/2026/中文目录",
+    ];
+    const raw = path.join(dir, "basename-cases.paths");
+    const staged = path.join(dir, "basename-cases.nul.tmp");
+    await writeFile(raw, entries.join(String.fromCharCode(0)) + String.fromCharCode(0));
+    await prepareIndex(raw, staged, {
+      version: 3,
+      count: entries.length,
+      createdAt: new Date().toISOString(),
+      roots: ["/data"],
+    });
+    await publishIndex(staged, dir);
+    const index = path.join(dir, "index.nul");
+
+    const yearAndPinyin = await runFzfFilter("fzf", index, "2026 dyc");
+    assert.deepEqual(yearAndPinyin.paths, ["/data/current/2026第一次.txt"]);
+    const plainYear = await runFzfFilter("fzf", index, "2026");
+    assert.deepEqual(new Set(plainYear.paths), new Set([
+      "/data/第一次/2026_report.txt",
+      "/data/current/2026第一次.txt",
+    ]));
+    const initials = await runFzfFilter("fzf", index, "dyc");
+    assert.deepEqual(new Set(initials.paths), new Set([
+      "/data/2026/第一次.txt",
+      "/data/current/2026第一次.txt",
+      "/data/old/第一次.txt",
+    ]));
+    const exact = await runFzfFilter("fzf", index, "'第一次");
+    assert.deepEqual(new Set(exact.paths), new Set(initials.paths));
+
+    const suffix = await runFzfFilter("fzf", index, ".pdf$");
+    assert.deepEqual(suffix.paths, ["/data/2026/driver.pdf"]);
+    const prefix = await runFzfFilter("fzf", index, "^2026");
+    assert.deepEqual(new Set(prefix.paths), new Set(plainYear.paths));
+    const parentIsNotSearchable = await runFzfFilter("fzf", index, "^data");
+    assert.deepEqual(parentIsNotSearchable.paths, []);
+  });
+});
