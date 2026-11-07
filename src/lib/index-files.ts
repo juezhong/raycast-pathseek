@@ -11,6 +11,7 @@ import {
   constants as zlibConstants,
 } from "node:zlib";
 import { PathPrefixEncoder, PathPrefixDecoder } from "./index-codec.ts";
+import { throwIfAborted } from "./managed-child.ts";
 
 export const ACTIVE_INDEX_FILENAME = "index.nul";
 export const LEGACY_INDEX_REGEX = /^index-[a-f0-9-]+\.nul$/;
@@ -258,11 +259,15 @@ export async function openIndexDataStream(
 export async function publishIndex(
   tempPath: string,
   indexDirectory: string,
+  signal?: AbortSignal,
 ): Promise<void> {
+  throwIfAborted(signal);
   const activePath = path.join(indexDirectory, ACTIVE_INDEX_FILENAME);
   const info = await stat(tempPath);
   if (!info.isFile()) throw new Error("Staged index is not a regular file");
   await readIndexHeader(tempPath);
+  // rename 是提交点：提交前最后一次检查取消，已发布的完整索引不得回滚为半成品。
+  throwIfAborted(signal);
   await rename(tempPath, activePath);
 }
 
