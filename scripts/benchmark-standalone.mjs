@@ -123,8 +123,8 @@ async function scanFd(root, sink, counters, signal, shortcut) {
           const ancestor = parent.match(/[A-Za-z0-9]{3,16}/)?.[0];
           if (candidate.startsWith("/") && leaf && ancestor) {
             counters.sampledPathQuery =
-              ancestor.slice(0, 3) + "/" + leaf.slice(0, 3);
-            counters.sampledLeafQuery = leaf.slice(0, 3);
+              (ancestor.slice(0, 3) + "/" + leaf.slice(0, 3)).toLowerCase();
+            counters.sampledLeafQuery = leaf.slice(0, 3).toLowerCase();
             break;
           }
           start = end + 1;
@@ -329,9 +329,6 @@ async function run() {
       includeHidden: args.hidden,
       compressionQuality: args.quality,
       compareRequested: args.compare,
-      comparisonTestQuery: process.env.PATHSEEK_TEST_QUERY === "1"
-        ? counters.sampledPathQuery
-        : undefined,
       comparison: args.compare
         ? {
             available: Boolean(counters.sampledPathQuery),
