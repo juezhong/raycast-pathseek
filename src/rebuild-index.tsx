@@ -43,17 +43,25 @@ function ChooseFolders({
   initialRoots: string[];
   initialSymlinkDirectory: string | null;
   actionTitle: string;
-  onSave: (roots: string[], symlinkDirectory: string | null) => void | Promise<void>;
+  onSave: (
+    roots: string[],
+    symlinkDirectory: string | null,
+  ) => void | Promise<void>;
 }) {
   const [saving, setSaving] = useState(false);
 
-  async function submit(values: { folders: string[]; symlinkDirectory?: string[] }) {
+  async function submit(values: {
+    folders: string[];
+    symlinkDirectory?: string[];
+  }) {
     if (saving) return;
     setSaving(true);
     try {
       // 先验证普通索引根目录，再持久化选定的快捷链接目录。
       const roots = await saveConfiguredIndexRoots(values.folders);
-      const symlinkDirectory = await saveConfiguredSymlinkDirectory(values.symlinkDirectory?.[0] ?? null);
+      const symlinkDirectory = await saveConfiguredSymlinkDirectory(
+        values.symlinkDirectory?.[0] ?? null,
+      );
       await onSave(roots, symlinkDirectory);
     } catch (error) {
       await showToast({
@@ -260,7 +268,9 @@ export default function RebuildIndex() {
                 "** indexed paths."
               : "No index exists. Select folders and explicitly build your first index.",
             "",
-            "**Selective symlink directory:** " + (symlinkDirectory ?? "None") + "\n\nOnly direct directory links inside that folder are traversed. All other symlinks are not followed.",
+            "**Selective symlink directory:** " +
+              (symlinkDirectory ?? "None") +
+              "\n\nOnly direct directory links inside that folder are traversed. All other symlinks are not followed.",
             "",
             "Use **Cmd+K → Change Indexed Folders** to choose different directories. Saving a new selection does not automatically rebuild.",
             ...(error
@@ -287,7 +297,16 @@ export default function RebuildIndex() {
             <Action.Push
               title="Change Indexed Folders"
               icon={Icon.Folder}
-              target={<ChangeFolders roots={roots} symlinkDirectory={symlinkDirectory} onSave={(paths, directory) => { setRoots(paths); setSymlinkDirectory(directory); }} />}
+              target={
+                <ChangeFolders
+                  roots={roots}
+                  symlinkDirectory={symlinkDirectory}
+                  onSave={(paths, directory) => {
+                    setRoots(paths);
+                    setSymlinkDirectory(directory);
+                  }}
+                />
+              }
             />
             {missingBinary && (
               <>

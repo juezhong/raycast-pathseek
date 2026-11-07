@@ -50,7 +50,7 @@ export async function saveConfiguredIndexRoots(
 /** 只允许配置一个真实目录，用于发现其直接子项中的目录软链接。 */
 export async function getConfiguredSymlinkDirectory(): Promise<string | null> {
   const stored = await LocalStorage.getItem<string>(SYMLINK_DIRECTORY_KEY);
-  return stored ? normalizeIndexRoots([stored])[0] ?? null : null;
+  return stored ? (normalizeIndexRoots([stored])[0] ?? null) : null;
 }
 
 export async function saveConfiguredSymlinkDirectory(

@@ -49,7 +49,12 @@ export async function discoverSelectiveSymlinks(
     } catch (error) {
       // 失效或不可访问的链接不能递归，跳过并记录数量。
       const code = (error as NodeJS.ErrnoException)?.code;
-      if (code === "ENOENT" || code === "EACCES" || code === "EPERM" || code === "ELOOP") {
+      if (
+        code === "ENOENT" ||
+        code === "EACCES" ||
+        code === "EPERM" ||
+        code === "ELOOP"
+      ) {
         result.linksSkipped++;
         continue;
       }
@@ -78,25 +83,42 @@ export class AliasPathMapper extends Transform {
 
   private appendPath(part: Buffer): void {
     const current = this.fragmentSize
-      ? Buffer.concat([...this.fragments, part], this.fragmentSize + part.length)
+      ? Buffer.concat(
+          [...this.fragments, part],
+          this.fragmentSize + part.length,
+        )
       : part;
-    if (current.length > MAX_PATH_BYTES) throw new Error("Selective symlink path too long");
+    if (current.length > MAX_PATH_BYTES)
+      throw new Error("Selective symlink path too long");
 
     const mapped = current.equals(this.real)
       ? this.alias
       : current.subarray(0, this.prefix.length).equals(this.prefix)
-        ? Buffer.concat([this.alias, Buffer.from("/"), current.subarray(this.prefix.length)])
+        ? Buffer.concat([
+            this.alias,
+            Buffer.from("/"),
+            current.subarray(this.prefix.length),
+          ])
         : null;
-    if (!mapped) throw new Error("fd emitted a path outside the selected symlink target");
+    if (!mapped)
+      throw new Error("fd emitted a path outside the selected symlink target");
     this.push(Buffer.concat([mapped, Buffer.from([0])]));
     this.fragments = [];
     this.fragmentSize = 0;
   }
 
-  override _transform(chunk: Buffer, _encoding: BufferEncoding, callback: TransformCallback): void {
+  override _transform(
+    chunk: Buffer,
+    _encoding: BufferEncoding,
+    callback: TransformCallback,
+  ): void {
     try {
       let start = 0;
-      for (let end = chunk.indexOf(0, start); end !== -1; end = chunk.indexOf(0, start)) {
+      for (
+        let end = chunk.indexOf(0, start);
+        end !== -1;
+        end = chunk.indexOf(0, start)
+      ) {
         this.appendPath(chunk.subarray(start, end));
         start = end + 1;
       }
@@ -104,7 +126,8 @@ export class AliasPathMapper extends Transform {
         const tail = chunk.subarray(start);
         this.fragments.push(Buffer.from(tail));
         this.fragmentSize += tail.length;
-        if (this.fragmentSize > MAX_PATH_BYTES) throw new Error("Selective symlink path too long");
+        if (this.fragmentSize > MAX_PATH_BYTES)
+          throw new Error("Selective symlink path too long");
       }
       callback();
     } catch (error) {
@@ -113,6 +136,10 @@ export class AliasPathMapper extends Transform {
   }
 
   override _flush(callback: TransformCallback): void {
-    callback(this.fragmentSize ? new Error("Unterminated fd path in selective symlink scan") : undefined);
+    callback(
+      this.fragmentSize
+        ? new Error("Unterminated fd path in selective symlink scan")
+        : undefined,
+    );
   }
 }

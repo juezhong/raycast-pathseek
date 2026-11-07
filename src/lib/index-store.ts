@@ -12,8 +12,15 @@ import { PathPrefixEncoder } from "./index-codec.ts";
 import { beginIndexBuildProgress } from "./index-progress";
 import lockfile from "proper-lockfile";
 import { beginCommandTrace } from "./command-trace";
-import { getConfiguredIndexRoots, getConfiguredSymlinkDirectory } from "./index-roots";
-import { AliasPathMapper, discoverSelectiveSymlinks, type SelectiveSymlinkTarget } from "./selective-symlinks";
+import {
+  getConfiguredIndexRoots,
+  getConfiguredSymlinkDirectory,
+} from "./index-roots";
+import {
+  AliasPathMapper,
+  discoverSelectiveSymlinks,
+  type SelectiveSymlinkTarget,
+} from "./selective-symlinks";
 import { selectRebuildRoots } from "./index-root-paths";
 import {
   ACTIVE_INDEX_FILENAME,
@@ -208,7 +215,9 @@ async function runFd(
   try {
     await Promise.all([
       pipeline(
-        shortcut ? child.stdout.pipe(new AliasPathMapper(shortcut)) : child.stdout,
+        shortcut
+          ? child.stdout.pipe(new AliasPathMapper(shortcut))
+          : child.stdout,
         meter,
         output,
         { end: false },
@@ -268,14 +277,25 @@ export async function rebuildIndex(
     const symlinkDirectory = await getConfiguredSymlinkDirectory();
     // 普通扫描始终不跟随软链接，仅显式目录内的直接目录链接另行扫描。
     const discovery = symlinkDirectory
-      ? await discoverSelectiveSymlinks(symlinkDirectory, prefs.includeHidden === true)
+      ? await discoverSelectiveSymlinks(
+          symlinkDirectory,
+          prefs.includeHidden === true,
+        )
       : null;
     const scanRoots = [...roots];
-    if (symlinkDirectory && !roots.some((root) => {
-      const relative = path.relative(root, symlinkDirectory);
-      return relative === "" ||
-        (relative !== ".." && !relative.startsWith(".." + path.sep) && !path.isAbsolute(relative));
-    })) scanRoots.push(symlinkDirectory);
+    if (
+      symlinkDirectory &&
+      !roots.some((root) => {
+        const relative = path.relative(root, symlinkDirectory);
+        return (
+          relative === "" ||
+          (relative !== ".." &&
+            !relative.startsWith(".." + path.sep) &&
+            !path.isAbsolute(relative))
+        );
+      })
+    )
+      scanRoots.push(symlinkDirectory);
 
     const fd = await findBinary("fd", prefs.fdBinary);
     const id = randomUUID();
