@@ -9,7 +9,7 @@ const exited = new WeakSet<ChildProcess>();
 process.once("exit", () => {
   for (const child of children) {
     try {
-      if (child.exitCode === null && child.signalCode === null) {
+      if (!exited.has(child)) {
         child.kill("SIGKILL");
       }
     } catch {
