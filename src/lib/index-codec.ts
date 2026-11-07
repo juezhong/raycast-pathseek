@@ -4,6 +4,7 @@ import { Transform, type TransformCallback } from "node:stream";
 // 记录格式：[unsigned LEB128 前缀长度][剩余路径字节][NUL]。
 const MAX_PATH_BYTES = 1024 * 1024;
 const NUL = Buffer.from([0]);
+const DECODE_BATCH_BYTES = 64 * 1024;
 
 function encodeLength(value: number): Buffer {
   const bytes: number[] = [];
@@ -81,6 +82,15 @@ export class PathPrefixEncoder extends Transform {
 
 export class PathPrefixDecoder extends Transform {
   private previous = Buffer.alloc(0);
+  private outputRecords: Buffer[] = [];
+  private outputBytes = 0;
+
+  private flushOutput(): void {
+    if (!this.outputBytes) return;
+    this.push(Buffer.concat(this.outputRecords, this.outputBytes));
+    this.outputRecords = [];
+    this.outputBytes = 0;
+  }
   private prefix = 0;
   private shift = 0;
   private suffixMode = false;
@@ -100,7 +110,12 @@ export class PathPrefixDecoder extends Transform {
     ]);
     if (current.length > MAX_PATH_BYTES)
       throw new Error("Index path exceeds size limit");
-    this.push(Buffer.concat([current, NUL]));
+    // 完整的 NUL 记录合并输出，避免为每条路径触发一次下游 Transform。
+    // 单条路径仍受 MAX_PATH_BYTES 限制；批次不跨越解码器生命周期。
+    const record = Buffer.concat([current, NUL]);
+    this.outputRecords.push(record);
+    this.outputBytes += record.length;
+    if (this.outputBytes >= DECODE_BATCH_BYTES) this.flushOutput();
     this.previous = current;
     this.prefix = 0;
     this.shift = 0;
@@ -151,10 +166,11 @@ export class PathPrefixDecoder extends Transform {
   }
 
   override _flush(callback: TransformCallback): void {
-    callback(
-      this.suffixMode || this.shift !== 0 || this.prefix !== 0
-        ? new Error("Incomplete prefix-encoded index")
-        : undefined,
-    );
+    if (this.suffixMode || this.shift !== 0 || this.prefix !== 0) {
+      callback(new Error("Incomplete prefix-encoded index"));
+      return;
+    }
+    this.flushOutput();
+    callback();
   }
 }
