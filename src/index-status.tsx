@@ -2,7 +2,6 @@ import {
   Action,
   ActionPanel,
   Detail,
-  environment,
   Icon,
   launchCommand,
   LaunchType,
@@ -11,6 +10,7 @@ import { useEffect, useState } from "react";
 import path from "node:path";
 import { stat } from "node:fs/promises";
 import {
+  indexDirectory,
   indexFilePath,
   readIndex,
   type IndexMetadata,
@@ -48,7 +48,7 @@ export default function IndexStatus() {
     };
   }, []);
 
-  const directory = environment.supportPath;
+  const directory = indexDirectory;
   const activeFile =
     state.status === "ready"
       ? indexFilePath(state.metadata)
