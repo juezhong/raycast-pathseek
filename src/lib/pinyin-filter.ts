@@ -66,8 +66,18 @@ export function createPinyinFilterInput(
   nativePathNameQuery?: string,
   filenameQuery = "",
   diagnostics?: PinyinInputDiagnostics,
+  scopeDirectory?: string,
 ): Transform {
   let pending = Buffer.alloc(0);
+  // 文件名前的完整目录前缀，避免将 /foo 与 /foobar 混淆。
+  const scopeBytes = scopeDirectory
+    ? Buffer.from(
+        scopeDirectory === "/"
+          ? "/"
+          : scopeDirectory.replace(/\/+$/u, "") + "/",
+        "utf8",
+      )
+    : undefined;
   // 同一个父目录会被大量文件复用，限制为 2048 项的单次搜索缓存。
   const aliasCache = new Map<string, string>();
   const hanText = /\p{Script=Han}/u;
@@ -175,6 +185,15 @@ export function createPinyinFilterInput(
             : section;
           pending = Buffer.alloc(0);
           if (diagnostics) diagnostics.inputRecords++;
+
+          if (
+            scopeBytes &&
+            (record.length <= scopeBytes.length ||
+              !record.subarray(0, scopeBytes.length).equals(scopeBytes))
+          ) {
+            offset = end + 1;
+            continue;
+          }
 
           if (!matchesParent && !matchesName && !segmentQueries) {
             // 普通无路径查询最常见：仅英文文件名直接复用索引字节。
