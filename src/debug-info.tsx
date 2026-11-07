@@ -59,6 +59,7 @@ async function collectDiagnostics(): Promise<Diagnostics> {
   let generationCount = "unknown";
   let createdAt = "unknown";
   let rootCount = "unknown";
+  let legacyIndexLocation = "unknown";
   let stagedBytes = 0;
   let stagedCount = 0;
 
@@ -95,6 +96,7 @@ async function collectDiagnostics(): Promise<Diagnostics> {
             : "v1 legacy index.json";
       declaredCount = String(metadata.count);
       rootCount = String(metadata.roots.length);
+      legacyIndexLocation = metadata.legacyDevelopmentLocation ? "yes" : "no";
       createdAt = metadata.createdAt;
       const info = await stat(indexFilePath(metadata));
       activeStatus = info.isFile() ? "present" : "not a regular file";
@@ -111,8 +113,9 @@ async function collectDiagnostics(): Promise<Diagnostics> {
     `- active index size (bytes): ${indexBytes}`,
     `- metadata path count: ${declaredCount}`,
     `- root directories count: ${rootCount}`,
+    `- old development index compatibility fallback: ${legacyIndexLocation}`,
     `- last rebuild: ${createdAt}`,
-    `- index generation files: ${generationCount}`,
+    `- index generation files in unified supportPath: ${generationCount}`,
     `- staging files: ${stagedCount}`,
     `- staging bytes: ${stagedBytes}`,
     "",
