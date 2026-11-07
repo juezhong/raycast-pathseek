@@ -89,7 +89,9 @@ export function SearchFilesView({
         ? "Loading Index"
         : !index
           ? "No Index Yet"
-          : !query.trim()
+          : isSearching
+            ? "Searching Index"
+            : !query.trim()
             ? "Type to Search"
             : "No Matching Files";
 
@@ -99,7 +101,9 @@ export function SearchFilesView({
       ? loadError
       : !index
         ? "No index yet. First install fd and fzf (brew install fd fzf), then choose folders in Build Index. Nothing is indexed automatically."
-        : !query.trim()
+        : isSearching
+          ? "Searching " + index.count.toLocaleString() + " indexed paths…"
+          : !query.trim()
           ? "Indexed " +
             index.count.toLocaleString() +
             " paths on " +
