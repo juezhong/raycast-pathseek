@@ -156,6 +156,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
     "benchmark:index": "node --experimental-strip-types scripts/benchmark-index.mjs",
-    "convert:index": "node --experimental-strip-types scripts/convert-index.mjs"
+    "convert:index": "node --experimental-strip-types scripts/convert-index.mjs",
+    "benchmark:quality": "node --experimental-strip-types scripts/benchmark-compression.mjs"
   }
 }
