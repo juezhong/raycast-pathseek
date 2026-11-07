@@ -12,7 +12,8 @@ import { PathPrefixEncoder } from "./index-codec.ts";
 import { beginIndexBuildProgress } from "./index-progress";
 import lockfile from "proper-lockfile";
 import { beginCommandTrace } from "./command-trace";
-import { getConfiguredIndexRoots } from "./index-roots";
+import { getConfiguredIndexRoots, getConfiguredSymlinkDirectory } from "./index-roots";
+import { AliasPathMapper, discoverSelectiveSymlinks, type SelectiveSymlinkTarget } from "./selective-symlinks";
 import { selectRebuildRoots } from "./index-root-paths";
 import {
   ACTIVE_INDEX_FILENAME,
@@ -155,6 +156,7 @@ async function runFd(
   output: Writable,
   reason: "manual-rebuild",
   progress: Awaited<ReturnType<typeof beginIndexBuildProgress>>,
+  shortcut?: SelectiveSymlinkTarget,
 ): Promise<number> {
   // Show effective flags without exposing directory names or exclude patterns.
   const flags = args.filter((arg) =>
@@ -165,7 +167,7 @@ async function runFd(
     "fd " +
     flags.join(" ") +
     (excludeCount ? " --exclude <redacted> (x" + excludeCount + ")" : "") +
-    " . <root>";
+    (shortcut ? " . <selective-symlink-target>" : " . <root>");
   const trace = await beginCommandTrace("fd", reason, invocation);
   const child = spawn(fdPath, args, { stdio: ["ignore", "pipe", "pipe"] });
   progress.fdStarted(child.pid);
@@ -205,7 +207,12 @@ async function runFd(
 
   try {
     await Promise.all([
-      pipeline(child.stdout, meter, output, { end: false }),
+      pipeline(
+        shortcut ? child.stdout.pipe(new AliasPathMapper(shortcut)) : child.stdout,
+        meter,
+        output,
+        { end: false },
+      ),
       completed,
     ]);
     progress.fdFinished(exitCode);
@@ -258,6 +265,18 @@ export async function rebuildIndex(
       if (!info.isDirectory()) throw new Error("Not a directory: " + root);
     }
 
+    const symlinkDirectory = await getConfiguredSymlinkDirectory();
+    // 普通扫描始终不跟随软链接，仅显式目录内的直接目录链接另行扫描。
+    const discovery = symlinkDirectory
+      ? await discoverSelectiveSymlinks(symlinkDirectory, prefs.includeHidden === true)
+      : null;
+    const scanRoots = [...roots];
+    if (symlinkDirectory && !roots.some((root) => {
+      const relative = path.relative(root, symlinkDirectory);
+      return relative === "" ||
+        (relative !== ".." && !relative.startsWith(".." + path.sep) && !path.isAbsolute(relative));
+    })) scanRoots.push(symlinkDirectory);
+
     const fd = await findBinary("fd", prefs.fdBinary);
     const id = randomUUID();
     const quality = [5, 7, 9, 11].includes(Number(prefs.compressionQuality))
@@ -265,15 +284,15 @@ export async function rebuildIndex(
       : 7;
     const progress = await beginIndexBuildProgress(indexDirectory, {
       buildId: id,
-      rootCount: roots.length,
+      rootCount: scanRoots.length + (discovery?.targets.length ?? 0),
       compressionQuality: quality,
-      followSymlinks: prefs.followSymlinks === true,
+      selectiveSymlinkTargets: discovery?.targets.length ?? 0,
+      selectiveSymlinkSkipped: discovery?.linksSkipped ?? 0,
       includeHidden: prefs.includeHidden === true,
     });
     const stagedTemp = path.join(indexDirectory, "index-" + id + ".nul.tmp");
     const args = ["--absolute-path", "--print0"];
     if (prefs.includeHidden) args.push("--hidden");
-    if (prefs.followSymlinks) args.push("--follow");
     for (const pattern of (prefs.excludePatterns || "")
       .split(",")
       .map((x) => x.trim())
@@ -306,7 +325,7 @@ export async function rebuildIndex(
       );
       // 防止扫描尚未结束时编码管线提前失败产生 unhandled rejection。
       void writer.catch(() => undefined);
-      for (const [index, root] of roots.entries()) {
+      for (const [index, root] of scanRoots.entries()) {
         progress.root(index + 1);
         total += await runFd(
           fd,
@@ -314,6 +333,17 @@ export async function rebuildIndex(
           input,
           "manual-rebuild",
           progress,
+        );
+      }
+      for (const [index, shortcut] of (discovery?.targets ?? []).entries()) {
+        progress.root(scanRoots.length + index + 1);
+        total += await runFd(
+          fd,
+          [...args, ".", shortcut.realPath],
+          input,
+          "manual-rebuild",
+          progress,
+          shortcut,
         );
       }
       progress.finalizing();
