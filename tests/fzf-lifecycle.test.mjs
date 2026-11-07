@@ -244,3 +244,37 @@ test("basename-only fzf prevents parent-directory false positives while preservi
     assert.deepEqual(parentIsNotSearchable.paths, []);
   });
 });
+
+test("real fzf searches arbitrary Chinese names using initials and partial pinyin", async () => {
+  await fixture(async (dir) => {
+    const entries = [
+      "/tmp/第二次.txt",
+      "/tmp/第一次.txt",
+      "/tmp/第三次/报告.txt",
+      "/tmp/开发记录.md",
+      "/tmp/电子技术.txt",
+      "/tmp/第二次会议纪要.md",
+      "/tmp/2026/第二次.txt",
+    ];
+    const raw = path.join(dir, "chinese-pinyin.pathlist");
+    const staged = path.join(dir, "chinese-pinyin.nul.tmp");
+    await writeFile(raw, entries.join(String.fromCharCode(0)) + String.fromCharCode(0));
+    await prepareIndex(raw, staged, {
+      version: 3,
+      count: entries.length,
+      createdAt: new Date().toISOString(),
+      roots: ["/tmp"],
+    });
+    await publishIndex(staged, dir);
+    const index = path.join(dir, "index.nul");
+    for (const query of ["dec", "derc", "d erc", "d er c", "di er ci", "dierci"]) {
+      const result = await runFzfFilter("fzf", index, query);
+      assert.ok(result.paths.includes("/tmp/第二次.txt"), query + ": " + JSON.stringify(result.paths));
+      assert.equal(result.paths.includes("/tmp/第三次/报告.txt"), false, query);
+    }
+    for (const [query, expected] of [["dyc", "第一次.txt"], ["dsc", "第三次"], ["dzjs", "电子技术.txt"], ["kfjl", "开发记录.md"]]) {
+      const result = await runFzfFilter("fzf", index, query);
+      assert.ok(result.paths.some((p) => path.basename(p) === expected), query);
+    }
+  });
+});
