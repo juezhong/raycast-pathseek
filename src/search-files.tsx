@@ -130,7 +130,11 @@ export function SearchFilesView({
         icon={Icon.MagnifyingGlass}
         actions={
           <ActionPanel>
-            <SearchAssistanceActions index={index} query={query} onApply={setQuery} />
+            <SearchAssistanceActions
+              index={index}
+              query={query}
+              onApply={setQuery}
+            />
             {!index && index !== undefined && (
               <Action
                 title="Choose Folders and Build Index"

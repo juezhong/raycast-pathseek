@@ -63,7 +63,9 @@ export async function runFzfFilter(
     registerChild(child);
 
     // 等待解压管道关闭后再结束 Promise，避免遗留文件描述符。
-    const waitForClose = (stream: typeof input | NonNullable<typeof augmented>) =>
+    const waitForClose = (
+      stream: typeof input | NonNullable<typeof augmented>,
+    ) =>
       new Promise<void>((resolve) => {
         if (stream.closed) resolve();
         else stream.once("close", () => resolve());

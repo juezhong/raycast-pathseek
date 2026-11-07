@@ -1,4 +1,11 @@
-import { Action, ActionPanel, Detail, Form, Icon, useNavigation } from "@raycast/api";
+import {
+  Action,
+  ActionPanel,
+  Detail,
+  Form,
+  Icon,
+  useNavigation,
+} from "@raycast/api";
 import { useEffect, useState } from "react";
 import path from "node:path";
 import { fuzzySearch } from "./lib/fuzzy-search";
@@ -40,7 +47,9 @@ Pinyin aliases are generated **only while searching**, not stored in a second in
 `;
 
 export function SearchSyntaxHelp() {
-  return <Detail navigationTitle="fzf Search Syntax & Pinyin" markdown={HELP} />;
+  return (
+    <Detail navigationTitle="fzf Search Syntax & Pinyin" markdown={HELP} />
+  );
 }
 
 function SearchExpressionBuilder({

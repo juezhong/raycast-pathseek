@@ -13,8 +13,7 @@ const MAX_ALIAS_CHARS = 2048;
  */
 export function shouldUsePinyinAliases(query: string): boolean {
   return (
-    query.length <= 80 &&
-    /^[a-zA-Z]+(?:\s+[a-zA-Z]+)*$/.test(query.trim())
+    query.length <= 80 && /^[a-zA-Z]+(?:\s+[a-zA-Z]+)*$/.test(query.trim())
   );
 }
 
