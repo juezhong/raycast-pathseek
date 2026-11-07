@@ -57,7 +57,7 @@ test("slash-space and double-slash enter subtree mode without changing normal sl
     directoryPatterns: ["fir", "se"],
     nameQuery: "thi",
   });
-  assert.throws(() => parseSubtreeQuery("raypath///.ts$"), /non-empty/);
+  assert.throws(() => parseSubtreeQuery("raypath///.ts$"), /empty directory/);
   assert.throws(() => parseSubtreeQuery("//.ts$"), /needs a directory/);
 });
 
