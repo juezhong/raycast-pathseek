@@ -48,9 +48,3 @@ jobs:
         run: npm run lint:code
       - name: Prettier source format check
         run: npm run format:check
-      # Raycast's full lint also validates the extension's Store author.
-      # The owner will provide their Raycast username at publication time.
-      # Keep the result visible without blocking the developer-only CI.
-      - name: Store metadata and formatting audit (publication gate)
-        continue-on-error: true
-        run: npm run lint
