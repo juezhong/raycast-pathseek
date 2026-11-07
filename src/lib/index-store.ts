@@ -160,7 +160,7 @@ async function runFd(
 ): Promise<number> {
   // Show effective flags without exposing directory names or exclude patterns.
   const flags = args.filter((arg) =>
-    ["--absolute-path", "--print0", "--hidden", "--follow"].includes(arg),
+    ["--absolute-path", "--print0", "--hidden"].includes(arg),
   );
   const excludeCount = args.filter((arg) => arg === "--exclude").length;
   const invocation =
