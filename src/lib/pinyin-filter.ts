@@ -22,7 +22,6 @@ export type PinyinInputDiagnostics = {
   transformMs: number;
 };
 
-
 /**
  * 只决定中文名称的保留配额，不影响拼音是否参与匹配。
  * 所有查询始终包含中文名称的拼音别名。
