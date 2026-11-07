@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import type { Readable } from "node:stream";
 import { openIndexDataStream } from "./index-files.ts";
 import { appendFzfOutputChunk, createFzfOutputState } from "./fzf-output.ts";
 import {
