@@ -169,7 +169,7 @@ test("streaming v3 index publishes without a raw-path temporary file", async () 
     const { Readable } = await import("node:stream");
     const { createBrotliCompress, constants } = await import("node:zlib");
     const { PathPrefixEncoder } = await import("../src/lib/index-codec.ts");
-    const paths = Buffer.from("/first/中文.txt\\0/first/a\\nb.txt\\0");
+    const paths = Buffer.from("/first/中文.txt\0/first/a\nb.txt\0");
     await pipeline(
       Readable.from([paths]),
       new PathPrefixEncoder(),
