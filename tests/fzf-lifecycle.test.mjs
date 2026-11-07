@@ -259,7 +259,10 @@ test("real fzf searches arbitrary Chinese names using initials and partial pinyi
     ];
     const raw = path.join(dir, "chinese-pinyin.pathlist");
     const staged = path.join(dir, "chinese-pinyin.nul.tmp");
-    await writeFile(raw, entries.join(String.fromCharCode(0)) + String.fromCharCode(0));
+    await writeFile(
+      raw,
+      entries.join(String.fromCharCode(0)) + String.fromCharCode(0),
+    );
     await prepareIndex(raw, staged, {
       version: 3,
       count: entries.length,
@@ -268,14 +271,32 @@ test("real fzf searches arbitrary Chinese names using initials and partial pinyi
     });
     await publishIndex(staged, dir);
     const index = path.join(dir, "index.nul");
-    for (const query of ["dec", "derc", "d erc", "d er c", "di er ci", "dierci"]) {
+    for (const query of [
+      "dec",
+      "derc",
+      "d erc",
+      "d er c",
+      "di er ci",
+      "dierci",
+    ]) {
       const result = await runFzfFilter("fzf", index, query);
-      assert.ok(result.paths.includes("/tmp/第二次.txt"), query + ": " + JSON.stringify(result.paths));
+      assert.ok(
+        result.paths.includes("/tmp/第二次.txt"),
+        query + ": " + JSON.stringify(result.paths),
+      );
       assert.equal(result.paths.includes("/tmp/第三次/报告.txt"), false, query);
     }
-    for (const [query, expected] of [["dyc", "第一次.txt"], ["dsc", "第三次"], ["dzjs", "电子技术.txt"], ["kfjl", "开发记录.md"]]) {
+    for (const [query, expected] of [
+      ["dyc", "第一次.txt"],
+      ["dsc", "第三次"],
+      ["dzjs", "电子技术.txt"],
+      ["kfjl", "开发记录.md"],
+    ]) {
       const result = await runFzfFilter("fzf", index, query);
-      assert.ok(result.paths.some((p) => path.basename(p) === expected), query);
+      assert.ok(
+        result.paths.some((p) => path.basename(p) === expected),
+        query,
+      );
     }
   });
 });
@@ -284,14 +305,21 @@ test("common Chinese initials are not lost behind 150 loosely matching Latin fil
   await fixture(async (dir) => {
     const target = "/home/docs/第二次.txt";
     const entries = [
-      ...Array.from({ length: 240 }, (_, n) =>
-        "/home/docs/decode-interface-package-" + String(n).padStart(4, "0") + ".txt"
+      ...Array.from(
+        { length: 240 },
+        (_, n) =>
+          "/home/docs/decode-interface-package-" +
+          String(n).padStart(4, "0") +
+          ".txt",
       ),
       target,
     ];
     const raw = path.join(dir, "rank-pinyin-input");
     const staged = path.join(dir, "rank-pinyin-stage.nul.tmp");
-    await writeFile(raw, entries.join(String.fromCharCode(0)) + String.fromCharCode(0));
+    await writeFile(
+      raw,
+      entries.join(String.fromCharCode(0)) + String.fromCharCode(0),
+    );
     await prepareIndex(raw, staged, {
       version: 3,
       count: entries.length,
@@ -302,7 +330,10 @@ test("common Chinese initials are not lost behind 150 loosely matching Latin fil
     const index = path.join(dir, "index.nul");
     for (const query of ["dec", "derc", "d erc", "d er c"]) {
       const result = await runFzfFilter("fzf", index, query);
-      assert.ok(result.paths.includes(target), query + " missing Chinese result");
+      assert.ok(
+        result.paths.includes(target),
+        query + " missing Chinese result",
+      );
       assert.ok(result.paths.length <= 150);
     }
   });
@@ -317,10 +348,25 @@ test("pinyin search still surfaces Chinese among 300 shorter prefix matches", as
     ];
     const raw = path.join(dir, "short-rank-input");
     const staged = path.join(dir, "short-rank-stage.tmp");
-    await writeFile(raw, entries.join(String.fromCharCode(0)) + String.fromCharCode(0));
-    await prepareIndex(raw, staged, { version: 3, count: entries.length, createdAt: new Date().toISOString(), roots: ["/docs"] });
+    await writeFile(
+      raw,
+      entries.join(String.fromCharCode(0)) + String.fromCharCode(0),
+    );
+    await prepareIndex(raw, staged, {
+      version: 3,
+      count: entries.length,
+      createdAt: new Date().toISOString(),
+      roots: ["/docs"],
+    });
     await publishIndex(staged, dir);
-    const result = await runFzfFilter("fzf", path.join(dir, "index.nul"), "dec");
-    assert.ok(result.paths.includes(target), "Chinese matches must be visible even when 300 short ASCII prefixes rank higher");
+    const result = await runFzfFilter(
+      "fzf",
+      path.join(dir, "index.nul"),
+      "dec",
+    );
+    assert.ok(
+      result.paths.includes(target),
+      "Chinese matches must be visible even when 300 short ASCII prefixes rank higher",
+    );
   });
 });

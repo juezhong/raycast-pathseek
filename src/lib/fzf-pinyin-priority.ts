@@ -107,10 +107,16 @@ export function appendPinyinPriorityChunk(
   state.pending = Buffer.from(data.subarray(offset));
 }
 
-export function finishPinyinPriorityOutput(state: PinyinPriorityOutput): string[] {
+export function finishPinyinPriorityOutput(
+  state: PinyinPriorityOutput,
+): string[] {
   const results: string[] = [];
   const seen = new Set<string>();
-  for (const record of [...state.primary, ...state.chinese, ...state.fallback]) {
+  for (const record of [
+    ...state.primary,
+    ...state.chinese,
+    ...state.fallback,
+  ]) {
     if (seen.has(record)) continue;
     seen.add(record);
     results.push(record);
