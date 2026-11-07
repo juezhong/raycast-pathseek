@@ -57,6 +57,9 @@ test("standalone benchmark builds, searches and removes only its temporary index
     assert.equal(output.symlinkLinksSkipped, 1);
     assert.equal(output.includeHidden, true);
     assert.equal(output.indexedPaths, output.decodedPaths);
+    assert.equal(output.decodeStats.runs, 3);
+    assert.equal(output.decodeMs, output.decodeStats.p50Ms);
+    assert.ok(output.decodeStats.p95Ms >= output.decodeStats.p50Ms);
     assert.ok(output.indexedPaths >= 200);
     assert.ok(output.uncompressedBytes > 0);
     assert.ok(output.compressedBytes > 0);
