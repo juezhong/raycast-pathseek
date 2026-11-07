@@ -104,7 +104,8 @@ async function scanFd(root, sink, counters, signal, shortcut) {
       }
       // 只抽取搜索样本，不保存任何完整文件路径或文件名。
       if (!counters.sample && counters.rawBytes < 8 * 1024 * 1024) {
-        for (const candidate of chunk.toString("utf8").split("\0")) {
+        // 只使用以 NUL 结束的完整记录，避免选到跨 chunk 的半截文件名。
+        for (const candidate of chunk.toString("utf8").split("\0").slice(0, -1)) {
           const name = path.basename(candidate);
           const tokens = name.match(/[A-Za-z0-9]{4,16}/g);
           if (tokens?.length) {
