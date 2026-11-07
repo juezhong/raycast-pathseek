@@ -19,7 +19,8 @@ export type IndexBuildProgress = {
   rootNumber: number;
   rootCount: number;
   compressionQuality: number;
-  followSymlinks: boolean;
+  selectiveSymlinkTargets: number;
+  selectiveSymlinkSkipped: number;
   includeHidden: boolean;
   cpuUserMs: number;
   cpuSystemMs: number;
@@ -90,7 +91,8 @@ export async function beginIndexBuildProgress(
     buildId: string;
     rootCount: number;
     compressionQuality: number;
-    followSymlinks: boolean;
+    selectiveSymlinkTargets: number;
+    selectiveSymlinkSkipped: number;
     includeHidden: boolean;
   },
 ) {
@@ -111,7 +113,8 @@ export async function beginIndexBuildProgress(
     rootNumber: 0,
     rootCount: options.rootCount,
     compressionQuality: options.compressionQuality,
-    followSymlinks: options.followSymlinks,
+    selectiveSymlinkTargets: options.selectiveSymlinkTargets,
+    selectiveSymlinkSkipped: options.selectiveSymlinkSkipped,
     includeHidden: options.includeHidden,
     cpuUserMs: 0,
     cpuSystemMs: 0,
