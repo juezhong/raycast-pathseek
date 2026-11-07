@@ -142,7 +142,7 @@ function compileSegment(pattern: string): SegmentMatcher {
   return (name, getAlias) => {
     const comparable = ignoreCase ? name.toLowerCase() : name;
     if (evaluate(comparable)) return true;
-    if (!allowPinyin) return false;
+    if (!allowPinyin || !/\p{Script=Han}/u.test(name)) return false;
     const alias = getAlias(name);
     return alias
       ? evaluate(ignoreCase ? (name + " " + alias).toLowerCase() : name + " " + alias)
