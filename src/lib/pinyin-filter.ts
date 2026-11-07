@@ -11,6 +11,7 @@ const HAN_TEXT = /\p{Script=Han}+/gu;
 const NUL = Buffer.from([0]);
 const TAB = Buffer.from("\t");
 const MAX_ALIAS_CHARS = 2048;
+const FZF_INPUT_BATCH_BYTES = 64 * 1024;
 
 /**
  * 只决定中文名称的保留配额，不影响拼音是否参与匹配。
@@ -123,6 +124,24 @@ export function createPinyinFilterInput(
   return new Transform({
     transform(chunk: Buffer, _encoding, callback) {
       try {
+        // 在单个输入块内合并完整记录，减少 Buffer.concat 和 stream.push 次数。
+        // 每次转换结束即提交，避免跨块积累真实路径或额外常驻索引。
+        const parts: Buffer[] = [];
+        let batchBytes = 0;
+        const flushBatch = () => {
+          if (!batchBytes) return;
+          this.push(Buffer.concat(parts, batchBytes));
+          parts.length = 0;
+          batchBytes = 0;
+        };
+        const emitRecord = (field: Buffer, record: Buffer) => {
+          const recordBytes = field.length + TAB.length + record.length;
+          if (recordBytes > MAX_FZF_PATH_BYTES)
+            throw new Error("Search record exceeds size limit");
+          parts.push(field, TAB, record, NUL);
+          batchBytes += recordBytes + NUL.length;
+          if (batchBytes >= FZF_INPUT_BATCH_BYTES) flushBatch();
+        };
         let offset = 0;
         while (offset < chunk.length) {
           const end = chunk.indexOf(0, offset);
@@ -154,12 +173,7 @@ export function createPinyinFilterInput(
               if (byte === 9 || byte > 127) simpleAscii = false;
             }
             if (simpleAscii) {
-              if (
-                nameBytes.length + TAB.length + record.length >
-                MAX_FZF_PATH_BYTES
-              )
-                throw new Error("Search record exceeds size limit");
-              this.push(Buffer.concat([nameBytes, TAB, record, NUL]));
+              emitRecord(nameBytes, record);
               offset = end + 1;
               continue;
             }
@@ -179,32 +193,20 @@ export function createPinyinFilterInput(
             offset = end + 1;
             continue;
           }
-          const matchField = Buffer.from(
-            projectPath(searchPath, filename),
-            "utf8",
-          );
-          if (
-            matchField.length + TAB.length + record.length >
-            MAX_FZF_PATH_BYTES
-          )
-            throw new Error("Search record exceeds size limit");
-          const emit = (field: Buffer) => {
-            if (field.length + TAB.length + record.length > MAX_FZF_PATH_BYTES)
-              throw new Error("Search record exceeds size limit");
-            this.push(Buffer.concat([field, TAB, record, NUL]));
-          };
           if (anchoredQuery && !segmentQueries) {
             // 前后锚点必须作用于真实名称；拼音候选独立参与同一个 fzf 查询。
-            emit(Buffer.from(filename.replaceAll("\t", " "), "utf8"));
+            emitRecord(Buffer.from(filename.replaceAll("\t", " "), "utf8"), record);
             if (enablePinyin) {
               const aliases = pinyinAlias(filename).split(" ").filter(Boolean);
-              for (const alias of aliases) emit(Buffer.from(alias, "utf8"));
+              for (const alias of aliases)
+                emitRecord(Buffer.from(alias, "utf8"), record);
             }
           } else {
-            emit(matchField);
+            emitRecord(Buffer.from(projectPath(searchPath, filename), "utf8"), record);
           }
           offset = end + 1;
         }
+        flushBatch();
         callback();
       } catch (error) {
         callback(error as Error);
