@@ -42,8 +42,10 @@ export function isProgressStale(
   progress: IndexBuildProgress,
   now = Date.now(),
 ): boolean {
-  return (progress.phase === "scanning" || progress.phase === "finalizing") &&
-    now - Date.parse(progress.updatedAt) > 15000;
+  return (
+    (progress.phase === "scanning" || progress.phase === "finalizing") &&
+    now - Date.parse(progress.updatedAt) > 15000
+  );
 }
 
 export async function readIndexBuildProgress(
@@ -54,15 +56,26 @@ export async function readIndexBuildProgress(
       await readFile(path.join(directory, FILE), "utf8"),
     );
     if (
-      !data || typeof data !== "object" ||
-      !("version" in data) || data.version !== 1 ||
-      !("buildId" in data) || typeof data.buildId !== "string" ||
+      !data ||
+      typeof data !== "object" ||
+      !("version" in data) ||
+      data.version !== 1 ||
+      !("buildId" in data) ||
+      typeof data.buildId !== "string" ||
       !("phase" in data) ||
-      !["scanning", "finalizing", "published", "failed"].includes(String(data.phase)) ||
-      !("updatedAt" in data) || typeof data.updatedAt !== "string" ||
-      !("inputBytes" in data) || typeof data.inputBytes !== "number" || !Number.isSafeInteger(data.inputBytes) ||
-      !("pathCount" in data) || typeof data.pathCount !== "number" || !Number.isSafeInteger(data.pathCount)
-    ) return null;
+      !["scanning", "finalizing", "published", "failed"].includes(
+        String(data.phase),
+      ) ||
+      !("updatedAt" in data) ||
+      typeof data.updatedAt !== "string" ||
+      !("inputBytes" in data) ||
+      typeof data.inputBytes !== "number" ||
+      !Number.isSafeInteger(data.inputBytes) ||
+      !("pathCount" in data) ||
+      typeof data.pathCount !== "number" ||
+      !Number.isSafeInteger(data.pathCount)
+    )
+      return null;
     return data as IndexBuildProgress;
   } catch (error) {
     if ((error as NodeJS.ErrnoException)?.code === "ENOENT") return null;
@@ -120,18 +133,25 @@ export async function beginIndexBuildProgress(
 
   function flush(): Promise<void> {
     const next = snapshot();
-    pending = pending.catch(() => undefined).then(async () => {
-      await writeFile(temporary, JSON.stringify(next), "utf8");
-      await rename(temporary, file);
-    });
+    pending = pending
+      .catch(() => undefined)
+      .then(async () => {
+        await writeFile(temporary, JSON.stringify(next), "utf8");
+        await rename(temporary, file);
+      });
     return pending;
   }
 
   await flush();
-  const timer = setInterval(() => { void flush().catch(() => undefined); }, INTERVAL_MS);
+  const timer = setInterval(() => {
+    void flush().catch(() => undefined);
+  }, INTERVAL_MS);
   timer.unref();
 
-  async function finish(phase: "published" | "failed", error?: unknown): Promise<void> {
+  async function finish(
+    phase: "published" | "failed",
+    error?: unknown,
+  ): Promise<void> {
     clearInterval(timer);
     progress.phase = phase;
     if (error !== undefined) latestErrorCode = safeCode(error);
@@ -148,13 +168,19 @@ export async function beginIndexBuildProgress(
       progress.compressedBytes += bytes;
       if (bytes > 0) progress.lastOutputAt = new Date().toISOString();
     },
-    root(number: number): void { progress.rootNumber = number; },
-    fdStarted(pid?: number): void { progress.fdPid = pid; },
+    root(number: number): void {
+      progress.rootNumber = number;
+    },
+    fdStarted(pid?: number): void {
+      progress.fdPid = pid;
+    },
     fdFinished(exitCode: number | null | undefined): void {
       progress.fdPid = undefined;
       progress.fdExitCode = exitCode;
     },
-    finalizing(): void { progress.phase = "finalizing"; },
+    finalizing(): void {
+      progress.phase = "finalizing";
+    },
     snapshot,
     flush,
     finish,

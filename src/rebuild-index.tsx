@@ -13,8 +13,16 @@ import {
   getConfiguredIndexRoots,
   saveConfiguredIndexRoots,
 } from "./lib/index-roots";
-import { indexDirectory, readIndex, rebuildIndex, type IndexMetadata } from "./lib/index-store";
-import { readIndexBuildProgress, type IndexBuildProgress } from "./lib/index-progress";
+import {
+  indexDirectory,
+  readIndex,
+  rebuildIndex,
+  type IndexMetadata,
+} from "./lib/index-store";
+import {
+  readIndexBuildProgress,
+  type IndexBuildProgress,
+} from "./lib/index-progress";
 import {
   getMissingBinary,
   missingBinaryMessage,
@@ -115,7 +123,10 @@ export default function RebuildIndex() {
     };
     refresh();
     const timer = setInterval(refresh, 1500);
-    return () => { active = false; clearInterval(timer); };
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
   }, [mode]);
 
   useEffect(() => {
@@ -182,7 +193,9 @@ export default function RebuildIndex() {
 
   const missingBinary = getMissingBinary(error);
   const mib = (bytes: number) => (bytes / (1024 * 1024)).toFixed(2) + " MiB";
-  const activeSeconds = progress ? Math.max(0.001, progress.elapsedMs / 1000) : 0;
+  const activeSeconds = progress
+    ? Math.max(0.001, progress.elapsedMs / 1000)
+    : 0;
   const progressMarkdown = progress
     ? [
         `**Phase:** ${progress.phase} · root ${progress.rootNumber}/${progress.rootCount}`,

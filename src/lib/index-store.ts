@@ -179,7 +179,12 @@ async function runFd(
   const meter = new Transform({
     transform(chunk: Buffer, _encoding, callback) {
       let found = 0;
-      for (let offset = chunk.indexOf(0); offset >= 0; offset = chunk.indexOf(0, offset + 1)) found++;
+      for (
+        let offset = chunk.indexOf(0);
+        offset >= 0;
+        offset = chunk.indexOf(0, offset + 1)
+      )
+        found++;
       count += found;
       progress.input(chunk.length, found);
       callback(null, chunk);
@@ -303,7 +308,13 @@ export async function rebuildIndex(
       void writer.catch(() => undefined);
       for (const [index, root] of roots.entries()) {
         progress.root(index + 1);
-        total += await runFd(fd, [...args, ".", root], input, "manual-rebuild", progress);
+        total += await runFd(
+          fd,
+          [...args, ".", root],
+          input,
+          "manual-rebuild",
+          progress,
+        );
       }
       progress.finalizing();
       input.end();

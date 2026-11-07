@@ -67,7 +67,10 @@ async function collectDiagnostics(): Promise<Diagnostics> {
     for (const name of entries) {
       if (!/^index-[a-f0-9-]+\\.nul\\.tmp$/.test(name)) continue;
       const fileInfo = await stat(path.join(root, name)).catch(() => null);
-      if (fileInfo?.isFile()) { stagedBytes += fileInfo.size; stagedCount++; }
+      if (fileInfo?.isFile()) {
+        stagedBytes += fileInfo.size;
+        stagedCount++;
+      }
     }
     generationCount = String(
       entries.filter(
@@ -120,12 +123,18 @@ async function collectDiagnostics(): Promise<Diagnostics> {
   report.push("", "## 重建进度（数值指标，不含实际文件路径）");
   const progress = await readIndexBuildProgress(root);
   if (!progress) {
-    report.push("No build-progress record (build may not have started in this version).");
+    report.push(
+      "No build-progress record (build may not have started in this version).",
+    );
   } else {
-    const ageSeconds = Math.max(0, Math.floor((Date.now() - Date.parse(progress.updatedAt)) / 1000));
-    const rate = progress.elapsedMs > 0
-      ? (progress.inputBytes / 1048576) / (progress.elapsedMs / 1000)
-      : 0;
+    const ageSeconds = Math.max(
+      0,
+      Math.floor((Date.now() - Date.parse(progress.updatedAt)) / 1000),
+    );
+    const rate =
+      progress.elapsedMs > 0
+        ? progress.inputBytes / 1048576 / (progress.elapsedMs / 1000)
+        : 0;
     report.push(
       `- phase: ${progress.phase}`,
       `- progress heartbeat age: ${ageSeconds} seconds`,
@@ -146,7 +155,7 @@ async function collectDiagnostics(): Promise<Diagnostics> {
       `- last compressed output at: ${progress.lastOutputAt ?? "not yet observed"}`,
       `- error code: ${progress.errorCode ?? "none"}`,
       "",
-      "> 心跳持续更新只能证明扩展仍在记录进度，不代表扫描或压缩一直有数据输出。"
+      "> 心跳持续更新只能证明扩展仍在记录进度，不代表扫描或压缩一直有数据输出。",
     );
   }
 
