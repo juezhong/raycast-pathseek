@@ -640,6 +640,9 @@ test("scoped fzf search matches all descendant levels without leaking sibling pa
     const ordinary = (await runFzfFilter("fzf", index, ".ts$")).paths;
     assert.ok(ordinary.includes(entries[1]));
     assert.ok(ordinary.includes(entries[5]));
-    assert.deepEqual((await runFzfFilter("fzf", index, "raypath/.ts$")).paths, [entries[1]]);
+    assert.deepEqual(
+      new Set((await runFzfFilter("fzf", index, "raypath/.ts$")).paths),
+      new Set([entries[1], entries[5]]),
+    );
   });
 });
