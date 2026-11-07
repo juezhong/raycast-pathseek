@@ -13,7 +13,8 @@ import {
   getConfiguredIndexRoots,
   saveConfiguredIndexRoots,
 } from "./lib/index-roots";
-import { readIndex, rebuildIndex, type IndexMetadata } from "./lib/index-store";
+import { indexDirectory, readIndex, rebuildIndex, type IndexMetadata } from "./lib/index-store";
+import { readIndexBuildProgress, type IndexBuildProgress } from "./lib/index-progress";
 import {
   getMissingBinary,
   missingBinaryMessage,
@@ -102,6 +103,20 @@ export default function RebuildIndex() {
   const [roots, setRoots] = useState<string[]>([]);
   const [current, setCurrent] = useState<IndexMetadata | null>(null);
   const [error, setError] = useState<string>();
+  const [progress, setProgress] = useState<IndexBuildProgress | null>(null);
+
+  useEffect(() => {
+    if (mode !== "building") return;
+    let active = true;
+    const refresh = () => {
+      void readIndexBuildProgress(indexDirectory).then((value) => {
+        if (active) setProgress(value);
+      });
+    };
+    refresh();
+    const timer = setInterval(refresh, 1500);
+    return () => { active = false; clearInterval(timer); };
+  }, [mode]);
 
   useEffect(() => {
     let mounted = true;
@@ -129,6 +144,7 @@ export default function RebuildIndex() {
 
   async function buildIndex(selectedRoots: string[]) {
     setError(undefined);
+    setProgress(null);
     setMode("building");
     try {
       // ONLY this user-initiated action invokes fd.
@@ -165,12 +181,31 @@ export default function RebuildIndex() {
   }
 
   const missingBinary = getMissingBinary(error);
+  const mib = (bytes: number) => (bytes / (1024 * 1024)).toFixed(2) + " MiB";
+  const activeSeconds = progress ? Math.max(0.001, progress.elapsedMs / 1000) : 0;
+  const progressMarkdown = progress
+    ? [
+        `**Phase:** ${progress.phase} · root ${progress.rootNumber}/${progress.rootCount}`,
+        `**Paths received:** ${progress.pathCount.toLocaleString()}`,
+        `**Uncompressed path input:** ${mib(progress.inputBytes)}`,
+        `**Compressed bytes emitted:** ${mib(progress.compressedBytes)}`,
+        `**Input rate (whole-build average):** ${mib(progress.inputBytes / activeSeconds)}/s`,
+        `**Elapsed:** ${(progress.elapsedMs / 1000).toFixed(1)} s`,
+        `**Compression quality:** ${progress.compressionQuality}`,
+        `**Extension CPU time:** ${(progress.cpuUserMs / 1000).toFixed(1)} s user + ${(progress.cpuSystemMs / 1000).toFixed(1)} s system (excludes fd process)`,
+        `**Follow symlinks:** ${progress.followSymlinks ? "yes" : "no"} · **Include hidden:** ${progress.includeHidden ? "yes" : "no"}`,
+        `**Last scanner output:** ${progress.lastInputAt ?? "not yet observed"}`,
+        `**Last compressed output:** ${progress.lastOutputAt ?? "not yet observed"}`,
+        "",
+        "The compressed file size is **not** the volume of paths already scanned. The final index is published only after the build finishes.",
+      ].join("\n\n")
+    : "Preparing the rebuild and its progress recorder…";
 
   const markdown =
     mode === "loading"
       ? "# Build Index\n\nReading saved folders. No scan will start automatically."
       : mode === "building"
-        ? "# Building Index\n\nRunning fd on your selected folders. The previous index stays available until the new one is complete."
+        ? "# Building Index\n\n" + progressMarkdown
         : [
             "# Build Index",
             "",
