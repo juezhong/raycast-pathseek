@@ -8,7 +8,7 @@ PathSeek 用于在 macOS 的 **Open/Save（打开/保存）对话框**中，快�
 
 ## 1. 环境准备
 
-- macOS 与 [Raycast](https://www.raycast.com/)（需要登录才能使用 **Import Extension**）。
+- macOS 与 [Raycast](https://www.raycast.com/)（请登录 Raycast 账号，以便使用扩展开发者命令）。
 - Node.js **22.14+**（本项目 macOS CI 验证 Node.js 22/24）；建议通过个人已有的 Node 版本管理器使用。
 - npm、`git`、`fd` 和 `fzf`。
 
@@ -38,28 +38,26 @@ npm run build
 
 `npm ci` 安装锁定版本依赖；`npm test` 检查索引、子进程清理等行为；`npm run build` 生成并验证 Raycast 扩展构建。**构建成功不等于已经导入 Raycast。**
 
-### 在 Raycast 中手动导入（推荐）
+### 本地安装：命令行自动导入（推荐）
 
-1. 打开 **Raycast 应用**，按 `⌘ ,` 进入 **Settings（设置）**，找到 **Extensions（扩展）**。
-2. 在扩展管理界面的右上角菜单 `⋯`（部分 Raycast 版本显示为 `+`）中选择 **Import Extension**；也可在 Raycast **主搜索框**直接搜索 `Import Extension` 并按回车执行。
-3. 文件夹选择框中选中刚克隆的 **`raycast-pathseek/` 仓库根目录**。该目录应直接包含 `package.json` 和 `src/`，**不要选择 `dist/`、`src/` 或 `assets/`**。
-4. 导入完成后，在 Raycast 主搜索框中搜索 **Build Index** 或 **Find in Open/Save**；也可在 **Settings → Extensions** 中检查 **PathSeek**，然后为 **Find in Open/Save** 设置快捷键。
-
-**注意：** `npm run build` 只验证构建，并不等于已安装。Raycast 官方的开发者命令要求登录 Raycast 账号；如找不到 **Import Extension**，请先确认已登录账号。
-
-### 找不到 Import Extension 时：命令行自动导入
-
-在仓库根目录执行：
+你使用的 Raycast 版本在 **Settings → Extensions → +** 中没有 `Import Extension`，因此不要再寻找这个菜单。**在已克隆并完成 `npm ci` 的仓库根目录执行：**
 
 ```bash
 npm run dev
 ```
 
-`ray develop` 会**自动导入尚未导入的源码扩展**。看到 PathSeek 命令出现在 Raycast 后，返回终端按 `Ctrl+C` 结束开发模式。Raycast 官方确认：**结束开发进程后，本地扩展仍保留在 Raycast，可通过主搜索继续打开。** 这不是 Store 发布，也不要求终端长期运行。
+这是 Raycast 官方的 `ray develop` 命令，会把尚未导入的本地扩展注册到 Raycast，同时临时启动开发热重载。具体操作：
 
-需要区分：执行 `npm run dev` 时扩展处于开发模式，其索引存放在独立的 `index-development-v3/` 下；正常本地使用模式的索引位置不同。第一次切换模式后可能需要在对应模式下重新执行一次 **Build Index**。不要因为搜索不到旧索引就卸载扩展。
+1. 终端运行上述命令，确认没有启动错误。
+2. 打开 **Raycast 主搜索框**，搜索 `PathSeek`、`Build Index` 或 `Find in Open/Save`；确认命令出现。
+3. 回到终端按 **`Ctrl+C`** 停止热重载。**官方文档确认：命令停止后，本地扩展仍会保留在 Raycast 中供搜索和使用**，不要求终端一直运行，也不会发布 Store。
+4. 在 **Raycast Settings → Extensions** 中找到 PathSeek，为 `Find in Open/Save` 设置快捷键；首次使用时主动执行一次 `Build Index`。
 
-**日常使用不需要一直运行 `npm run dev` 或保持终端打开。** 只有修改源码或排查问题时才需要开发模式。Raycast 宿主自身的进程生命周期由 Raycast 管理，PathSeek 不额外启动守护进程。
+`npm run build` 只验证可构建，**不会自动导入扩展**。此项目目前优先采用 CLI 导入，避免依赖不同 Raycast 版本中的菜单位置。
+
+Raycast 把本地扩展视为开发扩展；项目代码使用 `environment.isDevelopment` 区分索引存储位置。**不要假定停止 `npm run dev` 就会自动切换为 Store 正式安装模式**。需要核对实际索引时，请在 `View Index Status` 中选择 **Copy Active Index File Path**；日常更新无需反复卸载扩展或删除索引。
+
+若后续版本的 Raycast 提供 `Import Extension` 命令，也可以用它选择含 `package.json` 的仓库根目录；但对你当前的界面，不把它作为必需步骤。
 
 官方参考：[Raycast Getting Started](https://developers.raycast.com/basics/getting-started)、[Raycast CLI](https://developers.raycast.com/information/developer-tools/cli)、[Raycast Extensions](https://manual.raycast.com/extensions)。
 
@@ -72,7 +70,7 @@ npm run dev
 
 索引默认采用 **v3 前缀编码 + Brotli 压缩**，保存在 Raycast 扩展自己的支持目录。索引文件在完整构建成功后才原子替换；正常取消或失败应保留上一次成功的索引。
 
-**开发与日常模式隔离：**通过 `npm run dev` 启动时会使用独立的 `index-development-v3/` 目录，而正常导入使用非开发模式索引目录。若你之前只在开发模式构建索引，第一次改为日常导入方式使用时可能需要重新建立一次正式索引；此后更新代码不需要反复卸载和重建。
+**索引目录按实际运行模式区分：**代码根据 Raycast 提供的 `environment.isDevelopment` 选择存储目录。本地导入的扩展不应假定会自动变成 Store 正式安装模式。请用 **View Index Status → Copy Active Index File Path** 核对当前索引；不要擅自移动或删除数据文件。
 
 **软链接规则：**普通扫描不启用 `fd --follow`；只有指定快捷目录的**直接子项中指向目录的软链接**会被单独展开。搜索结果保留快捷链接路径，其目标内部的软链接不会继续跟随。
 
@@ -101,7 +99,7 @@ npm test
 npm run build
 ```
 
-已导入的本地扩展由用户自行维护，**不会通过 Raycast Store 自动更新**。如果更新构建后命令没有反映新代码，可在 Raycast 重新执行 **Import Extension**，选择同一个仓库目录，或临时使用 `npm run dev` 排查；完成调试后关闭开发模式。
+已导入的本地扩展由用户自行维护，**不会通过 Raycast Store 自动更新**。如果更新并构建后命令没有反映新代码，可在相同仓库目录重新运行一次 `npm run dev`，验证扩展重新加载后按 `Ctrl+C` 结束热重载；不要通过卸载/重新安装作为常规更新手段。
 
 **不要将扩展卸载当成日常更新方式。** 卸载可能清除 Raycast 扩展的支持数据（包含你主动构建的索引）；仅更新本地源码和重新构建，不需要刻意删除索引。
 
@@ -124,7 +122,7 @@ npm run build
 
 | 情况 | 检查方法 |
 | --- | --- |
-| Raycast 中找不到 PathSeek | 先在 Raycast 主搜索框输入 `Import Extension`，或在 **Settings → Extensions** 的右上角菜单找导入选项；仍找不到则执行一次 `npm run dev` 自动导入 |
+| Raycast 中找不到 PathSeek | 在仓库根目录执行 `npm run dev` 自动导入，再在 Raycast 主搜索框搜索 `Build Index`；停止开发命令后扩展仍保留 |
 | 构建成功但无法搜索 | 确认已在 **Build Index** 主动完成首次索引 |
 | 找不到 `fd` 或 `fzf` | 执行 `command -v fd` 和 `command -v fzf`；必要时在扩展偏好里填写绝对路径 |
 | 文件新增后搜索不到 | 正常行为；索引不会后台自动更新，需手动 **Build Index** |
