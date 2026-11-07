@@ -133,6 +133,18 @@ PathSeek 继续使用原生 `fzf --extended --read0 --print0 --filter` 和 `--nt
 
 索引文件仍是原来的 `index.nul`，没有第二份拼音索引、自动扫描或常驻后台任务。**名称字段与拼音别名按需流式生成**；相比旧的完整路径匹配，查询会有额外字符串处理和可能的拼音 CPU 开销，尤其在大型索引中应实际测量搜索延迟。
 
+### 含软链接目录的真实冷启动与搜索对比
+
+保留成熟的 `benchmark:standalone` 测试路径：每次在临时目录从零构建索引；`--shortcuts` 仅展开指定目录的直接目录软链接，不使用 `fd --follow`。扫描 HOME 及显式目标，使用流式索引压缩，且只删除本次创建的临时索引：
+
+```bash
+npm run benchmark:standalone -- "$HOME" \
+  --shortcuts "$HOME/Symlinks" \
+  --hidden --quality 7 --runs 5 --compare
+```
+
+`--compare` 额外加入同一条索引记录的普通名称模糊查询和连续父目录路径模糊查询对照（并非自动比较不同 Git 版本）；`symlinkTargets` 与 `symlinkLinksSkipped` 记录识别情况。**`nodeRss` 只包括 Node 进程，不包括 `fd` 和 `fzf` 子进程的峰值 RSS，不能仅凭该项断言全进程内存安全。** 建议在真实扫描时同时监控系统内存。
+
 ### 无索引冷启动基准
 
 从空的独立临时目录开始创建测试文件、运行 `fd` 建立压缩索引，并完成首次中英文与拼音路径搜索；不需要已有 `index.nul`，也不会清理或覆盖用户的 Raycast 插件目录与缓存：

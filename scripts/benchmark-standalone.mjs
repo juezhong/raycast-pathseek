@@ -44,13 +44,14 @@ function usageDelta(cpu) {
 
 function options(argv) {
   if (!argv.length || argv[0].startsWith("--")) {
-    throw new Error("Usage: npm run benchmark:standalone -- \"$HOME\" [--shortcuts \"$HOME/Symlinks\"] [--hidden] [--quality 7] [--runs 5]");
+    throw new Error("Usage: npm run benchmark:standalone -- \"$HOME\" [--shortcuts \"$HOME/Symlinks\"] [--hidden] [--quality 7] [--runs 5] [--compare]");
   }
   const root = path.resolve(argv[0]);
   let shortcuts = null;
   let hidden = false;
   let quality = 7;
   let runs = 5;
+  let compare = false;
   for (let i = 1; i < argv.length; i++) {
     if (argv[i] === "--shortcuts" && i + 1 < argv.length) {
       shortcuts = path.resolve(argv[++i]);
@@ -60,6 +61,8 @@ function options(argv) {
       quality = Number(argv[++i]);
     } else if (argv[i] === "--runs" && i + 1 < argv.length) {
       runs = Number(argv[++i]);
+    } else if (argv[i] === "--compare") {
+      compare = true;
     } else {
       throw new Error("Unknown or incomplete benchmark option");
     }
@@ -70,7 +73,7 @@ function options(argv) {
   if (!Number.isInteger(runs) || runs < 1 || runs > 10) {
     throw new Error("Repeat count must be an integer between 1 and 10");
   }
-  return { root, shortcuts, hidden, quality, runs };
+  return { root, shortcuts, hidden, quality, runs, compare };
 }
 
 async function scanFd(root, sink, counters, signal, shortcut) {
@@ -101,6 +104,21 @@ async function scanFd(root, sink, counters, signal, shortcut) {
       counters.rawBytes += chunk.length;
       for (let i = chunk.indexOf(0); i !== -1; i = chunk.indexOf(0, i + 1)) {
         counters.paths++;
+      }
+      // 仅短暂从扫描数据中抽取查询词，输出不包含文件名和路径。
+      if (counters.compare && !counters.sampledPathQuery) {
+        const records = chunk.toString("utf8").split("\0").slice(0, -1);
+        for (const candidate of records) {
+          const name = path.basename(candidate);
+          const parent = path.basename(path.dirname(candidate));
+          const leaf = name.match(/[A-Za-z0-9]{3,16}/)?.[0];
+          const ancestor = parent.match(/[A-Za-z0-9]{3,16}/)?.[0];
+          if (leaf && ancestor) {
+            counters.sampledPathQuery = ancestor.slice(0, 3) + "/" + leaf.slice(0, 3);
+            counters.sampledLeafQuery = leaf.slice(0, 3);
+            break;
+          }
+        }
       }
       // 只抽取搜索样本，不保存任何完整文件路径或文件名。
       if (!counters.sample && counters.rawBytes < 8 * 1024 * 1024) {
@@ -195,7 +213,15 @@ async function run() {
     const onAbort = () => input.destroy(new Error("Benchmark cancelled"));
     controller.signal.addEventListener("abort", onAbort, { once: true });
 
-    const counters = { paths: 0, rawBytes: 0, sample: "", hidden: args.hidden };
+    const counters = {
+      paths: 0,
+      rawBytes: 0,
+      sample: "",
+      hidden: args.hidden,
+      compare: args.compare,
+      sampledPathQuery: "",
+      sampledLeafQuery: "",
+    };
     const started = performance.now();
     const buildCpuStart = process.cpuUsage();
     try {
@@ -244,6 +270,13 @@ async function run() {
       { kind: "sampled-existing-filename", query: counters.sample || "src", timings: [], count: 0, limited: false },
       { kind: "full-scan-no-match", query: "pathseek_absent_" + randomUUID().replaceAll("-", ""), timings: [], count: 0, limited: false },
     ];
+    if (args.compare && counters.sampledPathQuery) {
+      // 两类搜索使用同一条真实索引记录生成查询词，但匹配范围不同。
+      tests.push(
+        { kind: "compare-leaf-fuzzy", query: counters.sampledLeafQuery, timings: [], count: 0, limited: false },
+        { kind: "compare-direct-parent-fuzzy", query: counters.sampledPathQuery, timings: [], count: 0, limited: false },
+      );
+    }
     const searchCpuStart = process.cpuUsage();
     // 第一轮为预热，不计入统计。之后交错测试三种负载，避免顺序偏差。
     for (let round = 0; round <= args.runs; round++) {
@@ -281,6 +314,14 @@ async function run() {
       symlinkLinksSkipped: discovery.linksSkipped,
       includeHidden: args.hidden,
       compressionQuality: args.quality,
+      compareRequested: args.compare,
+      comparison: args.compare
+        ? {
+            available: Boolean(counters.sampledPathQuery),
+            modes: ["basename-only", "consecutive-parent-path"],
+            note: "Same indexed fixture and sampled target, different matching scopes; not an old-version/new-version comparison.",
+          }
+        : undefined,
       indexedPaths: counters.paths,
       uncompressedBytes: counters.rawBytes,
       compressedBytes: indexBytes,

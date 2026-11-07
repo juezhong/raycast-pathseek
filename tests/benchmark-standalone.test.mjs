@@ -43,6 +43,7 @@ test("standalone benchmark builds, searches and removes only its temporary index
         "--hidden",
         "--runs",
         "3",
+        "--compare",
       ],
       { cwd: path.resolve("."), timeout: 30_000, maxBuffer: 1024 * 1024 },
     );
@@ -62,6 +63,12 @@ test("standalone benchmark builds, searches and removes only its temporary index
     assert.equal(output.symlinkTargets, 1);
     assert.equal(output.symlinkLinksSkipped, 1);
     assert.equal(output.includeHidden, true);
+    assert.equal(output.compareRequested, true);
+    assert.equal(output.comparison.available, true);
+    assert.deepEqual(output.comparison.modes, [
+      "basename-only",
+      "consecutive-parent-path",
+    ]);
     assert.equal(output.indexedPaths, output.decodedPaths);
     assert.equal(output.decodeStats.runs, 3);
     assert.equal(output.decodeMs, output.decodeStats.p50Ms);
@@ -69,7 +76,11 @@ test("standalone benchmark builds, searches and removes only its temporary index
     assert.ok(output.indexedPaths >= 200);
     assert.ok(output.uncompressedBytes > 0);
     assert.ok(output.compressedBytes > 0);
-    assert.equal(output.queries.length, 3);
+    assert.equal(output.queries.length, 5);
+    assert.equal(output.queries[3].kind, "compare-leaf-fuzzy");
+    assert.equal(output.queries[4].kind, "compare-direct-parent-fuzzy");
+    assert.ok(output.queries[3].resultCount > 0);
+    assert.ok(output.queries[4].resultCount > 0);
     assert.equal(output.measuredRounds, 3);
     assert.equal(output.warmupRounds, 1);
     assert.equal(output.queries[0].kind, "frequent-early-limit");
