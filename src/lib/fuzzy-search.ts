@@ -32,7 +32,11 @@ export async function fuzzySearch(
       signal,
     );
     await trace?.finish(
-      result.cancelled ? "cancelled" : result.limited ? "limit-reached" : "success",
+      result.cancelled
+        ? "cancelled"
+        : result.limited
+          ? "limit-reached"
+          : "success",
       result.paths.length,
       result.exitCode,
     );

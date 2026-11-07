@@ -218,7 +218,8 @@ export default function RebuildIndex() {
         });
       }
     } finally {
-      if (buildController.current === controller) buildController.current = null;
+      if (buildController.current === controller)
+        buildController.current = null;
       setMode("ready");
     }
   }

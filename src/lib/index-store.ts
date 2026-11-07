@@ -11,7 +11,12 @@ import { createBrotliCompress, constants as zlibConstants } from "node:zlib";
 import { PathPrefixEncoder } from "./index-codec.ts";
 import { createNonClosingSink } from "./non-closing-sink";
 import { beginIndexBuildProgress } from "./index-progress";
-import { cancelledError, registerChild, terminateChild, throwIfAborted } from "./managed-child";
+import {
+  cancelledError,
+  registerChild,
+  terminateChild,
+  throwIfAborted,
+} from "./managed-child";
 import lockfile from "proper-lockfile";
 import { beginCommandTrace } from "./command-trace";
 import {
@@ -184,7 +189,9 @@ async function runFd(
   const child = spawn(fdPath, args, { stdio: ["ignore", "pipe", "pipe"] });
   registerChild(child);
   progress.fdStarted(child.pid);
-  const closed = new Promise<void>((resolve) => child.once("close", () => resolve()));
+  const closed = new Promise<void>((resolve) =>
+    child.once("close", () => resolve()),
+  );
   const abort = () => terminateChild(child);
   signal?.addEventListener("abort", abort, { once: true });
   if (signal?.aborted) abort();

@@ -21,14 +21,14 @@ process.once("exit", () => {
 export function registerChild(child: ChildProcess): void {
   children.add(child);
   child.once("exit", () => exited.add(child));
-  child.once("close", () => { exited.add(child); children.delete(child); });
+  child.once("close", () => {
+    exited.add(child);
+    children.delete(child);
+  });
 }
 
 /** 请求退出，并在宽限期后升级到 SIGKILL；定时器不会阻止 Node 退出。 */
-export function terminateChild(
-  child: ChildProcess,
-  graceMs = 1500,
-): void {
+export function terminateChild(child: ChildProcess, graceMs = 1500): void {
   if (exited.has(child)) return;
   try {
     child.kill("SIGTERM");
