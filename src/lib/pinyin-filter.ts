@@ -2,7 +2,7 @@ import path from "node:path";
 import { Transform } from "node:stream";
 import { pinyin } from "pinyin-pro";
 import { MAX_FZF_PATH_BYTES } from "./fzf-output.ts";
-import { matchesFuzzyParentPath } from "./fuzzy-path-query.ts";
+import { compileFuzzyParentPathMatcher } from "./fuzzy-path-query.ts";
 
 const HAN_TEXT = /\p{Script=Han}+/gu;
 const NUL = Buffer.from([0]);
@@ -65,6 +65,10 @@ export function createPinyinFilterInput(
     aliasCache.set(name, alias);
     return alias;
   };
+  // 不带 '/' 的普通搜索保持原样；目录表达式只编译一次。
+  const matchesParent = directoryPatterns.length
+    ? compileFuzzyParentPathMatcher(directoryPatterns, directoryAlias)
+    : undefined;
   return new Transform({
     transform(chunk: Buffer, _encoding, callback) {
       try {
@@ -86,10 +90,7 @@ export function createPinyinFilterInput(
           pending = Buffer.alloc(0);
 
           const filepath = record.toString("utf8");
-          if (
-            directoryPatterns.length &&
-            !matchesFuzzyParentPath(filepath, directoryPatterns, directoryAlias)
-          ) {
+          if (matchesParent && !matchesParent(filepath)) {
             offset = end + 1;
             continue;
           }
