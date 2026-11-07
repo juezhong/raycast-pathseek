@@ -59,3 +59,53 @@ test("real fzf can search compressed v3 indexes; CLI reports metrics without pat
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+
+test("real index path benchmark is read-only and reports reliable baseline metrics without filenames", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "pathseek-path-benchmark-"));
+  try {
+    const raw = path.join(directory, "raw.paths");
+    const stage = path.join(directory, "stage.nul.tmp");
+    const index = path.join(directory, ACTIVE_INDEX_FILENAME);
+    const paths = [
+      "/home/private/src/driver.c",
+      "/home/private/src/driver.h",
+      "/home/private/第一次/第二次.txt",
+      "/home/private/other/report.md",
+    ];
+    await writeFile(raw, paths.join("\0") + "\0");
+    await prepareIndex(raw, stage, {
+      version: 3,
+      count: paths.length,
+      createdAt: "2026-11-07T00:00:00.000Z",
+      roots: ["/home/private"],
+    });
+    await publishIndex(stage, directory);
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      [
+        "--experimental-strip-types",
+        "scripts/benchmark-path-search.mjs",
+        index,
+        "driver",
+        "src/driver",
+        "dyc/dec",
+        "--runs",
+        "2",
+      ],
+      { cwd: path.resolve("."), timeout: 30_000, maxBuffer: 1024 * 1024 },
+    );
+    const parsed = JSON.parse(stdout);
+    assert.equal(parsed.indexedPaths, paths.length);
+    assert.equal(parsed.rounds, 2);
+    assert.equal(parsed.queries.length, 3);
+    assert.deepEqual(parsed.queries.map((item) => item.mode), ["basename", "path", "path"]);
+    assert.deepEqual(parsed.queries.map((item) => item.results), [2, 2, 1]);
+    assert.ok(parsed.queries.every((item) => item.p50Ms > 0 && item.p95Ms >= item.p50Ms));
+    assert.ok(parsed.queries.every((item) => item.averageNodeUserCpuMs >= 0));
+    assert.ok(parsed.peakNodeRssBytes > 0);
+    assert.doesNotMatch(stdout, /home\/private|第二次|dyc\/dec|src\/driver/);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
