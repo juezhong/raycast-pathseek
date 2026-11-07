@@ -26,7 +26,10 @@ import {
 
 export type IndexMetadata = SavedIndexMetadata;
 
-const indexDirectory = environment.supportPath;
+// 开发版索引与正式安装版隔离，避免测试重建覆盖用户原有数据。
+export const indexDirectory = environment.isDevelopment
+  ? path.join(environment.supportPath, "index-development-v3")
+  : environment.supportPath;
 const metadataPath = path.join(indexDirectory, "index.json");
 
 export function getPreferences(): Preferences {
