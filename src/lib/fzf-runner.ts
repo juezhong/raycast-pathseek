@@ -127,7 +127,12 @@ export async function runFzfFilter(
 
       void inputClosed.then(() => {
         if (cancelled) {
-          resolve({ paths: [], exitCode: code, limited: false, cancelled: true });
+          resolve({
+            paths: [],
+            exitCode: code,
+            limited: false,
+            cancelled: true,
+          });
         } else if (fatal) {
           reject(fatal);
         } else if (limited || code === 0 || (code === 1 && !stderr)) {
