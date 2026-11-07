@@ -11,6 +11,7 @@ import { createBrotliCompress, constants as zlibConstants } from "node:zlib";
 import { PathPrefixEncoder } from "./index-codec.ts";
 import { createNonClosingSink } from "./non-closing-sink";
 import { beginIndexBuildProgress } from "./index-progress";
+import { trackStagedIndex } from "./staged-index-lifecycle";
 import {
   cancelledError,
   registerChild,
@@ -235,7 +236,8 @@ export async function rebuildIndex(
     // Maintenance runs only after the explicit Build/Rebuild action acquires
     // the write lock. Search Files and Index Status never touch these files.
     try {
-      await cleanupStaleBuildTemps(indexDirectory);
+      // 已持有构建锁，不可能还有另一个正在运行的写入者；立即回收残留暂存文件。
+      await cleanupStaleBuildTemps(indexDirectory, Date.now(), 0);
     } catch (error) {
       console.warn("Stale build artifact cleanup deferred:", error);
     }
@@ -302,11 +304,17 @@ export async function rebuildIndex(
     let total = 0;
     const input = new PassThrough({ highWaterMark: 1024 * 1024 });
     let writer: Promise<void> | undefined;
-    const abortWriter = () => input.destroy(cancelledError());
+    let untrackStage: (() => void) | undefined;
+    const abortWriter = () => {
+      // 索引文件创建之前取消时，不能对尚未接入 pipeline 的流发出未处理 error。
+      if (writer) input.destroy(cancelledError());
+    };
     signal?.addEventListener("abort", abortWriter, { once: true });
     try {
       throwIfAborted(signal);
+      untrackStage = trackStagedIndex(stagedTemp);
       await createStreamingIndexStage(stagedTemp);
+      throwIfAborted(signal);
       // 仅保存压缩数据，不落盘存储整个家目录的原始路径列表。
       writer = pipeline(
         input,
@@ -327,6 +335,7 @@ export async function rebuildIndex(
       );
       // 防止扫描尚未结束时编码管线提前失败产生 unhandled rejection。
       void writer.catch(() => undefined);
+      if (signal?.aborted) abortWriter();
       for (const [index, root] of scanRoots.entries()) {
         progress.root(index + 1);
         total += await runFd(
@@ -370,7 +379,7 @@ export async function rebuildIndex(
         metadata,
       );
       throwIfAborted(signal);
-      await publishIndex(stagedTemp, indexDirectory);
+      await publishIndex(stagedTemp, indexDirectory, signal);
 
       try {
         await cleanupLegacyIndexes(indexDirectory);
@@ -385,11 +394,22 @@ export async function rebuildIndex(
     } catch (error) {
       input.destroy();
       await writer?.catch(() => undefined);
-      await progress.finish("failed", error).catch(() => undefined);
+      await progress
+        .finish(signal?.aborted ? "cancelled" : "failed", error)
+        .catch(() => undefined);
       throw error;
     } finally {
       signal?.removeEventListener("abort", abortWriter);
-      await rm(stagedTemp, { force: true }).catch(() => undefined);
+      try {
+        await rm(stagedTemp, { force: true });
+        untrackStage?.();
+      } catch (error) {
+        // 保留退出兜底登记；不删除用户配置或已发布索引。
+        console.warn(
+          "Could not remove incomplete index stage:",
+          (error as NodeJS.ErrnoException).code ?? "UNKNOWN",
+        );
+      }
     }
   } finally {
     await release();

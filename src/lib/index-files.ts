@@ -11,6 +11,7 @@ import {
   constants as zlibConstants,
 } from "node:zlib";
 import { PathPrefixEncoder, PathPrefixDecoder } from "./index-codec.ts";
+import { throwIfAborted } from "./managed-child.ts";
 
 export const ACTIVE_INDEX_FILENAME = "index.nul";
 export const LEGACY_INDEX_REGEX = /^index-[a-f0-9-]+\.nul$/;
@@ -258,11 +259,15 @@ export async function openIndexDataStream(
 export async function publishIndex(
   tempPath: string,
   indexDirectory: string,
+  signal?: AbortSignal,
 ): Promise<void> {
+  throwIfAborted(signal);
   const activePath = path.join(indexDirectory, ACTIVE_INDEX_FILENAME);
   const info = await stat(tempPath);
   if (!info.isFile()) throw new Error("Staged index is not a regular file");
   await readIndexHeader(tempPath);
+  // rename 是提交点：提交前最后一次检查取消，已发布的完整索引不得回滚为半成品。
+  throwIfAborted(signal);
   await rename(tempPath, activePath);
 }
 
@@ -291,9 +296,10 @@ export async function cleanupLegacyIndexes(
 }
 
 /**
- * Clean up abandoned build artifacts only while holding the exclusive rebuild
- * lock. This helper must NEVER run on Search Files startup or ordinary query.
- * The 24-hour safety margin avoids deleting a recently active build's data.
+ * 只能持有独占重建锁时调用；Search Files / Index Status 绝不执行清理。
+ * 普通调用遵循保守宽限期；确定获取构建锁后可传 graceMs=0，
+ * 立即回收已退出的构建留下的 UUID 暂存索引及进度写入临时文件。
+ * 已发布的 index.nul、配置数据和不认识的文件均不在删除范围内。
  */
 export async function cleanupStaleBuildTemps(
   indexDirectory: string,
@@ -301,12 +307,19 @@ export async function cleanupStaleBuildTemps(
   graceMs = LEGACY_GRACE_MS,
 ): Promise<number> {
   let removed = 0;
-  const tempPattern = /^index-[a-f0-9-]+\.(?:paths|nul)\.tmp$/;
+  const tempPattern =
+    /^index-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\.(?:paths|nul)\.tmp$/i;
   for (const filename of await readdir(indexDirectory)) {
-    if (!tempPattern.test(filename)) continue;
+    if (!tempPattern.test(filename) && filename !== "build-progress.json.tmp")
+      continue;
     const fullPath = path.join(indexDirectory, filename);
     const info = await stat(fullPath).catch(() => null);
-    if (!info || !info.isFile() || now - info.mtimeMs < graceMs) continue;
+    if (
+      !info ||
+      !info.isFile() ||
+      (graceMs > 0 && now - info.mtimeMs < graceMs)
+    )
+      continue;
     await rm(fullPath, { force: true });
     removed++;
   }

@@ -2,7 +2,8 @@ import { readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
 
-export type BuildPhase = "scanning" | "finalizing" | "published" | "failed";
+export type BuildPhase =
+  "scanning" | "finalizing" | "published" | "failed" | "cancelled";
 
 export type IndexBuildProgress = {
   version: 1;
@@ -64,7 +65,7 @@ export async function readIndexBuildProgress(
       !("buildId" in data) ||
       typeof data.buildId !== "string" ||
       !("phase" in data) ||
-      !["scanning", "finalizing", "published", "failed"].includes(
+      !["scanning", "finalizing", "published", "failed", "cancelled"].includes(
         String(data.phase),
       ) ||
       !("updatedAt" in data) ||
@@ -152,7 +153,7 @@ export async function beginIndexBuildProgress(
   timer.unref();
 
   async function finish(
-    phase: "published" | "failed",
+    phase: "published" | "failed" | "cancelled",
     error?: unknown,
   ): Promise<void> {
     clearInterval(timer);
