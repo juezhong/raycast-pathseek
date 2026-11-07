@@ -154,7 +154,10 @@ export function createPinyinFilterInput(
               if (byte === 9 || byte > 127) simpleAscii = false;
             }
             if (simpleAscii) {
-              if (nameBytes.length + TAB.length + record.length > MAX_FZF_PATH_BYTES)
+              if (
+                nameBytes.length + TAB.length + record.length >
+                MAX_FZF_PATH_BYTES
+              )
                 throw new Error("Search record exceeds size limit");
               this.push(Buffer.concat([nameBytes, TAB, record, NUL]));
               offset = end + 1;
