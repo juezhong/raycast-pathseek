@@ -25,9 +25,7 @@ export function appendFzfOutputChunk(
   maxResults = MAX_FZF_RESULTS,
 ): void {
   if (state.limitReached || !chunk.length) return;
-  const data = state.pending.length
-    ? Buffer.concat([state.pending, chunk])
-    : chunk;
+  const data = state.pending.length ? Buffer.concat([state.pending, chunk]) : chunk;
   let offset = 0;
 
   while (offset < data.length) {
