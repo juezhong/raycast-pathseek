@@ -5,6 +5,7 @@ import {
   createFzfOutputState,
   MAX_FZF_PATH_BYTES,
   MAX_FZF_RESULTS,
+  MAX_FZF_TOTAL_BYTES,
 } from "../src/lib/fzf-output.ts";
 
 test("fzf output is strictly capped when a single stdout chunk has too many entries", () => {
@@ -77,4 +78,16 @@ test("fzf output accepts a path exactly at the supported size boundary", () => {
   assert.equal(state.results.length, 1);
   assert.equal(Buffer.byteLength(state.results[0]), MAX_FZF_PATH_BYTES);
   assert.equal(state.pending.length, 0);
+});
+
+test("fzf results reject excessive aggregate path bytes", () => {
+  const state = createFzfOutputState();
+  const record = Buffer.alloc(MAX_FZF_PATH_BYTES + 1, 65);
+  record[record.length - 1] = 0;
+  for (let i = 0; i < MAX_FZF_TOTAL_BYTES / MAX_FZF_PATH_BYTES; i++) {
+    appendFzfOutputChunk(state, record);
+  }
+  assert.equal(state.resultBytes, MAX_FZF_TOTAL_BYTES);
+  assert.throws(() => appendFzfOutputChunk(state, record), /memory size limit/);
+  assert.equal(state.results.length, 8);
 });
