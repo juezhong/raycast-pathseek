@@ -104,20 +104,18 @@ test("standalone benchmark builds, searches and removes only its temporary index
     assert.ok(output.queries.every((query) => query.minMs <= query.p50Ms));
     assert.ok(output.queries[1].resultCount > 0);
     const noMatch = output.queries[2].pipeline;
-    assert.deepEqual(noMatch.recordsDecoded, {
-      min: output.indexedPaths,
-      max: output.indexedPaths,
-    });
-    assert.ok(noMatch.recordsSentToFzf.min > 0);
-    assert.ok(noMatch.bytesSentToFzf.min > 0);
-    assert.ok(noMatch.batchesSentToFzf.min > 0);
-    assert.ok(noMatch.transformCpuLikeMsP50 >= 0);
-    assert.ok(noMatch.decoderEndMsP50 > 0);
-    assert.ok(noMatch.stdinFinishMsP50 > 0);
-    assert.ok(noMatch.childCloseMsP50 > 0);
+    assert.equal(noMatch.recordsDecoded, output.indexedPaths);
+    assert.ok(noMatch.recordsSentToFzf > 0);
+    assert.ok(noMatch.bytesSentToFzf > 0);
+    assert.ok(noMatch.batchesSentToFzf > 0);
+    assert.ok(noMatch.transformSyncWallMs >= 0);
+    assert.ok(noMatch.decoderEndMs > 0);
+    assert.ok(noMatch.stdinFinishMs > 0);
+    assert.ok(noMatch.childCloseMs > 0);
+    assert.match(noMatch.scope, /Warmup run only/);
     assert.ok(
-      output.queries[4].pipeline.recordsSentToFzf.max <
-        noMatch.recordsSentToFzf.max,
+      output.queries[4].pipeline.recordsSentToFzf <
+        noMatch.recordsSentToFzf,
       "directory filtering must reduce records passed to fzf",
     );
     assert.ok(output.buildCpu.userMs >= 0);
