@@ -2,7 +2,10 @@ import path from "node:path";
 import { Transform } from "node:stream";
 import { pinyin } from "pinyin-pro";
 import { MAX_FZF_PATH_BYTES } from "./fzf-output.ts";
-import { compileFuzzyParentPathMatcher } from "./fuzzy-path-query.ts";
+import {
+  compileFuzzyParentPathMatcher,
+  compileFuzzyTargetNameMatcher,
+} from "./fuzzy-path-query.ts";
 
 const HAN_TEXT = /\p{Script=Han}+/gu;
 const NUL = Buffer.from([0]);
@@ -10,10 +13,10 @@ const TAB = Buffer.from("\t");
 const MAX_ALIAS_CHARS = 2048;
 
 /**
- * 带 fzf 操作符的表达式只在真实名称上匹配，不转写查询。
- * 数字和拉丁字母混合查询（例如 2026 dyc）允许启用拼音别名。
+ * 只决定中文名称的保留配额，不影响拼音是否参与匹配。
+ * 所有查询始终包含中文名称的拼音别名。
  */
-export function shouldUsePinyinAliases(query: string): boolean {
+export function shouldPrioritizePinyinResults(query: string): boolean {
   const normalized = query.trim();
   return (
     normalized.length > 0 &&
@@ -50,11 +53,14 @@ export function pinyinAlias(filename: string): string {
 export function createPinyinFilterInput(
   enablePinyin = true,
   directoryPatterns: readonly string[] = [],
+  nativePathNameQuery?: string,
 ): Transform {
   let pending = Buffer.alloc(0);
   // 同一个父目录会被大量文件复用，限制为 2048 项的单次搜索缓存。
   const aliasCache = new Map<string, string>();
+  const hanText = /\p{Script=Han}/u;
   const directoryAlias = (name: string): string => {
+    if (!enablePinyin || !hanText.test(name)) return "";
     const cached = aliasCache.get(name);
     if (cached !== undefined) return cached;
     const alias = pinyinAlias(name);
@@ -69,6 +75,47 @@ export function createPinyinFilterInput(
   const matchesParent = directoryPatterns.length
     ? compileFuzzyParentPathMatcher(directoryPatterns, directoryAlias)
     : undefined;
+  const matchesName = nativePathNameQuery
+    ? compileFuzzyTargetNameMatcher(nativePathNameQuery, pinyinAlias)
+    : undefined;
+  const segmentQueries =
+    nativePathNameQuery !== undefined
+      ? [...directoryPatterns, nativePathNameQuery]
+      : undefined;
+
+  const projectPath = (filepath: string, filename: string): string => {
+    if (!segmentQueries) {
+      const label = filename.replaceAll("\t", " ");
+      const alias = enablePinyin ? pinyinAlias(filename) : "";
+      return alias ? label + " " + alias : label;
+    }
+
+    // 只投影需要的连续末尾层级，其他祖先不参与搜索。
+    const segments = [filename];
+    let end = filepath.lastIndexOf("/");
+    for (let index = 0; index < directoryPatterns.length; index++) {
+      const begin = filepath.lastIndexOf("/", end - 1);
+      segments.push(filepath.slice(begin + 1, end));
+      end = begin;
+    }
+    segments.reverse();
+
+    return segments
+      .map((segment, index) => {
+        const label = segment.replaceAll("\t", " ");
+        const alias =
+          index === segments.length - 1
+            ? enablePinyin ? pinyinAlias(segment) : ""
+            : directoryAlias(segment);
+        const field = alias ? label + " " + alias : label;
+        // 包含大写的段严格匹配，其他段预先折叠大小写。
+        return segmentQueries[index] === segmentQueries[index].toLowerCase()
+          ? field.toLowerCase()
+          : field;
+      })
+      .join("/");
+  };
+
   return new Transform({
     transform(chunk: Buffer, _encoding, callback) {
       try {
@@ -95,13 +142,11 @@ export function createPinyinFilterInput(
             continue;
           }
           const filename = path.basename(filepath);
-          // fzf 字段分隔符不能成为可搜索文件名的一部分。
-          const label = filename.replaceAll("\t", " ");
-          const alias = enablePinyin ? pinyinAlias(filename) : "";
-          const matchField = Buffer.from(
-            alias ? label + " " + alias : label,
-            "utf8",
-          );
+          if (matchesName && !matchesName(filename)) {
+            offset = end + 1;
+            continue;
+          }
+          const matchField = Buffer.from(projectPath(filepath, filename), "utf8");
           if (
             matchField.length + TAB.length + record.length >
             MAX_FZF_PATH_BYTES

@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import type { Readable } from "node:stream";
 import { openIndexDataStream } from "./index-files.ts";
-import { parseFuzzyPathQuery } from "./fuzzy-path-query.ts";
+import { isNativeFuzzyPathQuery, parseFuzzyPathQuery } from "./fuzzy-path-query.ts";
 import { appendFzfOutputChunk, createFzfOutputState } from "./fzf-output.ts";
 import {
   appendPinyinPriorityChunk,
@@ -11,7 +11,7 @@ import {
 import {
   createPinyinFilterInput,
   originalPathFromPinyinResult,
-  shouldUsePinyinAliases,
+  shouldPrioritizePinyinResults,
 } from "./pinyin-filter.ts";
 import {
   cancelledError,
@@ -37,12 +37,14 @@ export async function runFzfFilter(
 ): Promise<FilterResult> {
   throwIfAborted(signal);
   const pathQuery = parseFuzzyPathQuery(query);
+  const nativePath = pathQuery !== null && isNativeFuzzyPathQuery(pathQuery);
   const nameQuery = pathQuery?.nameQuery ?? query;
   const input = await openIndexDataStream(indexPath);
-  const pinyinMode = shouldUsePinyinAliases(nameQuery);
+  const prioritizePinyin = shouldPrioritizePinyinResults(nameQuery);
   const augmented = createPinyinFilterInput(
-    pinyinMode,
+    true,
     pathQuery?.directoryPatterns ?? [],
+    nativePath ? pathQuery!.nameQuery : undefined,
   );
   const source = augmented;
   if (signal?.aborted) {
@@ -53,7 +55,7 @@ export async function runFzfFilter(
 
   return new Promise<FilterResult>((resolve, reject) => {
     const output = createFzfOutputState();
-    const pinyinOutput = pinyinMode ? createPinyinPriorityOutput() : undefined;
+    const pinyinOutput = prioritizePinyin ? createPinyinPriorityOutput() : undefined;
     let limited = false;
     let cancelled = false;
     let fatal: Error | undefined;
@@ -74,8 +76,9 @@ export async function runFzfFilter(
           "\t",
           "--nth",
           "1",
+          ...(nativePath ? ["--scheme", "path"] : []),
           "--filter",
-          nameQuery,
+          nativePath ? query : nameQuery,
         ],
         { stdio: ["pipe", "pipe", "pipe"] },
       );

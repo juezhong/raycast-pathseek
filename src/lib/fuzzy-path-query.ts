@@ -142,15 +142,10 @@ function compileSegment(pattern: string): SegmentMatcher {
   const evaluate = (name: string) =>
     groups.every((alternatives) => alternatives.some((test) => test(name)));
 
-  const allowPinyin =
-    pattern.length <= 80 &&
-    /[a-z]/i.test(pattern) &&
-    /^[a-z0-9]+(?:\s+[a-z0-9]+)*$/i.test(pattern);
-
   return (name, getAlias) => {
     const comparable = ignoreCase ? name.toLowerCase() : name;
     if (evaluate(comparable)) return true;
-    if (!allowPinyin || !/\p{Script=Han}/u.test(name)) return false;
+    if (!/\p{Script=Han}/u.test(name)) return false;
     const alias = getAlias(name);
     return alias
       ? evaluate(
@@ -192,4 +187,23 @@ export function matchesFuzzyParentPath(
   getAlias: (name: string) => string,
 ): boolean {
   return compileFuzzyParentPathMatcher(directoryPatterns, getAlias)(filepath);
+}
+
+/**
+ * 无 Extended Search 运算符的路径查询由原生 fzf 执行完整路径模糊匹配和排序。
+ * 其余查询仍兼容原来的逐段锚点、否定和 AND/OR 语义。
+ */
+export function isNativeFuzzyPathQuery(query: FuzzyPathQuery): boolean {
+  return [...query.directoryPatterns, query.nameQuery].every(
+    (part) => !/[\s^$'!|\\]/u.test(part),
+  );
+}
+
+/** 只做目标名称层级检查，不取代 fzf 的实际匹配评分。 */
+export function compileFuzzyTargetNameMatcher(
+  pattern: string,
+  getAlias: (name: string) => string,
+): (name: string) => boolean {
+  const matcher = compileSegment(pattern);
+  return (name: string) => matcher(name, getAlias);
 }
