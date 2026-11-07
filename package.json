@@ -149,6 +149,7 @@
     "benchmark:index": "node --experimental-strip-types scripts/benchmark-index.mjs",
     "convert:index": "node --experimental-strip-types scripts/convert-index.mjs",
     "benchmark:quality": "node --experimental-strip-types scripts/benchmark-compression.mjs",
-    "benchmark:search": "node --experimental-strip-types scripts/benchmark-search.mjs"
+    "benchmark:search": "node --experimental-strip-types scripts/benchmark-search.mjs",
+    "benchmark:standalone": "node --experimental-strip-types scripts/benchmark-standalone.mjs"
   }
 }
