@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -106,8 +106,19 @@ test("standalone benchmark builds, searches and removes only its temporary index
     assert.ok(output.buildCpu.userMs >= 0);
     assert.ok(output.decodeCpu.userMs >= 0);
     assert.ok(output.searchCpu.userMs >= 0);
-    assert.doesNotMatch(stdout + stderr, /sampledriver|中文文件|\.nul\.tmp/);
+    assert.doesNotMatch(stdout, /sampledriver|中文文件|\.nul\.tmp|pathseek-benchmark-/);
     assert.ok(!stdout.includes(root));
+    assert.doesNotMatch(stderr, /sampledriver|中文文件/);
+
+    // 操作日志要给出同一个绝对路径，明确中间文件和最终删除状态。
+    const created = stderr.match(/^\[PathSeek benchmark\] Temporary directory: (.+)$/m);
+    assert.ok(created, "missing temporary directory log");
+    const temporary = created[1];
+    assert.ok(path.isAbsolute(temporary));
+    assert.match(stderr, new RegExp("Temporary files: .*stage\\.nul\\.tmp -> .*index\\.nul"));
+    assert.ok(stderr.includes("[PathSeek benchmark] Created temporary staging file: " + path.join(temporary, "stage.nul.tmp")));
+    assert.ok(stderr.includes("[PathSeek benchmark] Published temporary index: " + path.join(temporary, "index.nul")));
+    assert.ok(stderr.includes("[PathSeek benchmark] Removed temporary directory (verified): " + temporary));
     assert.deepEqual(await temporaryBenchmarkFiles(), before);
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -124,4 +135,39 @@ test("invalid repeat count does not create any benchmark index", async () => {
     ),
   );
   assert.deepEqual(await temporaryBenchmarkFiles(), before);
+});
+
+
+test("failed fd scan still reports the exact temporary directory and verified cleanup", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "pathseek-benchmark-failure-fixture-"));
+  try {
+    const bin = path.join(root, "bin");
+    await mkdir(bin);
+    const fd = path.join(bin, "fd");
+    await writeFile(fd, "#!/bin/sh\nexit 19\n");
+    await chmod(fd, 0o755);
+    const before = await temporaryBenchmarkFiles();
+    const error = await execFileAsync(
+      process.execPath,
+      [
+        "--experimental-strip-types",
+        "scripts/benchmark-standalone.mjs",
+        root,
+        "--runs",
+        "1",
+      ],
+      { cwd: path.resolve("."), timeout: 30_000, maxBuffer: 1024 * 1024,
+        env: { ...process.env, PATH: bin + path.delimiter + (process.env.PATH ?? "") } },
+    ).then(() => null, (failure) => failure);
+    assert.ok(error);
+    assert.match(error.stderr, /Benchmark failed/);
+    const created = error.stderr.match(/^\[PathSeek benchmark\] Temporary directory: (.+)$/m);
+    assert.ok(created);
+    const temporary = created[1];
+    assert.ok(error.stderr.includes("[PathSeek benchmark] Cleaning temporary directory: " + temporary));
+    assert.ok(error.stderr.includes("[PathSeek benchmark] Removed temporary directory (verified): " + temporary));
+    assert.deepEqual(await temporaryBenchmarkFiles(), before);
+  } finally {
+    await rm(root, { force: true, recursive: true });
+  }
 });

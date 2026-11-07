@@ -2,7 +2,7 @@ import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
 import { createWriteStream } from "node:fs";
-import { mkdtemp, rm, stat } from "node:fs/promises";
+import { lstat, mkdtemp, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
@@ -294,6 +294,19 @@ async function run() {
     ? await discoverSelectiveSymlinks(args.shortcuts, args.hidden)
     : { targets: [], linksSkipped: 0 };
   const temporary = await mkdtemp(path.join(os.tmpdir(), "pathseek-benchmark-"));
+  const stage = path.join(temporary, "stage.nul.tmp");
+  const index = path.join(temporary, "index.nul");
+  // 日志走 stderr，保留 stdout 为可直接重定向的纯 JSON。
+  console.error("[PathSeek benchmark] Temporary directory: " + temporary);
+  console.error("[PathSeek benchmark] Temporary files: " + stage + " -> " + index + " (atomic rename)");
+  console.error("[PathSeek benchmark] Search input: streaming compressed index; no plaintext path cache or predecoded index file");
+  console.error(
+    "[PathSeek benchmark] Scan: root=" + args.root +
+    ", shortcuts=" + (args.shortcuts ?? "(none)") +
+    ", linkTargets=" + discovery.targets.length +
+    ", linksSkipped=" + discovery.linksSkipped +
+    "; recursive symlink following disabled",
+  );
   // 仅在用户显式运行 benchmark 时采样；不修改插件搜索组件，也不常驻。
   const rssAtStart = process.memoryUsage.rss();
   let sampledPeakRss = rssAtStart;
@@ -308,9 +321,8 @@ async function run() {
   process.once("SIGTERM", abort);
 
   try {
-    const stage = path.join(temporary, "stage.nul.tmp");
-    const index = path.join(temporary, "index.nul");
     await createStreamingIndexStage(stage);
+    console.error("[PathSeek benchmark] Created temporary staging file: " + stage);
 
     const input = new PassThrough({ highWaterMark: 1024 * 1024 });
     const compressed = pipeline(
@@ -361,6 +373,7 @@ async function run() {
       roots: [args.root],
     });
     await publishIndex(stage, temporary);
+    console.error("[PathSeek benchmark] Published temporary index: " + index);
     const indexBytes = (await stat(index)).size;
     const buildMs = Number((performance.now() - started).toFixed(1));
     const buildCpu = usageDelta(process.cpuUsage(buildCpuStart));
@@ -480,7 +493,23 @@ async function run() {
     process.off("SIGINT", abort);
     process.off("SIGTERM", abort);
     // 仅删除 mkdtemp 本次创建的临时目录；绝不操作 Raycast 正式索引。
-    await rm(temporary, { recursive: true, force: true });
+    console.error("[PathSeek benchmark] Cleaning temporary directory: " + temporary);
+    try {
+      await rm(temporary, { recursive: true, force: true });
+      const missing = await lstat(temporary).then(
+        () => false,
+        (error) => {
+          if (error?.code === "ENOENT") return true;
+          throw error;
+        },
+      );
+      if (!missing) throw new Error("Temporary directory still exists after cleanup");
+      console.error("[PathSeek benchmark] Removed temporary directory (verified): " + temporary);
+    } catch (error) {
+      const description = error?.code ?? (error instanceof Error ? error.message : String(error));
+      console.error("[PathSeek benchmark] CLEANUP FAILED: " + temporary + " (" + description + ")");
+      throw error;
+    }
   }
 }
 
