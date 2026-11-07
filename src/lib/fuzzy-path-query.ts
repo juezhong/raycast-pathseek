@@ -145,14 +145,18 @@ function compileSegment(pattern: string): SegmentMatcher {
 
   return (name, getAlias) => {
     const comparable = ignoreCase ? name.toLowerCase() : name;
-    if (evaluate(comparable)) return true;
-    if (!/\p{Script=Han}/u.test(name)) return false;
+    const direct = evaluate(comparable);
+    if (!/\p{Script=Han}/u.test(name)) return direct;
+    if (direct && !hasNegation) return true;
     const alias = getAlias(name);
-    if (!alias) return false;
+    if (!alias) return direct;
+    const combined = ignoreCase ? (name + " " + alias).toLowerCase() : name + " " + alias;
+    // 否定项必须对原名与所有拼音共同求值，否则会出现假阳性。
+    if (hasNegation) return evaluate(combined);
     const comparableAlias = ignoreCase ? alias.toLowerCase() : alias;
     return (
-      evaluate(ignoreCase ? (name + " " + alias).toLowerCase() : name + " " + alias) ||
-      (!hasNegation && comparableAlias.split(" ").some((reading) => evaluate(reading)))
+      evaluate(combined) ||
+      comparableAlias.split(" ").some((reading) => evaluate(reading))
     );
   };
 }
