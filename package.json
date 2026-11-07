@@ -41,6 +41,32 @@
       "required": false
     },
     {
+      "name": "compressionQuality",
+      "title": "Index Compression Level",
+      "description": "Higher levels may be substantially slower. Index size is workload-dependent; use benchmark tests to compare. Applies on next manual rebuild.",
+      "type": "dropdown",
+      "data": [
+        {
+          "title": "Balanced (7, recommended)",
+          "value": "7"
+        },
+        {
+          "title": "Fast (5)",
+          "value": "5"
+        },
+        {
+          "title": "High (9)",
+          "value": "9"
+        },
+        {
+          "title": "Maximum (11, potentially extremely slow)",
+          "value": "11"
+        }
+      ],
+      "default": "7",
+      "required": false
+    },
+    {
       "name": "fdBinary",
       "title": "fd Executable",
       "description": "Optional absolute path. Default: find fd in Homebrew, Cargo or PATH.",
