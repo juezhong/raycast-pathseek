@@ -16,10 +16,10 @@ test("prefix codec roundtrips Unicode, newlines and fragmented input", async () 
     "/Users/demo/项目/驱动B.c",
     "/Users/demo/项目/long/common/path/" + "a".repeat(4096),
     "/Users/demo/项目/long/common/path/" + "a".repeat(4095) + "b",
-    "/Users/demo/new\\nline.txt",
+    "/Users/demo/new\nline.txt",
     "/Users/demo/space file.txt",
   ];
-  const original = Buffer.from(paths.join("\\0") + "\\0");
+  const original = Buffer.from(paths.join("\0") + "\0");
   for (const chunkSize of [1, 2, 7, 64, 4096]) {
     const chunks = [];
     for (let i = 0; i < original.length; i += chunkSize)
@@ -33,7 +33,7 @@ test("prefix codec roundtrips Unicode, newlines and fragmented input", async () 
 
 test("Brotli prefix index decompresses to exact original paths", async () => {
   const original = Buffer.from(
-    Array.from({ length: 1000 }, (_, i) => "/Users/demo/source/common/" + i + ".c").join("\\0") + "\\0",
+    Array.from({ length: 1000 }, (_, i) => "/Users/demo/source/common/" + i + ".c").join("\0") + "\0",
   );
   const compressed = await collect(
     Readable.from([original])
