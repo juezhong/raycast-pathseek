@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { performance } from "node:perf_hooks";
 import type { Readable } from "node:stream";
 import { openIndexDataStream } from "./index-files.ts";
 import {
@@ -13,6 +14,7 @@ import {
 } from "./fzf-pinyin-priority.ts";
 import {
   createPinyinFilterInput,
+  type PinyinInputDiagnostics,
   originalPathFromPinyinResult,
   shouldPrioritizePinyinResults,
 } from "./pinyin-filter.ts";
@@ -22,6 +24,12 @@ import {
   terminateChild,
   throwIfAborted,
 } from "./managed-child.ts";
+
+export type FzfSearchDiagnostics = PinyinInputDiagnostics & {
+  decoderEndMs?: number;
+  stdinFinishMs?: number;
+  childCloseMs?: number;
+};
 
 export type FilterResult = {
   paths: string[];
@@ -37,7 +45,9 @@ export async function runFzfFilter(
   query: string,
   signal?: AbortSignal,
   timeoutMs = 60_000,
+  diagnostics?: FzfSearchDiagnostics,
 ): Promise<FilterResult> {
+  const startedAt = diagnostics ? performance.now() : 0;
   throwIfAborted(signal);
   const pathQuery = parseFuzzyPathQuery(query);
   const nativePath = pathQuery !== null && isNativeFuzzyPathQuery(pathQuery);
@@ -49,7 +59,13 @@ export async function runFzfFilter(
     pathQuery?.directoryPatterns ?? [],
     nativePath ? pathQuery!.nameQuery : undefined,
     nameQuery,
+    diagnostics,
   );
+  if (diagnostics) {
+    input.once("end", () => {
+      diagnostics.decoderEndMs = performance.now() - startedAt;
+    });
+  }
   const source = augmented;
   if (signal?.aborted) {
     input.destroy();
@@ -97,6 +113,11 @@ export async function runFzfFilter(
       return;
     }
     registerChild(child);
+    if (diagnostics) {
+      child.stdin.once("finish", () => {
+        diagnostics.stdinFinishMs = performance.now() - startedAt;
+      });
+    }
 
     // 等待解压管道关闭后再结束 Promise，避免遗留文件描述符。
     const waitForClose = (stream: Readable) =>
@@ -172,6 +193,7 @@ export async function runFzfFilter(
     });
     child.once("close", (code) => {
       if (finished) return;
+      if (diagnostics) diagnostics.childCloseMs = performance.now() - startedAt;
       finished = true;
       if (deadline) clearTimeout(deadline);
       signal?.removeEventListener("abort", onAbort);
