@@ -55,7 +55,7 @@ export async function fuzzySearch(
         },
       );
 
-      input.on("error", (error) => {
+      input.on("error", (error: Error) => {
         child.kill();
         finish(error);
       });
