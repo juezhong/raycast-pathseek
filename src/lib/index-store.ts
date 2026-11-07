@@ -9,6 +9,7 @@ import { pipeline } from "node:stream/promises";
 import { Transform, PassThrough, type Writable } from "node:stream";
 import { createBrotliCompress, constants as zlibConstants } from "node:zlib";
 import { PathPrefixEncoder } from "./index-codec.ts";
+import { createNonClosingSink } from "./non-closing-sink";
 import { beginIndexBuildProgress } from "./index-progress";
 import lockfile from "proper-lockfile";
 import { beginCommandTrace } from "./command-trace";
@@ -214,14 +215,14 @@ async function runFd(
 
   try {
     await Promise.all([
-      pipeline(
-        shortcut
-          ? child.stdout.pipe(new AliasPathMapper(shortcut))
-          : child.stdout,
-        meter,
-        output,
-        { end: false },
-      ),
+      shortcut
+        ? pipeline(
+            child.stdout,
+            new AliasPathMapper(shortcut),
+            meter,
+            createNonClosingSink(output),
+          )
+        : pipeline(child.stdout, meter, createNonClosingSink(output)),
       completed,
     ]);
     progress.fdFinished(exitCode);
