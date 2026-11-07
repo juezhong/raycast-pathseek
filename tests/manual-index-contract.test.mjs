@@ -56,3 +56,14 @@ test("Rebuild Index starts only on explicit form submit or Action", async () => 
   const initialization = code.slice(0, code.indexOf("async function buildIndex("));
   assert.doesNotMatch(initialization, /\brebuildIndex\s*\(/);
 });
+
+test("global follow-symlinks preference is absent and only selected shortcuts are expanded", async () => {
+  const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+  assert.equal(pkg.preferences.some((pref) => pref.name === "followSymlinks"), false);
+  const store = await source("lib/index-store.ts");
+  assert.doesNotMatch(store, /--follow/);
+  assert.match(store, /discoverSelectiveSymlinks/);
+  const ui = await source("rebuild-index.tsx");
+  assert.match(ui, /id="symlinkDirectory"/);
+  assert.match(ui, /allowMultipleSelection=\{false\}/);
+});
