@@ -64,9 +64,7 @@ export async function runFzfFilter(
     registerChild(child);
 
     // 等待解压管道关闭后再结束 Promise，避免遗留文件描述符。
-    const waitForClose = (
-      stream: Readable,
-    ) =>
+    const waitForClose = (stream: Readable) =>
       new Promise<void>((resolve) => {
         if (stream.closed) resolve();
         else stream.once("close", () => resolve());
@@ -156,14 +154,14 @@ export async function runFzfFilter(
         } else if (fatal) {
           reject(fatal);
         } else if (limited || code === 0 || (code === 1 && !stderr)) {
-          resolve({
-            paths: pinyinMode
+          try {
+            const paths = pinyinMode
               ? output.results.map(originalPathFromPinyinResult)
-              : output.results,
-            exitCode: code,
-            limited,
-            cancelled: false,
-          });
+              : output.results;
+            resolve({ paths, exitCode: code, limited, cancelled: false });
+          } catch (error) {
+            reject(error);
+          }
         } else {
           reject(new Error(`fzf failed (exit ${code}): ${stderr.trim()}`));
         }
