@@ -4,7 +4,7 @@ import { readdir, stat } from "node:fs/promises";
 import os from "node:os";
 import { promisify } from "node:util";
 import { useEffect, useState } from "react";
-import { readIndex, indexFilePath } from "./lib/index-store";
+import { readIndex, indexFilePath, indexDirectory } from "./lib/index-store";
 import {
   commandTracingEnabled,
   readCommandTrace,
@@ -36,7 +36,7 @@ async function getMacOSVersion(): Promise<string> {
 }
 
 async function collectDiagnostics(): Promise<Diagnostics> {
-  const root = environment.supportPath;
+  const root = indexDirectory;
   const report: string[] = [
     "## PathSeek 诊断信息（已隐藏绝对路径）",
     "",
@@ -76,7 +76,7 @@ async function collectDiagnostics(): Promise<Diagnostics> {
       activeStatus = "not checked";
     } else {
       metadataStatus =
-        metadata.version === 2 ? "v2 embedded header" : "v1 legacy index.json";
+        metadata.version === 3 ? "v3 compressed prefix + Brotli" : metadata.version === 2 ? "v2 embedded header" : "v1 legacy index.json";
       declaredCount = String(metadata.count);
       rootCount = String(metadata.roots.length);
       createdAt = metadata.createdAt;
