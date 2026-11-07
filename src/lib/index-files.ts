@@ -15,6 +15,7 @@ const MAGIC_V2 = Buffer.from("PSIDX002", "ascii");
 const MAGIC_V3 = Buffer.from("PSIDX003", "ascii");
 const PREFIX_SIZE = 12;
 const MAX_HEADER_BYTES = 64 * 1024;
+const STREAMED_DATA_OFFSET = 64 * 1024;
 
 export type SavedIndexMetadata = {
   version: 1 | 2 | 3;
@@ -50,6 +51,10 @@ function validateMetadata(raw: unknown): SavedIndexMetadata {
     createdAt: payload.createdAt as string,
     count: payload.count as number,
     roots: payload.roots as string[],
+    dataOffset: typeof payload.dataOffset === "number" &&
+      Number.isSafeInteger(payload.dataOffset) &&
+      payload.dataOffset >= PREFIX_SIZE &&
+      payload.dataOffset <= MAX_HEADER_BYTES ? payload.dataOffset : undefined,
   };
 }
 
@@ -119,6 +124,42 @@ export async function prepareIndex(
   return parsed;
 }
 
+/**
+ * 为流式重建预留固定大小头部。压缩结果直接追加到 staged 文件，
+ * 整个构建过程中不产生完整的未压缩路径临时文件。
+ */
+export async function createStreamingIndexStage(stagedPath: string): Promise<void> {
+  await writeFile(stagedPath, Buffer.alloc(STREAMED_DATA_OFFSET), { flag: "wx" });
+}
+
+export async function finalizeStreamingIndexStage(
+  stagedPath: string,
+  metadata: Omit<SavedIndexMetadata, "filename" | "dataOffset">,
+): Promise<SavedIndexMetadata> {
+  const json = Buffer.from(JSON.stringify({
+    version: 3,
+    createdAt: metadata.createdAt,
+    count: metadata.count,
+    roots: metadata.roots,
+    dataOffset: STREAMED_DATA_OFFSET,
+  }), "utf8");
+  if (PREFIX_SIZE + json.length > STREAMED_DATA_OFFSET)
+    throw new Error("Index metadata exceeds reserved header");
+  const prefix = Buffer.alloc(PREFIX_SIZE);
+  MAGIC_V3.copy(prefix);
+  prefix.writeUInt32LE(json.length, MAGIC_V3.length);
+  const handle = await open(stagedPath, "r+");
+  try {
+    if ((await handle.stat()).size <= STREAMED_DATA_OFFSET)
+      throw new Error("Missing compressed index payload");
+    await handle.write(Buffer.concat([prefix, json]), 0, PREFIX_SIZE + json.length, 0);
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+  return readIndexHeader(stagedPath);
+}
+
 async function readHeader(handle: FileHandle): Promise<SavedIndexMetadata> {
   const prefix = Buffer.alloc(PREFIX_SIZE);
   const first = await handle.read(prefix, 0, PREFIX_SIZE, 0);
@@ -145,7 +186,11 @@ async function readHeader(handle: FileHandle): Promise<SavedIndexMetadata> {
   if (!prefix.subarray(0, expectedMagic.length).equals(expectedMagic)) {
     throw new Error("Index header magic and version mismatch");
   }
-  return { ...metadata, dataOffset: PREFIX_SIZE + length };
+  const offset = metadata.dataOffset ?? PREFIX_SIZE + length;
+  if (offset < PREFIX_SIZE + length || offset > info.size) {
+    throw new Error("Invalid index payload offset");
+  }
+  return { ...metadata, dataOffset: offset };
 }
 
 export async function readIndexHeader(
