@@ -204,7 +204,10 @@ test("basename-only fzf prevents parent-directory false positives while preservi
     ];
     const raw = path.join(dir, "basename-cases.paths");
     const staged = path.join(dir, "basename-cases.nul.tmp");
-    await writeFile(raw, entries.join(String.fromCharCode(0)) + String.fromCharCode(0));
+    await writeFile(
+      raw,
+      entries.join(String.fromCharCode(0)) + String.fromCharCode(0),
+    );
     await prepareIndex(raw, staged, {
       version: 3,
       count: entries.length,
@@ -217,16 +220,19 @@ test("basename-only fzf prevents parent-directory false positives while preservi
     const yearAndPinyin = await runFzfFilter("fzf", index, "2026 dyc");
     assert.deepEqual(yearAndPinyin.paths, ["/data/current/2026第一次.txt"]);
     const plainYear = await runFzfFilter("fzf", index, "2026");
-    assert.deepEqual(new Set(plainYear.paths), new Set([
-      "/data/第一次/2026_report.txt",
-      "/data/current/2026第一次.txt",
-    ]));
+    assert.deepEqual(
+      new Set(plainYear.paths),
+      new Set(["/data/第一次/2026_report.txt", "/data/current/2026第一次.txt"]),
+    );
     const initials = await runFzfFilter("fzf", index, "dyc");
-    assert.deepEqual(new Set(initials.paths), new Set([
-      "/data/2026/第一次.txt",
-      "/data/current/2026第一次.txt",
-      "/data/old/第一次.txt",
-    ]));
+    assert.deepEqual(
+      new Set(initials.paths),
+      new Set([
+        "/data/2026/第一次.txt",
+        "/data/current/2026第一次.txt",
+        "/data/old/第一次.txt",
+      ]),
+    );
     const exact = await runFzfFilter("fzf", index, "'第一次");
     assert.deepEqual(new Set(exact.paths), new Set(initials.paths));
 

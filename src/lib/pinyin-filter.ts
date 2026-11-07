@@ -77,7 +77,10 @@ export function createPinyinFilterInput(enablePinyin = true): Transform {
             alias ? label + " " + alias : label,
             "utf8",
           );
-          if (matchField.length + TAB.length + record.length > MAX_FZF_PATH_BYTES)
+          if (
+            matchField.length + TAB.length + record.length >
+            MAX_FZF_PATH_BYTES
+          )
             throw new Error("Search record exceeds size limit");
           this.push(Buffer.concat([matchField, TAB, record, NUL]));
           offset = end + 1;

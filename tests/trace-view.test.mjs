@@ -2,14 +2,19 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import test from "node:test";
-import { formatLocalTimestamp, summarizeTraceRecords } from "../src/lib/trace-view.ts";
+import {
+  formatLocalTimestamp,
+  summarizeTraceRecords,
+} from "../src/lib/trace-view.ts";
 
 const execFileAsync = promisify(execFile);
 
 test("diagnostic time is local, never a hard-coded +8 offset", async () => {
   const sourceUrl = new URL("../src/lib/trace-view.ts", import.meta.url).href;
   const script =
-    "import { formatLocalTimestamp } from " + JSON.stringify(sourceUrl) + ";" +
+    "import { formatLocalTimestamp } from " +
+    JSON.stringify(sourceUrl) +
+    ";" +
     "console.log(formatLocalTimestamp('2026-11-07T12:34:56.000Z'));";
   const shanghai = await execFileAsync(
     process.execPath,
@@ -72,14 +77,19 @@ test("trace renderer joins start/end and retains failures, counts, duration and 
 
 test("empty trace and end-only event render without throwing", () => {
   assert.match(summarizeTraceRecords([]), /暂无/);
-  assert.match(summarizeTraceRecords([{
-    id: "end-only",
-    at: "2026-11-07T12:00:00Z",
-    tool: "fzf",
-    reason: "fuzzy-query",
-    invocation: "fzf <redacted>",
-    phase: "end",
-    outcome: "failure",
-    errorCode: "ENOENT",
-  }]), /失败/);
+  assert.match(
+    summarizeTraceRecords([
+      {
+        id: "end-only",
+        at: "2026-11-07T12:00:00Z",
+        tool: "fzf",
+        reason: "fuzzy-query",
+        invocation: "fzf <redacted>",
+        phase: "end",
+        outcome: "failure",
+        errorCode: "ENOENT",
+      },
+    ]),
+    /失败/,
+  );
 });

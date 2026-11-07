@@ -226,7 +226,12 @@ export default function DebugInfo() {
           <ActionPanel>
             <Action.Push
               title="View fd/fzf Trace"
-              target={<Detail navigationTitle="fd/fzf Trace" markdown={data.traceMarkdown} />}
+              target={
+                <Detail
+                  navigationTitle="fd/fzf Trace"
+                  markdown={data.traceMarkdown}
+                />
+              }
             />
             <Action.CopyToClipboard
               title="Copy Sanitized Debug Info"
