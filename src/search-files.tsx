@@ -119,8 +119,8 @@ export function SearchFilesView({
       searchText={query}
       searchBarPlaceholder={
         dialogMode
-          ? "Search paths, fzf syntax or pinyin initials: dyc / yc d"
-          : "Search paths with fzf, or Chinese pinyin: dyc / yc d"
+          ? "Search names, fzf syntax or pinyin: 2026 dyc"
+          : "Search file/folder names with fzf, pinyin: 2026 dyc"
       }
       onSearchTextChange={setQuery}
     >

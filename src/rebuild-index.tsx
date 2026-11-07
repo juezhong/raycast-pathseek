@@ -9,6 +9,7 @@ import {
   useNavigation,
 } from "@raycast/api";
 import { useEffect, useRef, useState } from "react";
+import { formatLocalTimestamp } from "./lib/trace-view";
 import {
   getConfiguredIndexRoots,
   getConfiguredSymlinkDirectory,
@@ -255,8 +256,8 @@ export default function RebuildIndex() {
         `**Compression quality:** ${progress.compressionQuality}`,
         `**Extension CPU time:** ${(progress.cpuUserMs / 1000).toFixed(1)} s user + ${(progress.cpuSystemMs / 1000).toFixed(1)} s system (excludes fd process)`,
         `**Selective symlink targets:** ${progress.selectiveSymlinkTargets ?? 0}, skipped: ${progress.selectiveSymlinkSkipped ?? 0} · **Include hidden:** ${progress.includeHidden ? "yes" : "no"}`,
-        `**Last scanner output:** ${progress.lastInputAt ?? "not yet observed"}`,
-        `**Last compressed output:** ${progress.lastOutputAt ?? "not yet observed"}`,
+        `**Last scanner output:** ${progress.lastInputAt ? formatLocalTimestamp(progress.lastInputAt) : "not yet observed"}`,
+        `**Last compressed output:** ${progress.lastOutputAt ? formatLocalTimestamp(progress.lastOutputAt) : "not yet observed"}`,
         "",
         "The compressed file size is **not** the volume of paths already scanned. The final index is published only after the build finishes.",
       ].join("\n\n")

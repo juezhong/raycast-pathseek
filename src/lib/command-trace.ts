@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { appendFile, mkdir, readFile, rename, stat } from "node:fs/promises";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
+import { summarizeTraceRecords } from "./trace-view";
 
 /**
  * Developer-only local observability. No work (and no disk writes) is done
@@ -138,40 +139,5 @@ export async function readCommandTrace(): Promise<CommandTraceRecord[]> {
 }
 
 export function summarizeCommandTrace(records: CommandTraceRecord[]): string {
-  if (!records.length)
-    return "No fd/fzf calls recorded in this tracing session.";
-  const tick = String.fromCharCode(96);
-  const output = records.map((event) => {
-    const detail =
-      event.phase === "start"
-        ? "started"
-        : [
-            event.outcome ?? "finished",
-            event.durationMs === undefined ? "" : event.durationMs + "ms",
-            event.resultCount === undefined
-              ? ""
-              : "results=" + event.resultCount,
-            event.exitCode === undefined
-              ? ""
-              : "exit=" + String(event.exitCode),
-            event.errorCode ? "error=" + event.errorCode : "",
-          ]
-            .filter(Boolean)
-            .join(", ");
-    return (
-      "- " +
-      event.at +
-      " | " +
-      tick +
-      event.tool +
-      tick +
-      " | " +
-      event.reason +
-      " | " +
-      event.invocation +
-      " | " +
-      detail
-    );
-  });
-  return output.reverse().join("\n");
+  return summarizeTraceRecords(records);
 }

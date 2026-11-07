@@ -12,12 +12,14 @@ import {
   readCommandTrace,
   summarizeCommandTrace,
 } from "./lib/command-trace";
+import { formatLocalTimestamp } from "./lib/trace-view";
 
 const run = promisify(execFile);
 
 type Diagnostics = {
   markdown: string;
   copyText: string;
+  traceMarkdown: string;
 };
 
 function errorCode(error: unknown): string {
@@ -97,7 +99,7 @@ async function collectDiagnostics(): Promise<Diagnostics> {
       declaredCount = String(metadata.count);
       rootCount = String(metadata.roots.length);
       legacyIndexLocation = metadata.legacyDevelopmentLocation ? "yes" : "no";
-      createdAt = metadata.createdAt;
+      createdAt = formatLocalTimestamp(metadata.createdAt);
       const info = await stat(indexFilePath(metadata));
       activeStatus = info.isFile() ? "present" : "not a regular file";
       indexBytes = String(info.size);
@@ -155,8 +157,8 @@ async function collectDiagnostics(): Promise<Diagnostics> {
       `- extension CPU user/system ms: ${progress.cpuUserMs}/${progress.cpuSystemMs} (fd child excluded)`,
       `- fd pid: ${progress.fdPid ?? "none"}`,
       `- last fd exit code: ${progress.fdExitCode ?? "unknown"}`,
-      `- last raw input at: ${progress.lastInputAt ?? "not yet observed"}`,
-      `- last compressed output at: ${progress.lastOutputAt ?? "not yet observed"}`,
+      `- last raw input at: ${progress.lastInputAt ? formatLocalTimestamp(progress.lastInputAt) : "not yet observed"}`,
+      `- last compressed output at: ${progress.lastOutputAt ? formatLocalTimestamp(progress.lastOutputAt) : "not yet observed"}`,
       `- error code: ${progress.errorCode ?? "none"}`,
       "",
       "> 心跳持续更新只能证明扩展仍在记录进度，不代表扫描或压缩一直有数据输出。",
@@ -164,8 +166,16 @@ async function collectDiagnostics(): Promise<Diagnostics> {
   }
 
   report.push("", "## fd/fzf 调用记录（开发者选项）");
+  let traceMarkdown = "# fd/fzf 调用记录\n\n尚未启用调试追踪。";
   if (commandTracingEnabled()) {
     const records = await readCommandTrace();
+    traceMarkdown = [
+      "# fd/fzf 调用记录",
+      "",
+      "按命令调用合并开始/结束事件；显示为 macOS 本地时间，原始 JSONL 仍使用 UTC。",
+      "",
+      summarizeCommandTrace(records),
+    ].join("\n");
     report.push(
       "Tracing: enabled (local, sanitized, maximum 256 KiB per file)",
       "Method: Node.js child_process.spawn, no shell",
@@ -181,7 +191,7 @@ async function collectDiagnostics(): Promise<Diagnostics> {
   }
 
   const copyText = report.join("\n");
-  return { markdown: copyText, copyText };
+  return { markdown: copyText, copyText, traceMarkdown };
 }
 
 export default function DebugInfo() {
@@ -214,6 +224,15 @@ export default function DebugInfo() {
       actions={
         data ? (
           <ActionPanel>
+            <Action.Push
+              title="View fd/fzf Trace"
+              target={
+                <Detail
+                  navigationTitle="fd/fzf Trace"
+                  markdown={data.traceMarkdown}
+                />
+              }
+            />
             <Action.CopyToClipboard
               title="Copy Sanitized Debug Info"
               content={data.copyText}
@@ -221,10 +240,6 @@ export default function DebugInfo() {
             <Action
               title="Refresh Diagnostics"
               onAction={() => setRefreshCount((count) => count + 1)}
-            />
-            <Action.Open
-              title="Open PathSeek GitHub Issue"
-              target="https://github.com/juezhong/raycast-pathseek/issues/1"
             />
           </ActionPanel>
         ) : undefined

@@ -13,37 +13,38 @@ import type { IndexMetadata } from "./lib/index-store";
 
 const HELP = `# Search Syntax Guide
 
-PathSeek queries **existing file paths** with \`fzf --extended --read0 --print0 --filter\`. A search is not a live filesystem scan.
+PathSeek searches **only each indexed file or directory name** with \`fzf --extended --read0 --print0 --filter\`. A search is not a live filesystem scan.
 
 | Expression | Behavior |
 | --- | --- |
-| \`driver\` | Ordered fuzzy characters anywhere in the full path |
+| \`driver\` | Ordered fuzzy characters in the file/directory name |
 | \`'driver\` | Exact substring |
 | \`'driver'\` | Exact word boundary match |
-| \`^/Users\` | Entire path starts with \`/Users\` |
-| \`.pdf$\` | Entire path ends with \`.pdf\` |
-| \`!node_modules\` | Exclude paths containing \`node_modules\` |
+| \`^driver\` | Name starts with \`driver\` |
+| \`.pdf$\` | Name ends with \`.pdf\` |
+| \`!node_modules\` | Exclude names containing \`node_modules\` |
 | \`driver .c$\` | Both conditions must match (AND) |
 | \`.c$ | .h$\` | Either alternative may match (OR) |
 
 ## Chinese Pinyin
 
-For plain Latin-letter queries (letters and spaces), PathSeek also supplies temporary pinyin initials and full readings of Chinese names to fzf. Examples for \`第一次\`:
+For simple Latin-letter/digit queries (including spaces), PathSeek also supplies temporary pinyin initials and full readings of Chinese names to fzf. Examples for \`第一次\`:
 
 - \`dyc\`, \`d y c\` — ordered or separate initials
 - \`yc d\`, \`y c d\` — the independent terms can appear in any order
 - \`diyici\` — full pinyin
+- \`2026 dyc\` — both year and initials must appear in **the same name**, not its parent folders
 
-Pinyin aliases are generated **only while searching**, not stored in a second index. They support the same \`fzf\` matcher, but no transliteration library can guarantee every polyphonic proper name. Complex \`fzf\` operators (\`!\`, \`^\`, \`$\`, \`'\`, \`|\`) continue to match the **unmodified original paths**.
+Pinyin aliases are generated **only while searching**, not stored in a second index. They support the same \`fzf\` matcher, but no transliteration library can guarantee every polyphonic proper name. Complex \`fzf\` operators (\`!\`, \`^\`, \`$\`, \`'\`, \`|\`) still use native fzf syntax, restricted to the **original file/directory name**.
 
 ## Notes
 
-- Prefix and suffix anchors apply to the **absolute path**, not only the basename.
+- Prefix and suffix anchors apply to the **file/directory name**, never the parent path.
 - Multiple terms separated by spaces mean AND; a standalone \`|\` means OR.
 - Results are capped at 150. Opening the guide or expression editor never starts \`fd\`.
 - Use **Compose Expression & Preview** to see real matching files before pressing Enter.
 
-[Official fzf search syntax](https://github.com/junegunn/fzf#search-syntax)
+
 `;
 
 export function SearchSyntaxHelp() {
@@ -133,7 +134,7 @@ function SearchExpressionBuilder({
       <Form.TextField
         id="expression"
         title="Expression"
-        placeholder="driver .c$ | dyc | yc d"
+        placeholder="2026 dyc | driver .c$"
         value={expression}
         onChange={setExpression}
         autoFocus
