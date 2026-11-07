@@ -55,7 +55,7 @@ npm run dev
 
 `npm run build` 只验证可构建，**不会自动导入扩展**。此项目目前优先采用 CLI 导入，避免依赖不同 Raycast 版本中的菜单位置。
 
-Raycast 把本地扩展视为开发扩展；项目代码使用 `environment.isDevelopment` 区分索引存储位置。**不要假定停止 `npm run dev` 就会自动切换为 Store 正式安装模式**。需要核对实际索引时，请在 `View Index Status` 中选择 **Copy Active Index File Path**；日常更新无需反复卸载扩展或删除索引。
+PathSeek 统一使用 Raycast 提供的 `environment.supportPath` 作为索引存储根目录，**不会因为 `npm run dev`、退出调试或本地扩展的开发模式标志而切换目录**。通过 `View Index Status → Copy Active Index File Path` 可以查看当前真实索引路径；日常更新不需要卸载扩展或删除索引。
 
 若后续版本的 Raycast 提供 `Import Extension` 命令，也可以用它选择含 `package.json` 的仓库根目录；但对你当前的界面，不把它作为必需步骤。
 
@@ -68,9 +68,11 @@ Raycast 把本地扩展视为开发扩展；项目代码使用 `environment.isDe
 3. 确认后主动执行建立索引；首次构建完成前，搜索不会自动扫描文件系统。
 4. 用 **View Index Status** 检查索引的路径数、构建时间和体积。
 
-索引默认采用 **v3 前缀编码 + Brotli 压缩**，保存在 Raycast 扩展自己的支持目录。索引文件在完整构建成功后才原子替换；正常取消或失败应保留上一次成功的索引。
+索引默认采用 **v3 前缀编码 + Brotli 压缩**，保存在 Raycast 扩展自己的支持目录（通常位于 `~/Library/Application Support/com.raycast.macos/extensions/` 的某个扩展子目录，由 Raycast 决定具体位置）。**这是插件数据目录，而不是 Git 源码目录或可执行文件资源包**。索引文件在完整构建成功后才原子替换；正常取消或失败应保留上一次成功的索引。
 
-**索引目录按实际运行模式区分：**代码根据 Raycast 提供的 `environment.isDevelopment` 选择存储目录。本地导入的扩展不应假定会自动变成 Store 正式安装模式。请用 **View Index Status → Copy Active Index File Path** 核对当前索引；不要擅自移动或删除数据文件。
+**统一目录与旧索引兼容：**新版本始终在 `environment.supportPath/index.nul` 建立和读取索引。如果这个位置没有有效索引，仍可**只读**使用历史 `environment.supportPath/index-development-v3/index.nul`；`View Index Status` 会明确提示旧位置。下一次你主动执行 `Build Index` 才在统一目录生成新索引，**不会自动删除或覆盖旧目录**。如果两个位置都有索引，统一目录优先。
+
+**清理旧索引：**只有在 `View Index Status → Copy Active Index File Path` 已显示统一目录中的 `index.nul`，并且搜索功能验收通过后，才考虑在 Finder 中备份并删除**旧的 `index-development-v3` 子目录**。请勿删除整个 `environment.supportPath`；其中可能还有当前索引、构建进度和日志。为避免误操作，PathSeek 不会自动清除旧目录。
 
 **软链接规则：**普通扫描不启用 `fd --follow`；只有指定快捷目录的**直接子项中指向目录的软链接**会被单独展开。搜索结果保留快捷链接路径，其目标内部的软链接不会继续跟随。
 
@@ -148,4 +150,4 @@ npm run benchmark:standalone -- "$HOME" --hidden --quality 7 --runs 5
 
 ## 许可
 
-MIT License。PathSeek 基于 Raycast [Fuzzy File Search](https://github.com/raycast/extensions/tree/main/extensions/fuzzy-file-search) 的 MIT 许可代码进行扩展。版权及第三方许可请参阅 [LICENSE](LICENSE) 和 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+PathSeek 的源代码遵循 [MIT License](LICENSE)。运行时依赖 Raycast API 和用户自行安装的 `fd` / `fzf`，并不打包或自动下载这两个命令行工具。

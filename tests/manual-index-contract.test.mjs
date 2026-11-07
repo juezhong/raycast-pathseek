@@ -86,3 +86,13 @@ test("search and rebuild commands release work on unmount instead of keeping bac
   assert.match(runner, /inputClosed\.then/);
   assert.doesNotMatch(runner, /setInterval\s*\(/);
 });
+
+test("development and locally imported commands share the Raycast supportPath index root", async () => {
+  const store = await source("lib/index-store.ts");
+  assert.match(store, /indexDirectory = environment\.supportPath/);
+  assert.doesNotMatch(store, /environment\.isDevelopment/);
+  assert.match(store, /readStoredIndex\(indexDirectory\)/);
+  const locations = await source("lib/index-location.ts");
+  assert.match(locations, /OLD_DEVELOPMENT_INDEX_FOLDER = "index-development-v3"/);
+  assert.match(locations, /readIndexAt\(supportPath, supportPath, false\)/);
+});

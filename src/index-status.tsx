@@ -50,11 +50,15 @@ export default function IndexStatus() {
     };
   }, []);
 
-  const directory = indexDirectory;
+  // 在兼容旧开发索引期间，展示实际读取的目录而不是误指向新目录。
+  const directory =
+    state.status === "ready"
+      ? path.dirname(indexFilePath(state.metadata))
+      : indexDirectory;
   const activeFile =
     state.status === "ready"
       ? indexFilePath(state.metadata)
-      : path.join(directory, "index.nul");
+      : path.join(indexDirectory, "index.nul");
 
   const markdown =
     state.status === "loading"
@@ -63,7 +67,7 @@ export default function IndexStatus() {
         ? "# No Index Yet\n\nPathSeek has not indexed anything. Nothing will be scanned automatically.\n\nChoose your folders through **Build Index**, then explicitly build your first index."
         : state.status === "error"
           ? `# Index Error\n\n${state.message}\n\nCheck the index files, then use **Build Index** to recover.`
-          : `# Index Status\n\n- **Indexed paths:** ${state.metadata.count.toLocaleString()}\n- **Index size:** ${indexBytes === null ? "Reading…" : (indexBytes / (1024 * 1024)).toFixed(2) + " MiB (" + indexBytes.toLocaleString() + " bytes)"}\n- **Bytes per path:** ${indexBytes === null || !state.metadata.count ? "N/A" : (indexBytes / state.metadata.count).toFixed(2)}\n- **Last built:** ${new Date(state.metadata.createdAt).toLocaleString()}\n- **Index file:** \`${state.metadata.filename}\`\n- **Format:** ${state.metadata.version === 3 ? "v3 prefix + Brotli (compressed)" : state.metadata.version === 2 ? "v2 self-describing" : "v1 legacy"}\n- **Search roots:**\n${state.metadata.roots.map((root) => `  - \`${root}\``).join("\n")}\n\nThis index is reused until you manually run Build Index. **No automatic refresh or background scanning.**`;
+          : `# Index Status\n\n${state.metadata.legacyDevelopmentLocation ? "**Old development index:** Read-only compatibility mode. Run Build Index once to write the next index into Raycast supportPath; the old file will not be removed automatically.\n\n" : ""}- **Indexed paths:** ${state.metadata.count.toLocaleString()}\n- **Index size:** ${indexBytes === null ? "Reading…" : (indexBytes / (1024 * 1024)).toFixed(2) + " MiB (" + indexBytes.toLocaleString() + " bytes)"}\n- **Bytes per path:** ${indexBytes === null || !state.metadata.count ? "N/A" : (indexBytes / state.metadata.count).toFixed(2)}\n- **Last built:** ${new Date(state.metadata.createdAt).toLocaleString()}\n- **Index file:** \`${state.metadata.filename}\`\n- **Format:** ${state.metadata.version === 3 ? "v3 prefix + Brotli (compressed)" : state.metadata.version === 2 ? "v2 self-describing" : "v1 legacy"}\n- **Search roots:**\n${state.metadata.roots.map((root) => `  - \`${root}\``).join("\n")}\n\nThis index is reused until you manually run Build Index. **No automatic refresh or background scanning.**`;
 
   return (
     <Detail
