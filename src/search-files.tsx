@@ -66,7 +66,7 @@ export function SearchFilesView({
   }
   const directoryExpression = subtreeQuery?.directoryExpression;
   const scopedFolder =
-    directoryExpression === activeScope?.expression
+    subtreeQuery && activeScope?.expression === directoryExpression
       ? activeScope.folder
       : undefined;
   const selectingFolder = Boolean(subtreeQuery && !scopedFolder);
