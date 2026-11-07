@@ -167,7 +167,7 @@ export async function readIndexHeader(
  */
 export async function openIndexDataStream(
   indexPath: string,
-): Promise<NodeJS.ReadableStream> {
+): Promise<ReadStream | PathPrefixDecoder> {
   const handle = await open(indexPath, "r");
   try {
     const header = path.basename(indexPath) === ACTIVE_INDEX_FILENAME
