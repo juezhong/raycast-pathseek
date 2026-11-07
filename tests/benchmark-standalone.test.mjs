@@ -50,6 +50,12 @@ test("standalone benchmark builds, searches and removes only its temporary index
     const output = JSON.parse(stdout);
     assert.equal(output.benchmarkVersion, 2);
     assert.equal(output.formatVersion, 3);
+    assert.equal(output.nodeRss.sampleIntervalMs, 50);
+    assert.ok(output.nodeRss.atStartBytes > 0);
+    assert.ok(output.nodeRss.afterBenchmarkBytes > 0);
+    assert.ok(output.nodeRss.sampledPeakBytes >= output.nodeRss.atStartBytes);
+    assert.ok(output.nodeRss.sampledPeakBytes >= output.nodeRss.afterBenchmarkBytes);
+    assert.match(output.nodeRss.scope, /excludes fd\/fzf and Raycast/);
     assert.equal(output.host.platform, process.platform);
     assert.equal(output.host.architecture, process.arch);
     assert.equal(output.scanRoots, 2);
