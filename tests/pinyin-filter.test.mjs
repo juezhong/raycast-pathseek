@@ -159,3 +159,63 @@ test("ASCII basename fast path is byte-exact and does not expose parent text", a
   assert.match(records[7], /^第一次\.txt dyc diyici /);
   assert.equal(records[8], "line\nbreak.c\t" + entries[8]);
 });
+
+
+test("batched fzf records preserve exact bytes and order with split input chunks", async () => {
+  const entries = [
+    ...Array.from({ length: 2600 }, (_, i) => "/目录/sample-" + i + ".txt"),
+    "/docs/第一次.txt",
+    "/docs/tab\tname.c",
+    "/docs/café.txt",
+    "/docs/line\nbreak.c",
+    "/docs/ending/",
+  ];
+  const source = Buffer.from(entries.join("\0") + "\0", "utf8");
+  const expected = Buffer.concat(
+    entries.map((entry) => {
+      const basename = entry.split("/").filter(Boolean).at(-1);
+      const alias = pinyinAlias(basename);
+      const label = basename.replaceAll("\t", " ");
+      const field = alias ? label + " " + alias : label;
+      return Buffer.from(field + "\t" + entry + "\0", "utf8");
+    }),
+  );
+  const collect = async (chunks) => {
+    const results = [];
+    for await (const chunk of Readable.from(chunks).pipe(createPinyinFilterInput(true)))
+      results.push(chunk);
+    return results;
+  };
+
+  const merged = await collect([source]);
+  assert.ok(merged.length < 100, "a batch should contain many NUL-delimited records");
+  assert.deepEqual(Buffer.concat(merged), expected);
+
+  // 索引流跨任意输入边界时，也必须恢复同一字节序列。
+  const fragments = [];
+  let position = 0;
+  let sequence = 0;
+  while (position < source.length) {
+    const size = [43, 777, 4096, 3][sequence++ % 4];
+    fragments.push(source.subarray(position, position + size));
+    position += size;
+  }
+  assert.deepEqual(Buffer.concat(await collect(fragments)), expected);
+});
+
+test("batched output preserves separately anchored original and Chinese alias records", async () => {
+  const entries = ["/docs/第一次.txt", "/docs/第二次.md", "/docs/driver.c"];
+  const chunks = [];
+  const raw = Buffer.from(entries.join("\0") + "\0");
+  for await (const chunk of Readable.from([raw]).pipe(
+    createPinyinFilterInput(true, [], undefined, "^dyc$"),
+  )) {
+    chunks.push(chunk);
+  }
+  const records = Buffer.concat(chunks).toString("utf8").split("\0").filter(Boolean);
+  assert.ok(records.includes("第一次.txt\t" + entries[0]));
+  assert.ok(records.includes("dyc\t" + entries[0]));
+  assert.ok(records.includes("diyici\t" + entries[0]));
+  assert.ok(records.includes("driver.c\t" + entries[2]));
+  assert.deepEqual(new Set(records.map(originalPathFromPinyinResult)), new Set(entries));
+});
