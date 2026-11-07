@@ -1,19 +1,18 @@
 # PathSeek v3 搜索性能与 Open/Save 验证
 
-索引构建、压缩和选择性软链接扫描已通过本分支的 macOS CI。下一步验证搜索体验。整个流程**不会重新构建索引，也不会删除或覆盖文件**。
+本指南用于本地搜索性能验收。独立基准测试会**扫描目录并创建一个临时压缩索引**，正常完成后自动删除；仅对已有索引运行的基准测试不会扫描或修改索引。两者都不需要后台任务。
 
-## 1. 启动当前测试分支
+## 1. 使用主分支（benchmark 本身不需要 Raycast 插件）
 
 ```bash
-git switch feat/compact-compressed-index-v3
-git pull --ff-only
+git switch main
+git pull --ff-only origin main
 npm ci
 npm test
 npm run build
-npm run dev
 ```
 
-在 Raycast 的开发版 **View Index Status** 中找到并复制 **Copy Active Index File Path**。本分支通常位于 `.../index-development-v3/index.nul`，不要使用正式版路径。
+只有在使用下文第 3 节已有索引模式时，才需要从 Raycast 开发版 **View Index Status → Copy Active Index File Path** 复制 `index.nul` 的路径。第 2 节的独立测试完全不需要这个文件。
 
 ## 2. 无需索引缓存的独立基准测试（推荐）
 
