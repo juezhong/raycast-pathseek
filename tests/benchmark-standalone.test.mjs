@@ -85,3 +85,15 @@ test("standalone benchmark builds, searches and removes only its temporary index
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("invalid repeat count does not create any benchmark index", async () => {
+  const before = await temporaryBenchmarkFiles();
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      ["--experimental-strip-types", "scripts/benchmark-standalone.mjs", os.tmpdir(), "--runs", "0"],
+      { cwd: path.resolve("."), timeout: 10_000 },
+    ),
+  );
+  assert.deepEqual(await temporaryBenchmarkFiles(), before);
+});
