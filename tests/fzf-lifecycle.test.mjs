@@ -447,7 +447,7 @@ test("slash-delimited fuzzy path search matches directory levels before the real
     const plain = await runFzfFilter("fzf", index, "four");
     assert.ok(plain.paths.includes(targets[0]));
     assert.ok(plain.paths.includes("/sample/first/second/third/archive/fourth"));
-    const advanced = await runFzfFilter("fzf", index, "th/.txt$");
+    const advanced = await runFzfFilter("fzf", index, "third/.txt$");
     assert.deepEqual(advanced.paths, [targets[1]]);
     const malformed = await assert.rejects(
       runFzfFilter("fzf", index, "third//fourth"),
