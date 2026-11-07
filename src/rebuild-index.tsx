@@ -11,7 +11,9 @@ import {
 import { useEffect, useState } from "react";
 import {
   getConfiguredIndexRoots,
+  getConfiguredSymlinkDirectory,
   saveConfiguredIndexRoots,
+  saveConfiguredSymlinkDirectory,
 } from "./lib/index-roots";
 import {
   indexDirectory,
@@ -34,21 +36,25 @@ type Mode = "loading" | "configure" | "ready" | "building";
 
 function ChooseFolders({
   initialRoots,
+  initialSymlinkDirectory,
   actionTitle,
   onSave,
 }: {
   initialRoots: string[];
+  initialSymlinkDirectory: string | null;
   actionTitle: string;
-  onSave: (roots: string[]) => void | Promise<void>;
+  onSave: (roots: string[], symlinkDirectory: string | null) => void | Promise<void>;
 }) {
   const [saving, setSaving] = useState(false);
 
-  async function submit(values: { folders: string[] }) {
+  async function submit(values: { folders: string[]; symlinkDirectory?: string[] }) {
     if (saving) return;
     setSaving(true);
     try {
+      // 先验证普通索引根目录，再持久化选定的快捷链接目录。
       const roots = await saveConfiguredIndexRoots(values.folders);
-      await onSave(roots);
+      const symlinkDirectory = await saveConfiguredSymlinkDirectory(values.symlinkDirectory?.[0] ?? null);
+      await onSave(roots, symlinkDirectory);
     } catch (error) {
       await showToast({
         style: Toast.Style.Failure,
@@ -73,7 +79,7 @@ function ChooseFolders({
         </ActionPanel>
       }
     >
-      <Form.Description text="Requires fd and fzf (Homebrew: brew install fd fzf). Select the folders to search. Only pressing Build Index runs a scan." />
+      <Form.Description text="Choose normal index folders and, optionally, ONE folder containing symlink shortcuts. Only direct directory symlinks in that folder are expanded. Other symlinks are never followed." />
       <Form.FilePicker
         id="folders"
         title="Index Folders"
@@ -82,24 +88,36 @@ function ChooseFolders({
         canChooseDirectories
         canChooseFiles={false}
       />
+      <Form.FilePicker
+        id="symlinkDirectory"
+        title="Symlink Shortcut Folder (Optional)"
+        defaultValue={initialSymlinkDirectory ? [initialSymlinkDirectory] : []}
+        canChooseDirectories
+        canChooseFiles={false}
+        allowMultipleSelection={false}
+        info="Only direct directory symlinks inside this folder are expanded. The search results preserve the shortcut path."
+      />
     </Form>
   );
 }
 
 function ChangeFolders({
   roots,
+  symlinkDirectory,
   onSave,
 }: {
   roots: string[];
-  onSave: (paths: string[]) => void;
+  symlinkDirectory: string | null;
+  onSave: (paths: string[], directory: string | null) => void;
 }) {
   const { pop } = useNavigation();
   return (
     <ChooseFolders
       initialRoots={roots}
+      initialSymlinkDirectory={symlinkDirectory}
       actionTitle="Save Selected Folders"
-      onSave={(paths) => {
-        onSave(paths);
+      onSave={(paths, directory) => {
+        onSave(paths, directory);
         pop();
       }}
     />
@@ -109,6 +127,7 @@ function ChangeFolders({
 export default function RebuildIndex() {
   const [mode, setMode] = useState<Mode>("loading");
   const [roots, setRoots] = useState<string[]>([]);
+  const [symlinkDirectory, setSymlinkDirectory] = useState<string | null>(null);
   const [current, setCurrent] = useState<IndexMetadata | null>(null);
   const [error, setError] = useState<string>();
   const [progress, setProgress] = useState<IndexBuildProgress | null>(null);
@@ -135,9 +154,11 @@ export default function RebuildIndex() {
       try {
         const metadata = await readIndex();
         const configured = await getConfiguredIndexRoots(metadata?.roots);
+        const selectedLinks = await getConfiguredSymlinkDirectory();
         if (!mounted) return;
         setCurrent(metadata);
         setRoots(configured);
+        setSymlinkDirectory(selectedLinks);
         // Missing index always gets the folder picker, even if a prior selection was saved.
         setMode(metadata && configured.length ? "ready" : "configure");
       } catch (failure) {
@@ -182,9 +203,11 @@ export default function RebuildIndex() {
     return (
       <ChooseFolders
         initialRoots={roots}
+        initialSymlinkDirectory={symlinkDirectory}
         actionTitle="Choose Folders and Build Index"
-        onSave={(chosen) => {
+        onSave={(chosen, directory) => {
           setRoots(chosen);
+          setSymlinkDirectory(directory);
           void buildIndex(chosen);
         }}
       />
@@ -206,7 +229,7 @@ export default function RebuildIndex() {
         `**Elapsed:** ${(progress.elapsedMs / 1000).toFixed(1)} s`,
         `**Compression quality:** ${progress.compressionQuality}`,
         `**Extension CPU time:** ${(progress.cpuUserMs / 1000).toFixed(1)} s user + ${(progress.cpuSystemMs / 1000).toFixed(1)} s system (excludes fd process)`,
-        `**Follow symlinks:** ${progress.followSymlinks ? "yes" : "no"} · **Include hidden:** ${progress.includeHidden ? "yes" : "no"}`,
+        `**Selective symlink targets:** ${progress.selectiveSymlinkTargets ?? 0}, skipped: ${progress.selectiveSymlinkSkipped ?? 0} · **Include hidden:** ${progress.includeHidden ? "yes" : "no"}`,
         `**Last scanner output:** ${progress.lastInputAt ?? "not yet observed"}`,
         `**Last compressed output:** ${progress.lastOutputAt ?? "not yet observed"}`,
         "",
@@ -237,6 +260,8 @@ export default function RebuildIndex() {
                 "** indexed paths."
               : "No index exists. Select folders and explicitly build your first index.",
             "",
+            "**Selective symlink directory:** " + (symlinkDirectory ?? "None") + "\n\nOnly direct directory links inside that folder are traversed. All other symlinks are not followed.",
+            "",
             "Use **Cmd+K → Change Indexed Folders** to choose different directories. Saving a new selection does not automatically rebuild.",
             ...(error
               ? [
@@ -262,7 +287,7 @@ export default function RebuildIndex() {
             <Action.Push
               title="Change Indexed Folders"
               icon={Icon.Folder}
-              target={<ChangeFolders roots={roots} onSave={setRoots} />}
+              target={<ChangeFolders roots={roots} symlinkDirectory={symlinkDirectory} onSave={(paths, directory) => { setRoots(paths); setSymlinkDirectory(directory); }} />}
             />
             {missingBinary && (
               <>
