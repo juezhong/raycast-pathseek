@@ -97,3 +97,55 @@ test("invalid repeat count does not create any benchmark index", async () => {
   );
   assert.deepEqual(await temporaryBenchmarkFiles(), before);
 });
+
+test("CPU strategy comparison reuses one temporary index and emits no paths", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "pathseek-compare-fixture-"));
+  try {
+    await mkdir(path.join(root, "sources"));
+    for (let i = 0; i < 180; i++) {
+      await writeFile(path.join(root, "sources", "driveralpha" + i + ".c"), "x");
+    }
+    const before = await temporaryBenchmarkFiles();
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      [
+        "--experimental-strip-types",
+        "scripts/benchmark-standalone.mjs",
+        root,
+        "--compare",
+        "--runs",
+        "2",
+      ],
+      { cwd: path.resolve("."), timeout: 60_000, maxBuffer: 1024 * 1024 },
+    );
+    const result = JSON.parse(stdout);
+    assert.equal(result.benchmarkVersion, 2);
+    assert.equal(result.measuredRounds, 2);
+    assert.equal(result.cpuComparison.strategies.length, 12);
+    assert.equal(result.cpuComparison.warmupRounds, 1);
+    assert.equal(result.cpuComparison.measuredRounds, 2);
+    assert.equal(result.cpuComparison.rawMemoryBytes, result.uncompressedBytes);
+    assert.equal(result.cpuComparison.resultLimit, 150);
+    assert.ok(result.cpuComparison.peakNodeRssBytes > 0);
+    assert.deepEqual(
+      [...new Set(result.cpuComparison.strategies.map((entry) => entry.strategy))].sort(),
+      ["sorted-compressed", "sorted-memory", "unsorted-compressed", "unsorted-memory"],
+    );
+    for (const row of result.cpuComparison.strategies) {
+      assert.ok(row.p50Ms > 0);
+      assert.ok(row.p95Ms >= row.p50Ms);
+      assert.ok(row.resultOverlapWithSortedPercent >= 0);
+      assert.ok(row.resultOverlapWithSortedPercent <= 100);
+    }
+    const empty = result.cpuComparison.strategies.filter((entry) => entry.workload === "full-scan-no-match");
+    assert.equal(empty.length, 4);
+    assert.ok(empty.every((entry) => entry.count === 0 && entry.firstResultP50Ms === null));
+    assert.ok(result.cpuComparison.strategies
+      .filter((entry) => entry.strategy === "sorted-memory")
+      .every((entry) => entry.resultOverlapWithSortedPercent === 100));
+    assert.doesNotMatch(stdout, /driveralpha|pathseek-compare-fixture-/);
+    assert.deepEqual(await temporaryBenchmarkFiles(), before);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
