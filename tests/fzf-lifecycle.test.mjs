@@ -117,12 +117,12 @@ test("real fzf accepts Chinese pinyin initials, unordered terms, and native exte
       "/example/第一次.txt",
       "/example/第一次/记录.md",
       "/example/driver.c",
-      "/example/abc\\tdef.txt",
+      "/example/abc" + String.fromCharCode(9) + "def.txt",
       "/example/普通中文.txt",
-    ].map((value) => value.replace("\\\\t", "\\t"));
+    ];
     const raw = path.join(dir, "pinyin-input.paths");
     const staged = path.join(dir, "pinyin-stage.nul.tmp");
-    await writeFile(raw, entries.join("\\0") + "\\0");
+    await writeFile(raw, entries.join(String.fromCharCode(0)) + String.fromCharCode(0));
     await prepareIndex(raw, staged, {
       version: 3,
       count: entries.length,
@@ -143,6 +143,6 @@ test("real fzf accepts Chinese pinyin initials, unordered terms, and native exte
     const noPinyinSyntaxOverride = await runFzfFilter("fzf", index, "'dyc");
     assert.equal(noPinyinSyntaxOverride.paths.includes("/example/第一次.txt"), false);
     const tabName = await runFzfFilter("fzf", index, "abc");
-    assert.ok(tabName.paths.includes("/example/abc\tdef.txt"));
+    assert.ok(tabName.paths.includes(entries[3]));
   });
 });
