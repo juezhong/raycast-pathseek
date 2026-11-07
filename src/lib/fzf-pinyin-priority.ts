@@ -86,12 +86,17 @@ export function appendPinyinPriorityChunk(
       }
       continue;
     }
-    state.seen.add(key);
     const shouldRetain =
       state.primary.length < plainLimit ||
       state.fallback.length < PINYIN_RESERVED_RESULTS ||
       state.chinese.length < PINYIN_RESERVED_RESULTS;
     if (shouldRetain) {
+      // 仅保留进入有界结果集合的路径键，避免宽泛查询积累额外内存。
+      if (
+        state.primary.length < plainLimit ||
+        state.fallback.length < PINYIN_RESERVED_RESULTS ||
+        (state.chinese.length < PINYIN_RESERVED_RESULTS && hasChineseBasename(value))
+      ) state.seen.add(key);
       if (state.primary.length < plainLimit) add(state, state.primary, value);
       else {
         if (state.fallback.length < PINYIN_RESERVED_RESULTS)
