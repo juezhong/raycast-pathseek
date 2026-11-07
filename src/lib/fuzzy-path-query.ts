@@ -122,7 +122,7 @@ type SegmentMatcher = (
 /**
  * 每个目录段在搜索开始时只解析一次 Extended Search：
  * 空格表示 AND；独立的 | 表示相邻条件之间的 OR。
- * 大写字母触发 fzf Smart Case，不包含运算符的纯拉丁查询仍支持拼音。
+ * 大写字母触发 fzf Smart Case；所有目录段均支持中文与拼音别名。
  */
 function compileSegment(pattern: string): SegmentMatcher {
   const ignoreCase = pattern === pattern.toLowerCase();
