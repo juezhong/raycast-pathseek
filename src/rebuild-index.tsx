@@ -8,7 +8,7 @@ import {
   Toast,
   useNavigation,
 } from "@raycast/api";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   getConfiguredIndexRoots,
   getConfiguredSymlinkDirectory,
@@ -139,6 +139,11 @@ export default function RebuildIndex() {
   const [current, setCurrent] = useState<IndexMetadata | null>(null);
   const [error, setError] = useState<string>();
   const [progress, setProgress] = useState<IndexBuildProgress | null>(null);
+  const buildController = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => buildController.current?.abort();
+  }, []);
 
   useEffect(() => {
     if (mode !== "building") return;
@@ -186,9 +191,11 @@ export default function RebuildIndex() {
     setError(undefined);
     setProgress(null);
     setMode("building");
+    const controller = new AbortController();
+    buildController.current = controller;
     try {
-      // ONLY this user-initiated action invokes fd.
-      const metadata = await rebuildIndex(selectedRoots);
+      // 仅用户主动触发，退出页面或点取消会停止 fd/压缩管道。
+      const metadata = await rebuildIndex(selectedRoots, controller.signal);
       setCurrent(metadata);
       await showToast({
         style: Toast.Style.Success,
@@ -196,13 +203,22 @@ export default function RebuildIndex() {
         message: metadata.count.toLocaleString() + " paths indexed",
       });
     } catch (failure) {
-      setError(String(failure));
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Index Build Failed",
-        message: String(failure),
-      });
+      if (controller.signal.aborted) {
+        await showToast({
+          style: Toast.Style.Failure,
+          title: "Index Build Cancelled",
+          message: "The previous published index was preserved.",
+        });
+      } else {
+        setError(String(failure));
+        await showToast({
+          style: Toast.Style.Failure,
+          title: "Index Build Failed",
+          message: String(failure),
+        });
+      }
     } finally {
+      if (buildController.current === controller) buildController.current = null;
       setMode("ready");
     }
   }
@@ -287,7 +303,15 @@ export default function RebuildIndex() {
       isLoading={mode === "loading" || mode === "building"}
       markdown={markdown}
       actions={
-        mode === "ready" ? (
+        mode === "building" ? (
+          <ActionPanel>
+            <Action
+              title="Cancel Index Build"
+              icon={Icon.XMarkCircle}
+              onAction={() => buildController.current?.abort()}
+            />
+          </ActionPanel>
+        ) : mode === "ready" ? (
           <ActionPanel>
             <Action
               title="Rebuild Index Now"
