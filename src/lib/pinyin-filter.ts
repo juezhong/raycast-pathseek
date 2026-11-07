@@ -2,6 +2,7 @@ import path from "node:path";
 import { Transform } from "node:stream";
 import { pinyin } from "pinyin-pro";
 import { MAX_FZF_PATH_BYTES } from "./fzf-output.ts";
+import { matchesFuzzyParentPath } from "./fuzzy-path-query.ts";
 
 const HAN_TEXT = /\p{Script=Han}+/gu;
 const NUL = Buffer.from([0]);
@@ -46,8 +47,24 @@ export function pinyinAlias(filename: string): string {
  * TAB 在名称的搜索字段中替换为空格，原始路径字节完全保留。
  * 全程流式处理，不落盘、不创建第二份索引或后台缓存。
  */
-export function createPinyinFilterInput(enablePinyin = true): Transform {
+export function createPinyinFilterInput(
+  enablePinyin = true,
+  directoryPatterns: readonly string[] = [],
+): Transform {
   let pending = Buffer.alloc(0);
+  // 同一个父目录会被大量文件复用，限制为 2048 项的单次搜索缓存。
+  const aliasCache = new Map<string, string>();
+  const directoryAlias = (name: string): string => {
+    const cached = aliasCache.get(name);
+    if (cached !== undefined) return cached;
+    const alias = pinyinAlias(name);
+    if (aliasCache.size >= 2048) {
+      const oldest = aliasCache.keys().next().value;
+      if (oldest !== undefined) aliasCache.delete(oldest);
+    }
+    aliasCache.set(name, alias);
+    return alias;
+  };
   return new Transform({
     transform(chunk: Buffer, _encoding, callback) {
       try {
@@ -69,6 +86,13 @@ export function createPinyinFilterInput(enablePinyin = true): Transform {
           pending = Buffer.alloc(0);
 
           const filepath = record.toString("utf8");
+          if (
+            directoryPatterns.length &&
+            !matchesFuzzyParentPath(filepath, directoryPatterns, directoryAlias)
+          ) {
+            offset = end + 1;
+            continue;
+          }
           const filename = path.basename(filepath);
           // fzf 字段分隔符不能成为可搜索文件名的一部分。
           const label = filename.replaceAll("\t", " ");
