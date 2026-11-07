@@ -95,8 +95,10 @@ export function appendPinyinPriorityChunk(
       if (
         state.primary.length < plainLimit ||
         state.fallback.length < PINYIN_RESERVED_RESULTS ||
-        (state.chinese.length < PINYIN_RESERVED_RESULTS && hasChineseBasename(value))
-      ) state.seen.add(key);
+        (state.chinese.length < PINYIN_RESERVED_RESULTS &&
+          hasChineseBasename(value))
+      )
+        state.seen.add(key);
       if (state.primary.length < plainLimit) add(state, state.primary, value);
       else {
         if (state.fallback.length < PINYIN_RESERVED_RESULTS)

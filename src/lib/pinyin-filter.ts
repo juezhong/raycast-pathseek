@@ -107,7 +107,9 @@ export function createPinyinFilterInput(
         const label = segment.replaceAll("\t", " ");
         const alias =
           index === segments.length - 1
-            ? enablePinyin ? pinyinAlias(segment) : ""
+            ? enablePinyin
+              ? pinyinAlias(segment)
+              : ""
             : directoryAlias(segment);
         const field = alias ? label + " " + alias : label;
         // 包含大写的段严格匹配，其他段预先折叠大小写。
@@ -148,8 +150,14 @@ export function createPinyinFilterInput(
             offset = end + 1;
             continue;
           }
-          const matchField = Buffer.from(projectPath(filepath, filename), "utf8");
-          if (matchField.length + TAB.length + record.length > MAX_FZF_PATH_BYTES)
+          const matchField = Buffer.from(
+            projectPath(filepath, filename),
+            "utf8",
+          );
+          if (
+            matchField.length + TAB.length + record.length >
+            MAX_FZF_PATH_BYTES
+          )
             throw new Error("Search record exceeds size limit");
           const emit = (field: Buffer) => {
             if (field.length + TAB.length + record.length > MAX_FZF_PATH_BYTES)

@@ -1,7 +1,10 @@
 import { spawn } from "node:child_process";
 import type { Readable } from "node:stream";
 import { openIndexDataStream } from "./index-files.ts";
-import { isNativeFuzzyPathQuery, parseFuzzyPathQuery } from "./fuzzy-path-query.ts";
+import {
+  isNativeFuzzyPathQuery,
+  parseFuzzyPathQuery,
+} from "./fuzzy-path-query.ts";
 import { appendFzfOutputChunk, createFzfOutputState } from "./fzf-output.ts";
 import {
   appendPinyinPriorityChunk,
@@ -56,7 +59,9 @@ export async function runFzfFilter(
 
   return new Promise<FilterResult>((resolve, reject) => {
     const output = createFzfOutputState();
-    const pinyinOutput = prioritizePinyin ? createPinyinPriorityOutput() : undefined;
+    const pinyinOutput = prioritizePinyin
+      ? createPinyinPriorityOutput()
+      : undefined;
     let limited = false;
     let cancelled = false;
     let fatal: Error | undefined;
@@ -79,7 +84,9 @@ export async function runFzfFilter(
           "1",
           ...(nativePath ? ["--scheme", "path"] : []),
           "--filter",
-          nativePath ? [...pathQuery!.directoryPatterns, pathQuery!.nameQuery].join("/") : nameQuery,
+          nativePath
+            ? [...pathQuery!.directoryPatterns, pathQuery!.nameQuery].join("/")
+            : nameQuery,
         ],
         { stdio: ["pipe", "pipe", "pipe"] },
       );
