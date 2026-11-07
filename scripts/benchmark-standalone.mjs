@@ -174,6 +174,11 @@ async function run() {
   try {
     const stage = path.join(temporary, "stage.nul.tmp");
     const index = path.join(temporary, "index.nul");
+    if (args.compare) {
+      console.error("[PathSeek benchmark] Temporary directory: " + temporary);
+      console.error("[PathSeek benchmark] Temporary files: stage.nul.tmp -> index.nul (atomic rename)");
+      console.error("[PathSeek benchmark] Predecoded search input: memory only (no raw-path file)");
+    }
     await createStreamingIndexStage(stage);
 
     const input = new PassThrough({ highWaterMark: 1024 * 1024 });
@@ -329,7 +334,13 @@ async function run() {
     process.off("SIGINT", abort);
     process.off("SIGTERM", abort);
     // 仅删除 mkdtemp 本次创建的临时目录；绝不操作 Raycast 正式索引。
-    await rm(temporary, { recursive: true, force: true });
+    try {
+      await rm(temporary, { recursive: true, force: true });
+      if (args.compare) console.error("[PathSeek benchmark] Removed temporary directory: " + temporary);
+    } catch (error) {
+      console.error("[PathSeek benchmark] WARNING: temporary directory cleanup failed: " + temporary);
+      throw error;
+    }
   }
 }
 
