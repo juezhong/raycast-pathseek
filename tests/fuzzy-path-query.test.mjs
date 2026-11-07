@@ -75,6 +75,7 @@ test("directory extended syntax supports exact, prefix, suffix, inverse, AND and
     matchesFuzzyParentPath(filepath, [expression, "components"], pinyinAlias);
   for (const expression of [
     "^Source",
+    "^source",
     "Core$",
     "'Source",
     "^SourceCore$",
@@ -87,7 +88,6 @@ test("directory extended syntax supports exact, prefix, suffix, inverse, AND and
     "^test | ^Source",
   ]) assert.equal(match(expression), true, expression);
   for (const expression of [
-    "^source",
     "^SOURCE",
     "^sources",
     "sourcemissing",
