@@ -5,13 +5,25 @@ import {
   LaunchType,
   List,
   launchCommand,
+  showToast,
+  Toast,
 } from "@raycast/api";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fuzzySearch } from "./lib/fuzzy-search";
 import { SearchAssistanceActions } from "./search-guides";
-import { readIndex, type IndexMetadata } from "./lib/index-store";
+import {
+  indexFilePath,
+  readIndex,
+  type IndexMetadata,
+} from "./lib/index-store";
+import {
+  findIndexedDirectoryChoices,
+  matchesSelectedDirectory,
+  parseSubtreeQuery,
+} from "./lib/subtree-search";
 import { getDialogNavigationPaths } from "./lib/dialog-navigation";
 import {
   getMissingBinary,
@@ -30,6 +42,102 @@ export function SearchFilesView({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<string[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [activeScope, setActiveScope] = useState<{
+    expression: string;
+    folder: string;
+  } | null>(null);
+  const [scopeHint, setScopeHint] = useState<{
+    expression: string;
+    selectedPath: string | null;
+  } | null>(null);
+  const [directoryChoices, setDirectoryChoices] = useState<string[]>([]);
+  const [choicesTruncated, setChoicesTruncated] = useState(false);
+  const [isLocatingDirectory, setIsLocatingDirectory] = useState(false);
+  const [scopeError, setScopeError] = useState<string>();
+  const queryRef = useRef("");
+  const selectedPathRef = useRef<string | null>(null);
+
+  let subtreeQuery: ReturnType<typeof parseSubtreeQuery> = null;
+  let subtreeSyntaxError: string | undefined;
+  try {
+    subtreeQuery = parseSubtreeQuery(query);
+  } catch (error) {
+    subtreeSyntaxError = String(error);
+  }
+  const directoryExpression = subtreeQuery?.directoryExpression;
+  const scopedFolder =
+    directoryExpression === activeScope?.expression
+      ? activeScope.folder
+      : undefined;
+  const selectingFolder = Boolean(subtreeQuery && !scopedFolder);
+
+  function onQueryChange(value: string) {
+    let previousScope: ReturnType<typeof parseSubtreeQuery> = null;
+    let nextScope: ReturnType<typeof parseSubtreeQuery> = null;
+    try {
+      previousScope = parseSubtreeQuery(queryRef.current);
+      nextScope = parseSubtreeQuery(value);
+    } catch {
+      // 在后面的搜索效果中统一显示无效语法。
+    }
+    if (nextScope && !previousScope) {
+      // 在 Raycast 因搜索文本变化重新选中列表项前，保存当前高亮路径。
+      setScopeHint({
+        expression: nextScope.directoryExpression,
+        selectedPath: selectedPathRef.current,
+      });
+    }
+    if (nextScope?.directoryExpression !== previousScope?.directoryExpression) {
+      setActiveScope(null);
+      setDirectoryChoices([]);
+      setChoicesTruncated(false);
+    }
+    queryRef.current = value;
+    setQuery(value);
+  }
+
+  async function enterFolder(filepath: string) {
+    try {
+      const info = await stat(filepath);
+      if (!info.isDirectory()) {
+        await showToast({
+          style: Toast.Style.Failure,
+          title: "Select a Folder",
+          message: "Only an indexed directory can be used as the search scope.",
+        });
+        return;
+      }
+      let request: ReturnType<typeof parseSubtreeQuery> = null;
+      try {
+        request = parseSubtreeQuery(queryRef.current);
+      } catch {
+        // 当前表达式无效时，从真实的选中目录名称重新开始。
+      }
+      const expression = request?.directoryExpression ?? path.basename(filepath);
+      const nextQuery = request ? queryRef.current : expression + "/ ";
+      const folder = filepath === "/" ? "/" : filepath.replace(/\/+$/u, "");
+      setActiveScope({ expression, folder });
+      setDirectoryChoices([]);
+      setScopeHint(null);
+      queryRef.current = nextQuery;
+      setQuery(nextQuery);
+    } catch (error) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Could Not Enter Folder",
+        message: String(error),
+      });
+    }
+  }
+
+  function leaveFolder() {
+    const expression = activeScope?.expression ?? "";
+    setActiveScope(null);
+    setScopeHint(null);
+    selectedPathRef.current = null;
+    queryRef.current = expression;
+    setQuery(expression);
+  }
 
   useEffect(() => {
     let active = true;
