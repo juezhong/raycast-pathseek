@@ -15,6 +15,10 @@ import {
 } from "../src/lib/index-files.ts";
 
 const [sourceIndex, destinationDirectory] = process.argv.slice(2);
+const abortController = new AbortController();
+const onInterrupt = () => abortController.abort(new Error("Conversion interrupted"));
+process.once("SIGINT", onInterrupt);
+process.once("SIGTERM", onInterrupt);
 
 if (!sourceIndex || !destinationDirectory) {
   console.error('Usage: npm run convert:index -- "/absolute/path/to/old/index.nul" "/new/nonexistent/test-directory"');
@@ -51,6 +55,7 @@ if (!sourceIndex || !destinationDirectory) {
         },
       }),
       createWriteStream(staged, { flags: "a" }),
+      { signal: abortController.signal },
     );
 
     if (actualCount !== metadata.count) {
@@ -77,5 +82,7 @@ if (!sourceIndex || !destinationDirectory) {
     process.exitCode = 1;
   } finally {
     if (staged) await rm(staged, { force: true }).catch(() => undefined);
+    process.off("SIGINT", onInterrupt);
+    process.off("SIGTERM", onInterrupt);
   }
 }
