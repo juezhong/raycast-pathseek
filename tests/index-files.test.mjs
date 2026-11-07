@@ -43,7 +43,7 @@ async function streamText(stream) {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-test("v2 stores metadata and paths in one atomically published file", async () => {
+test("v3 stores compressed metadata and paths in one atomically published file", async () => {
   await withDirectory(async (dir) => {
     const { staged, metadata } = await stage(dir, "first");
     assert.equal(metadata.filename, ACTIVE_INDEX_FILENAME);
