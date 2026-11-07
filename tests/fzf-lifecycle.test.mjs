@@ -101,9 +101,12 @@ test("malformed fzf stdout is bounded and the child is reaped", async () => {
         "process.stdin.resume(); setInterval(() => {}, 1000);\n",
     );
     await chmod(binary, 0o755);
-    const task = runFzfFilter(binary, index, pidFile, undefined, 10_000);
+    const rejection = assert.rejects(
+      runFzfFilter(binary, index, pidFile, undefined, 10_000),
+      /fzf output path exceeds size limit/,
+    );
     const pid = await waitForPid(pidFile);
-    await assert.rejects(task, /fzf output path exceeds size limit/);
+    await rejection;
     assertGone(pid);
   });
 });
