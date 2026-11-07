@@ -1,0 +1,31 @@
+name: One-shot v3 progress formatter
+
+on:
+  push:
+    branches:
+      - feat/compact-compressed-index-v3
+    paths:
+      - ".github/workflows/format-progress-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci --no-audit --no-fund
+      - name: Format all src files and commit changes
+        run: |
+          npm run format
+          if ! git diff --quiet -- src; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src
+            git commit -m "style: format progress diagnostics and Brotli preferences"
+            git push origin HEAD:feat/compact-compressed-index-v3
+          fi
