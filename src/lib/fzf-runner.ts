@@ -37,6 +37,7 @@ export async function runFzfFilter(
     let fatal: Error | undefined;
     let stderr = "";
     let finished = false;
+    let stopping = false;
     let deadline: ReturnType<typeof setTimeout> | undefined;
 
     let child;
@@ -53,7 +54,16 @@ export async function runFzfFilter(
     }
     registerChild(child);
 
+    // 等待解压管道关闭后再结束 Promise，避免遗留文件描述符。
+    const inputClosed = new Promise<void>((resolve) => {
+      if (input.closed) resolve();
+      else input.once("close", () => resolve());
+    });
+
     const stop = () => {
+      if (stopping) return;
+      stopping = true;
+      input.unpipe(child.stdin);
       input.destroy();
       child.stdin.destroy();
       terminateChild(child);
@@ -88,10 +98,14 @@ export async function runFzfFilter(
     });
     child.stdout.on("data", (chunk: Buffer) => {
       if (limited || cancelled) return;
-      appendFzfOutputChunk(output, chunk);
-      if (output.limitReached) {
-        limited = true;
-        stop();
+      try {
+        appendFzfOutputChunk(output, chunk);
+        if (output.limitReached) {
+          limited = true;
+          stop();
+        }
+      } catch (error) {
+        fail(error as Error);
       }
     });
     child.stderr.on("data", (chunk: Buffer) => {
@@ -111,6 +125,7 @@ export async function runFzfFilter(
       input.destroy();
       child.stdin.destroy();
 
+      void inputClosed.then(() => {
       if (cancelled) {
         resolve({ paths: [], exitCode: code, limited: false, cancelled: true });
       } else if (fatal) {
@@ -125,8 +140,9 @@ export async function runFzfFilter(
       } else {
         reject(new Error(`fzf failed (exit ${code}): ${stderr.trim()}`));
       }
+      });
     });
 
-    if (!cancelled) input.pipe(child.stdin);
+    if (!cancelled && !stopping) input.pipe(child.stdin);
   });
 }
