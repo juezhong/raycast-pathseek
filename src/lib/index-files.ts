@@ -244,13 +244,9 @@ export async function openIndexDataStream(
     if (header?.version !== 3) return source;
     const decompressor = createBrotliDecompress();
     const decoder = new PathPrefixDecoder();
-    source.on("error", (error) => decompressor.destroy(error));
-    decompressor.on("error", (error) => decoder.destroy(error));
-    source.pipe(decompressor).pipe(decoder);
-    decoder.on("close", () => {
-      source.destroy();
-      decompressor.destroy();
-    });
+    // pipeline 双向传播错误与提前销毁，查询取消时会关闭底层 fd。
+    // 调用方通过 decoder 的 error/close 观察失败；Promise 仅防止未处理拒绝。
+    void pipeline(source, decompressor, decoder).catch(() => undefined);
     return decoder;
   } catch (error) {
     await handle.close();
