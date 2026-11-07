@@ -72,6 +72,8 @@ PathSeek 统一使用 Raycast 提供的 `environment.supportPath` 作为索引�
 
 **统一目录与旧索引兼容：**新版本始终在 `environment.supportPath/index.nul` 建立和读取索引。如果这个位置没有有效索引，仍可**只读**使用历史 `environment.supportPath/index-development-v3/index.nul`；`View Index Status` 会明确提示旧位置。下一次你主动执行 `Build Index` 才在统一目录生成新索引，**不会自动删除或覆盖旧目录**。如果两个位置都有索引，统一目录优先。
 
+**清理旧索引：**只有在 `View Index Status → Copy Active Index File Path` 已显示统一目录中的 `index.nul`，并且搜索功能验收通过后，才考虑在 Finder 中备份并删除**旧的 `index-development-v3` 子目录**。请勿删除整个 `environment.supportPath`；其中可能还有当前索引、构建进度和日志。为避免误操作，PathSeek 不会自动清除旧目录。
+
 **软链接规则：**普通扫描不启用 `fd --follow`；只有指定快捷目录的**直接子项中指向目录的软链接**会被单独展开。搜索结果保留快捷链接路径，其目标内部的软链接不会继续跟随。
 
 可在 Raycast 的扩展偏好设置里配置 `Include Hidden Files`、排除规则、Brotli 等级及 `fd`/`fzf` 可执行文件路径。修改扫描配置后需要**主动重建**，已有索引不会自动刷新。
