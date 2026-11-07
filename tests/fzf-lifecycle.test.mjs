@@ -110,3 +110,39 @@ test("malformed fzf stdout is bounded and the child is reaped", async () => {
     assertGone(pid);
   });
 });
+
+test("real fzf accepts Chinese pinyin initials, unordered terms, and native extended operators", async () => {
+  await fixture(async (dir) => {
+    const entries = [
+      "/example/第一次.txt",
+      "/example/第一次/记录.md",
+      "/example/driver.c",
+      "/example/abc\\tdef.txt",
+      "/example/普通中文.txt",
+    ].map((value) => value.replace("\\\\t", "\\t"));
+    const raw = path.join(dir, "pinyin-input.paths");
+    const staged = path.join(dir, "pinyin-stage.nul.tmp");
+    await writeFile(raw, entries.join("\\0") + "\\0");
+    await prepareIndex(raw, staged, {
+      version: 3,
+      count: entries.length,
+      createdAt: new Date().toISOString(),
+      roots: ["/example"],
+    });
+    await publishIndex(staged, dir);
+    const index = path.join(dir, "index.nul");
+    for (const query of ["dyc", "yc d", "d y c", "y c d", "diyici", "DYC"]) {
+      const matched = await runFzfFilter("fzf", index, query);
+      assert.ok(matched.paths.includes("/example/第一次.txt"), query);
+      assert.ok(matched.paths.every((value) => entries.includes(value)), query);
+    }
+    const exactChinese = await runFzfFilter("fzf", index, "'第一次");
+    assert.ok(exactChinese.paths.includes("/example/第一次.txt"));
+    const extended = await runFzfFilter("fzf", index, ".md$");
+    assert.deepEqual(extended.paths, ["/example/第一次/记录.md"]);
+    const noPinyinSyntaxOverride = await runFzfFilter("fzf", index, "'dyc");
+    assert.equal(noPinyinSyntaxOverride.paths.includes("/example/第一次.txt"), false);
+    const tabName = await runFzfFilter("fzf", index, "abc");
+    assert.ok(tabName.paths.includes("/example/abc\tdef.txt"));
+  });
+});
