@@ -126,20 +126,20 @@ export async function runFzfFilter(
       child.stdin.destroy();
 
       void inputClosed.then(() => {
-      if (cancelled) {
-        resolve({ paths: [], exitCode: code, limited: false, cancelled: true });
-      } else if (fatal) {
-        reject(fatal);
-      } else if (limited || code === 0 || (code === 1 && !stderr)) {
-        resolve({
-          paths: output.results,
-          exitCode: code,
-          limited,
-          cancelled: false,
-        });
-      } else {
-        reject(new Error(`fzf failed (exit ${code}): ${stderr.trim()}`));
-      }
+        if (cancelled) {
+          resolve({ paths: [], exitCode: code, limited: false, cancelled: true });
+        } else if (fatal) {
+          reject(fatal);
+        } else if (limited || code === 0 || (code === 1 && !stderr)) {
+          resolve({
+            paths: output.results,
+            exitCode: code,
+            limited,
+            cancelled: false,
+          });
+        } else {
+          reject(new Error(`fzf failed (exit ${code}): ${stderr.trim()}`));
+        }
       });
     });
 
