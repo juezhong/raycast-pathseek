@@ -174,10 +174,10 @@ test("pinyin-mode cancellation closes the decoder and reaps the fzf child", asyn
     const pidFile = path.join(dir, "pinyin-child.pid");
     await writeFile(
       binary,
-      "#!/usr/bin/env node\\n" +
-        "const fs = require('node:fs');\\n" +
-        `fs.writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));\\n` +
-        "process.stdin.resume(); setInterval(() => {}, 1000);\\n",
+      "#!/usr/bin/env node\n" +
+        "const fs = require('node:fs');\n" +
+        `fs.writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));\n` +
+        "process.stdin.resume(); setInterval(() => {}, 1000);\n",
     );
     await chmod(binary, 0o755);
     const controller = new AbortController();
