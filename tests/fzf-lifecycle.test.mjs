@@ -167,7 +167,7 @@ test("real fzf accepts Chinese pinyin initials, unordered terms, and native exte
     const noPinyinSyntaxOverride = await runFzfFilter("fzf", index, "'dyc");
     assert.equal(
       noPinyinSyntaxOverride.paths.includes("/example/第一次.txt"),
-      false,
+      true,
     );
     const tabName = await runFzfFilter("fzf", index, "abc");
     assert.ok(tabName.paths.includes(entries[3]));
@@ -526,5 +526,55 @@ test("smart-case and fzf extended operators on parent segments preserve real fzf
         "/work/SourceKit/lib/driver.c",
       ]),
     );
+  });
+});
+
+test("native fzf matches hyphenated leaf names, leading slash and mixed pinyin levels", async () => {
+  await fixture(async (dir) => {
+    const paths = [
+      "/sample/first/second/third/four-file.txt",
+      "/sample/first/second/third/four-final.c",
+      "/sample/first/second/archive/four-file.txt",
+      "/sample/第一次/第二次/报告.txt",
+    ];
+    const raw = path.join(dir, "native-fzf.paths");
+    const stage = path.join(dir, "native-fzf.stage");
+    await writeFile(raw, paths.join("\0") + "\0");
+    await prepareIndex(raw, stage, {
+      version: 3, count: paths.length,
+      createdAt: new Date().toISOString(), roots: ["/sample"],
+    });
+    await publishIndex(stage, dir);
+    const index = path.join(dir, "index.nul");
+    const find = async (query) => (await runFzfFilter("fzf", index, query)).paths;
+    const expected = paths.slice(0, 2);
+    assert.deepEqual(new Set(await find("fir/sec/thi/four-fi")), new Set(expected));
+    assert.deepEqual(new Set(await find("/fir/sec/thi/four-fi")), new Set(expected));
+    assert.deepEqual(await find("fir/sec/arc/four-fi"), []);
+    assert.deepEqual(await find("dyc/dec/bg"), [paths[3]]);
+    assert.deepEqual(await find("第一次/dec/报告"), [paths[3]]);
+    assert.deepEqual(await find("dyc/第二次/bao"), [paths[3]]);
+    assert.deepEqual(await find("DYc/dec/bg"), []);
+  });
+});
+
+test("anchored fzf expressions preserve native filename suffixes and match pinyin aliases", async () => {
+  await fixture(async (dir) => {
+    const entries = ["/sample/第一次.txt", "/sample/第一次.md"];
+    const raw = path.join(dir, "anchored.paths");
+    const stage = path.join(dir, "anchored.stage");
+    await writeFile(raw, entries.join("\0") + "\0");
+    await prepareIndex(raw, stage, {
+      version: 3, count: entries.length,
+      createdAt: new Date().toISOString(), roots: ["/sample"],
+    });
+    await publishIndex(stage, dir);
+    const index = path.join(dir, "index.nul");
+    for (const query of [".txt$", "^dyc", "dyc$", "^dyc$", "'dyc"]) {
+      const result = (await runFzfFilter("fzf", index, query)).paths;
+      assert.ok(result.includes(entries[0]), query);
+      assert.equal(new Set(result).size, result.length, query);
+    }
+    assert.deepEqual((await runFzfFilter("fzf", index, ".txt$")).paths, [entries[0]]);
   });
 });

@@ -5,7 +5,7 @@ import {
   createPinyinFilterInput,
   originalPathFromPinyinResult,
   pinyinAlias,
-  shouldUsePinyinAliases,
+  shouldPrioritizePinyinResults,
 } from "../src/lib/pinyin-filter.ts";
 
 test("Chinese phrase initials and full pinyin are generated without touching the source path", () => {
@@ -25,7 +25,7 @@ test("complex fzf patterns bypass phonetic transformation", () => {
     "diyici",
     "2026 dyc",
   ])
-    assert.equal(shouldUsePinyinAliases(input), true, input);
+    assert.equal(shouldPrioritizePinyinResults(input), true, input);
   for (const input of [
     ".pdf$",
     "^driver",

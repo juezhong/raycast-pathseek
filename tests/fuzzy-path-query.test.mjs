@@ -186,7 +186,7 @@ test("Chinese aliases continue to work in each path level, advanced syntax uses 
   );
   assert.equal(
     matchesFuzzyParentPath(file, ["^dyc", "dec"], pinyinAlias),
-    false,
+    true,
   );
   assert.equal(
     matchesFuzzyParentPath(file, ["!第一次", "dec"], pinyinAlias),
@@ -194,7 +194,7 @@ test("Chinese aliases continue to work in each path level, advanced syntax uses 
   );
   assert.equal(
     matchesFuzzyParentPath(file, ["!dyc", "dec"], pinyinAlias),
-    true,
+    false,
   );
 });
 
@@ -250,4 +250,10 @@ test("directory operator decisions agree with real fzf for ASCII names", () => {
     const actual = new Set(names.filter((name) => matcher("/tmp/" + name + "/file.txt")));
     assert.deepEqual(actual, expected, pattern);
   }
+});
+
+test("native path mode only applies to pure fuzzy slash queries", async () => {
+  const { isNativeFuzzyPathQuery } = await import("../src/lib/fuzzy-path-query.ts");
+  assert.equal(isNativeFuzzyPathQuery(parseFuzzyPathQuery("fir/sec/thi/four-fi")), true);
+  assert.equal(isNativeFuzzyPathQuery(parseFuzzyPathQuery("src/.txt$")), false);
 });

@@ -85,9 +85,13 @@ test("fzf results reject excessive aggregate path bytes", () => {
   const record = Buffer.alloc(MAX_FZF_PATH_BYTES + 1, 65);
   record[record.length - 1] = 0;
   for (let i = 0; i < MAX_FZF_TOTAL_BYTES / MAX_FZF_PATH_BYTES; i++) {
-    appendFzfOutputChunk(state, record);
+    const unique = Buffer.from(String(i) + "x".repeat(MAX_FZF_PATH_BYTES - 1) + "\0");
+    appendFzfOutputChunk(state, unique);
   }
   assert.equal(state.resultBytes, MAX_FZF_TOTAL_BYTES);
-  assert.throws(() => appendFzfOutputChunk(state, record), /memory size limit/);
+  assert.throws(
+    () => appendFzfOutputChunk(state, Buffer.from("z".repeat(MAX_FZF_PATH_BYTES) + "\0")),
+    /memory size limit/,
+  );
   assert.equal(state.results.length, 8);
 });

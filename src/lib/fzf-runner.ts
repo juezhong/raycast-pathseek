@@ -79,7 +79,7 @@ export async function runFzfFilter(
           "1",
           ...(nativePath ? ["--scheme", "path"] : []),
           "--filter",
-          nativePath ? query : nameQuery,
+          nativePath ? [...pathQuery!.directoryPatterns, pathQuery!.nameQuery].join("/") : nameQuery,
         ],
         { stdio: ["pipe", "pipe", "pipe"] },
       );
