@@ -6,7 +6,7 @@ import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Transform } from "node:stream";
 import { createBrotliCompress, createBrotliDecompress, constants as zlibConstants } from "node:zlib";
-import { PathPrefixEncoder, PathPrefixDecoder } from "./index-codec";
+import { PathPrefixEncoder, PathPrefixDecoder } from "./index-codec.ts";
 
 export const ACTIVE_INDEX_FILENAME = "index.nul";
 export const LEGACY_INDEX_REGEX = /^index-[a-f0-9-]+\.nul$/;
