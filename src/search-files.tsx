@@ -407,80 +407,81 @@ export function SearchFilesView({
             }
           />
         ))}
-      {!selectingFolder && results.map((filepath) => {
-        const display = filepath.startsWith(os.homedir() + path.sep)
-          ? "~" + filepath.slice(os.homedir().length)
-          : filepath;
-        return (
-          <List.Item
-            key={filepath}
-            id={filepath}
-            title={path.basename(filepath)}
-            subtitle={path.dirname(display)}
-            icon={{ fileIcon: filepath }}
-            quickLook={{ path: filepath, name: path.basename(filepath) }}
-            actions={
-              <ActionPanel>
-                {dialogMode && (
-                  <ActionPanel.Section title="Assisted Open/Save Navigation">
-                    <Action.Paste
-                      title="Select File or Go to Folder (Paste Full Path)"
-                      icon={Icon.ArrowRight}
-                      content={getDialogNavigationPaths(filepath).selectedPath}
-                    />
-                    <Action.Paste
-                      title="Go to Containing Folder (Fallback)"
+      {!selectingFolder &&
+        results.map((filepath) => {
+          const display = filepath.startsWith(os.homedir() + path.sep)
+            ? "~" + filepath.slice(os.homedir().length)
+            : filepath;
+          return (
+            <List.Item
+              key={filepath}
+              id={filepath}
+              title={path.basename(filepath)}
+              subtitle={path.dirname(display)}
+              icon={{ fileIcon: filepath }}
+              quickLook={{ path: filepath, name: path.basename(filepath) }}
+              actions={
+                <ActionPanel>
+                  {dialogMode && (
+                    <ActionPanel.Section title="Assisted Open/Save Navigation">
+                      <Action.Paste
+                        title="Select File or Go to Folder (Paste Full Path)"
+                        icon={Icon.ArrowRight}
+                        content={getDialogNavigationPaths(filepath).selectedPath}
+                      />
+                      <Action.Paste
+                        title="Go to Containing Folder (Fallback)"
+                        icon={Icon.Folder}
+                        content={
+                          getDialogNavigationPaths(filepath).containingFolder
+                        }
+                      />
+                    </ActionPanel.Section>
+                  )}
+                  <ActionPanel.Section title="Other File Actions">
+                    <Action.Open title="Open" target={filepath} />
+                    <Action
+                      title="Search Within This Folder"
                       icon={Icon.Folder}
-                      content={
-                        getDialogNavigationPaths(filepath).containingFolder
-                      }
+                      shortcut={{ modifiers: [], key: "tab" }}
+                      onAction={() => void enterFolder(filepath)}
+                    />
+                    {scopedFolder && (
+                      <Action
+                        title="Leave Folder Scope"
+                        icon={Icon.ArrowLeft}
+                        onAction={leaveFolder}
+                      />
+                    )}
+                    <Action.ShowInFinder title="Show in Finder" path={filepath} />
+                    <Action.Open
+                      title="Open Containing Folder"
+                      target={path.dirname(filepath)}
+                    />
+                    <Action.OpenWith
+                      path={filepath}
+                      shortcut={{ modifiers: ["cmd"], key: "o" }}
+                    />
+                    <Action.CopyToClipboard
+                      title="Copy Absolute Path"
+                      content={filepath}
+                      shortcut={{ modifiers: ["cmd"], key: "c" }}
+                    />
+                    <Action.ToggleQuickLook
+                      shortcut={{ modifiers: ["cmd"], key: "y" }}
                     />
                   </ActionPanel.Section>
-                )}
-                <ActionPanel.Section title="Other File Actions">
-                  <Action.Open title="Open" target={filepath} />
-                  <Action
-                    title="Search Within This Folder"
-                    icon={Icon.Folder}
-                    shortcut={{ modifiers: [], key: "tab" }}
-                    onAction={() => void enterFolder(filepath)}
+                  <SearchAssistanceActions
+                    index={index}
+                    query={query}
+                    onApply={onQueryChange}
                   />
-                  {scopedFolder && (
-                    <Action
-                      title="Leave Folder Scope"
-                      icon={Icon.ArrowLeft}
-                      onAction={leaveFolder}
-                    />
-                  )}
-                  <Action.ShowInFinder title="Show in Finder" path={filepath} />
-                  <Action.Open
-                    title="Open Containing Folder"
-                    target={path.dirname(filepath)}
-                  />
-                  <Action.OpenWith
-                    path={filepath}
-                    shortcut={{ modifiers: ["cmd"], key: "o" }}
-                  />
-                  <Action.CopyToClipboard
-                    title="Copy Absolute Path"
-                    content={filepath}
-                    shortcut={{ modifiers: ["cmd"], key: "c" }}
-                  />
-                  <Action.ToggleQuickLook
-                    shortcut={{ modifiers: ["cmd"], key: "y" }}
-                  />
-                </ActionPanel.Section>
-                <SearchAssistanceActions
-                  index={index}
-                  query={query}
-                  onApply={onQueryChange}
-                />
-              </ActionPanel>
-            }
-          />
-        );
-      })}
-    </List>
+                </ActionPanel>
+              }
+            />
+          );
+        })}
+        })}   </List>
   );
 }
 
