@@ -308,6 +308,10 @@ async function run() {
         const elapsed = performance.now() - startedQuery;
         if (round > 0) entry.timings.push(elapsed);
         entry.count = result.paths.length;
+        if (process.env.PATHSEEK_TEST_QUERY === "1" &&
+            entry.kind === "compare-leaf-fuzzy" && result.paths.length) {
+          counters.debugActualLeaf = path.relative(args.root, result.paths[0]);
+        }
         entry.limited = result.limited;
         if (result.cancelled) throw new Error("Search cancelled");
       }
@@ -336,7 +340,9 @@ async function run() {
       includeHidden: args.hidden,
       compressionQuality: args.quality,
       compareRequested: args.compare,
-      compareTestSample: process.env.PATHSEEK_TEST_QUERY === "1" ? counters.debugSample : undefined,
+      compareTestSample: process.env.PATHSEEK_TEST_QUERY === "1"
+        ? { ...counters.debugSample, actualLeaf: counters.debugActualLeaf }
+        : undefined,
       comparison: args.compare
         ? {
             available: Boolean(counters.sampledPathQuery),
