@@ -95,6 +95,7 @@ test("directory picker discovers unique and multiple real indexed parent directo
     assert.deepEqual(multi.paths, [
       "/projects/other/raypath",
       "/projects/raypath",
+      "/projects/raypath2",
     ]);
     assert.equal(multi.truncated, false);
 
