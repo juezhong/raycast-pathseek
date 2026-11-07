@@ -57,3 +57,9 @@ test("decoder rejects corrupted prefix and truncated path", async () => {
   await assert.rejects(collect(Readable.from([Buffer.from([0, 65])]).pipe(new PathPrefixDecoder())));
   await assert.rejects(collect(Readable.from([Buffer.from([0x80])]).pipe(new PathPrefixDecoder())));
 });
+
+test("encoder rejects an unterminated path instead of publishing partial data", async () => {
+  await assert.rejects(
+    collect(Readable.from([Buffer.from("/Users/demo/unfinished")]).pipe(new PathPrefixEncoder())),
+  );
+});
