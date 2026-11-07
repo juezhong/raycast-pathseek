@@ -149,7 +149,7 @@ function SearchExpressionBuilder({
       <Form.TextField
         id="expression"
         title="Expression"
-        placeholder="src/lib/file or report .pdf$"
+        placeholder="src/.pdf$"
         value={expression}
         onChange={setExpression}
         autoFocus
