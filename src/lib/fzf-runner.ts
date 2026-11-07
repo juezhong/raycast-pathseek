@@ -32,10 +32,11 @@ export async function runFzfFilter(
   throwIfAborted(signal);
   const input = await openIndexDataStream(indexPath);
   const pinyinMode = shouldUsePinyinAliases(query);
-  const augmented = pinyinMode ? createPinyinFilterInput() : undefined;
-  const source = augmented ?? input;
+  const augmented = createPinyinFilterInput(pinyinMode);
+  const source = augmented;
   if (signal?.aborted) {
     input.destroy();
+    augmented.destroy();
     throw cancelledError();
   }
 
@@ -53,11 +54,22 @@ export async function runFzfFilter(
     try {
       child = spawn(
         binary,
-        ["--extended", "--read0", "--print0", "--filter", query],
+        [
+          "--extended",
+          "--read0",
+          "--print0",
+          "--delimiter",
+          "\t",
+          "--nth",
+          "1",
+          "--filter",
+          query,
+        ],
         { stdio: ["pipe", "pipe", "pipe"] },
       );
     } catch (error) {
       input.destroy();
+      augmented.destroy();
       reject(error);
       return;
     }
@@ -71,7 +83,7 @@ export async function runFzfFilter(
       });
     const inputClosed = Promise.all([
       waitForClose(input),
-      ...(augmented ? [waitForClose(augmented)] : []),
+      waitForClose(augmented),
     ]);
 
     const stop = () => {
@@ -109,7 +121,7 @@ export async function runFzfFilter(
     };
 
     input.once("error", fail);
-    if (augmented) augmented.once("error", fail);
+    augmented.once("error", fail);
     child.stdin.on("error", (error: NodeJS.ErrnoException) => {
       if (!cancelled && !limited && error.code !== "EPIPE") fail(error);
     });
@@ -140,7 +152,7 @@ export async function runFzfFilter(
       if (deadline) clearTimeout(deadline);
       signal?.removeEventListener("abort", onAbort);
       input.destroy();
-      augmented?.destroy();
+      augmented.destroy();
       child.stdin.destroy();
 
       void inputClosed.then(() => {
@@ -155,9 +167,7 @@ export async function runFzfFilter(
           reject(fatal);
         } else if (limited || code === 0 || (code === 1 && !stderr)) {
           try {
-            const paths = pinyinMode
-              ? output.results.map(originalPathFromPinyinResult)
-              : output.results;
+            const paths = output.results.map(originalPathFromPinyinResult);
             resolve({ paths, exitCode: code, limited, cancelled: false });
           } catch (error) {
             reject(error);
@@ -169,8 +179,7 @@ export async function runFzfFilter(
     });
 
     if (!cancelled && !stopping) {
-      if (augmented) input.pipe(augmented).pipe(child.stdin);
-      else input.pipe(child.stdin);
+      input.pipe(augmented).pipe(child.stdin);
     }
   });
 }
