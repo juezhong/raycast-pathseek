@@ -68,3 +68,27 @@ test("failed progress records only sanitized error codes and stale warning", asy
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("cancelled progress retains only a diagnostic state, never becomes a successful index", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "pathseek-progress-cancel-"));
+  try {
+    const reporter = await beginIndexBuildProgress(dir, {
+      buildId: "cancel-test",
+      rootCount: 1,
+      compressionQuality: 7,
+      selectiveSymlinkTargets: 0,
+      selectiveSymlinkSkipped: 0,
+      includeHidden: false,
+    });
+    reporter.input(2048, 4);
+    await reporter.finish("cancelled", Object.assign(new Error("Cancelled"), { code: "ABORT_ERR" }));
+    const saved = await readIndexBuildProgress(dir);
+    assert.equal(saved.phase, "cancelled");
+    assert.equal(saved.pathCount, 4);
+    assert.equal(saved.errorCode, "ABORT_ERR");
+    assert.equal(isProgressStale(saved), false);
+    assert.doesNotMatch(JSON.stringify(saved), /private[\\/]user/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
