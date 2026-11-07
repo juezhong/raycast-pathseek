@@ -16,7 +16,8 @@ test("progress persists counters and records final state without paths", async (
       buildId: "test",
       rootCount: 2,
       compressionQuality: 7,
-      followSymlinks: false,
+      selectiveSymlinkTargets: 2,
+      selectiveSymlinkSkipped: 1,
       includeHidden: true,
     });
     reporter.root(1);
@@ -33,6 +34,8 @@ test("progress persists counters and records final state without paths", async (
     assert.equal(current.compressedBytes, 321);
     assert.equal(current.fdExitCode, 0);
     assert.equal(current.compressionQuality, 7);
+    assert.equal(current.selectiveSymlinkTargets, 2);
+    assert.equal(current.selectiveSymlinkSkipped, 1);
     assert.equal(isProgressStale(current), false);
 
     await reporter.finish("published");
@@ -51,7 +54,8 @@ test("failed progress records only sanitized error codes and stale warning", asy
       buildId: "failed",
       rootCount: 1,
       compressionQuality: 11,
-      followSymlinks: true,
+      selectiveSymlinkTargets: 1,
+      selectiveSymlinkSkipped: 0,
       includeHidden: false,
     });
     await reporter.finish("failed", Object.assign(new Error("/Users/alice/private.txt"), { code: "EIO" }));
