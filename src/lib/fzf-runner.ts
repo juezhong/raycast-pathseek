@@ -46,6 +46,7 @@ export async function runFzfFilter(
   signal?: AbortSignal,
   timeoutMs = 60_000,
   diagnostics?: FzfSearchDiagnostics,
+  scopeDirectory?: string,
 ): Promise<FilterResult> {
   const startedAt = diagnostics ? performance.now() : 0;
   throwIfAborted(signal);
@@ -60,6 +61,7 @@ export async function runFzfFilter(
     nativePath ? pathQuery!.nameQuery : undefined,
     nameQuery,
     diagnostics,
+    scopeDirectory,
   );
   if (diagnostics) {
     input.once("end", () => {
