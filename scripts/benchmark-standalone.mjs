@@ -16,6 +16,7 @@ import {
   publishIndex,
 } from "../src/lib/index-files.ts";
 import { runFzfFilter } from "../src/lib/fzf-runner.ts";
+import { compareCpuSearchStrategies } from "./benchmark-cpu-strategies.mjs";
 import { registerChild, terminateChild } from "../src/lib/managed-child.ts";
 import { createNonClosingSink } from "../src/lib/non-closing-sink.ts";
 import {
@@ -44,13 +45,14 @@ function usageDelta(cpu) {
 
 function options(argv) {
   if (!argv.length || argv[0].startsWith("--")) {
-    throw new Error("Usage: npm run benchmark:standalone -- \"$HOME\" [--shortcuts \"$HOME/Symlinks\"] [--hidden] [--quality 7] [--runs 5]");
+    throw new Error("Usage: npm run benchmark:standalone -- \"$HOME\" [--shortcuts \"$HOME/Symlinks\"] [--hidden] [--quality 7] [--runs 5] [--compare]");
   }
   const root = path.resolve(argv[0]);
   let shortcuts = null;
   let hidden = false;
   let quality = 7;
   let runs = 5;
+  let compare = false;
   for (let i = 1; i < argv.length; i++) {
     if (argv[i] === "--shortcuts" && i + 1 < argv.length) {
       shortcuts = path.resolve(argv[++i]);
@@ -60,6 +62,8 @@ function options(argv) {
       quality = Number(argv[++i]);
     } else if (argv[i] === "--runs" && i + 1 < argv.length) {
       runs = Number(argv[++i]);
+    } else if (argv[i] === "--compare") {
+      compare = true;
     } else {
       throw new Error("Unknown or incomplete benchmark option");
     }
@@ -70,7 +74,7 @@ function options(argv) {
   if (!Number.isInteger(runs) || runs < 1 || runs > 10) {
     throw new Error("Repeat count must be an integer between 1 and 10");
   }
-  return { root, shortcuts, hidden, quality, runs };
+  return { root, shortcuts, hidden, quality, runs, compare };
 }
 
 async function scanFd(root, sink, counters, signal, shortcut) {
@@ -238,27 +242,55 @@ async function run() {
       { kind: "full-scan-no-match", query: "pathseek_absent_" + randomUUID().replaceAll("-", ""), timings: [], count: 0, limited: false },
     ];
     const searchCpuStart = process.cpuUsage();
-    // 第一轮为预热，不计入统计。之后交错测试三种负载，避免顺序偏差。
-    for (let round = 0; round <= args.runs; round++) {
-      for (const entry of tests) {
-        if (controller.signal.aborted) throw new Error("Benchmark cancelled");
-        const startedQuery = performance.now();
-        const result = await runFzfFilter("fzf", index, entry.query, controller.signal);
-        const elapsed = performance.now() - startedQuery;
-        if (round > 0) entry.timings.push(elapsed);
-        entry.count = result.paths.length;
-        entry.limited = result.limited;
-        if (result.cancelled) throw new Error("Search cancelled");
+    let comparison = null;
+    let measurements;
+    if (args.compare) {
+      comparison = await compareCpuSearchStrategies({
+        indexPath: index,
+        queries: tests.map(({ kind, query }) => ({ kind, query })),
+        runs: args.runs,
+        signal: controller.signal,
+      });
+      measurements = tests.map((entry) => {
+        const baseline = comparison.strategies.find(
+          (result) => result.workload === entry.kind && result.strategy === "sorted-compressed",
+        );
+        return {
+          kind: entry.kind,
+          runs: args.runs,
+          minMs: baseline.minMs,
+          p50Ms: baseline.p50Ms,
+          p95Ms: baseline.p95Ms,
+          maxMs: baseline.maxMs,
+          resultCount: baseline.count,
+          limitReached: baseline.limitReached,
+        };
+      });
+    } else {
+      // 普通基准维持原有行为：只调用生产版 fzf 流式搜索代码。
+      for (let round = 0; round <= args.runs; round++) {
+        for (const entry of tests) {
+          if (controller.signal.aborted) throw new Error("Benchmark cancelled");
+          const startedQuery = performance.now();
+          const result = await runFzfFilter("fzf", index, entry.query, controller.signal);
+          const elapsed = performance.now() - startedQuery;
+          if (round > 0) entry.timings.push(elapsed);
+          entry.count = result.paths.length;
+          entry.limited = result.limited;
+          if (result.cancelled) throw new Error("Search cancelled");
+        }
       }
+      measurements = tests.map((entry) => ({
+        kind: entry.kind,
+        ...summarizeTimes(entry.timings),
+        resultCount: entry.count,
+        limitReached: entry.limited,
+      }));
     }
     const searchCpu = usageDelta(process.cpuUsage(searchCpuStart));
-    const measurements = tests.map((entry) => ({
-      kind: entry.kind,
-      ...summarizeTimes(entry.timings),
-      resultCount: entry.count,
-      limitReached: entry.limited,
-    }));
-    if (tests[2].count !== 0) throw new Error("No-match control unexpectedly matched");
+    if (measurements[2].resultCount !== 0) {
+      throw new Error("No-match control unexpectedly matched");
+    }
 
     return {
       benchmarkVersion: 2,
@@ -290,6 +322,7 @@ async function run() {
       warmupRounds: 1,
       measuredRounds: args.runs,
       queries: measurements,
+      ...(comparison ? { cpuComparison: comparison } : {}),
       note: "Build/decode/search CPU times only include the Node process, not fd/fzf. No path or query text is emitted.",
     };
   } finally {
