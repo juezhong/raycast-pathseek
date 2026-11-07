@@ -92,8 +92,8 @@ export function SearchFilesView({
           : isSearching
             ? "Searching Index"
             : !query.trim()
-            ? "Type to Search"
-            : "No Matching Files";
+              ? "Type to Search"
+              : "No Matching Files";
 
   const emptyDescription = missingBinary
     ? missingBinaryMessage(missingBinary)
@@ -104,12 +104,12 @@ export function SearchFilesView({
         : isSearching
           ? "Searching " + index.count.toLocaleString() + " indexed paths…"
           : !query.trim()
-          ? "Indexed " +
-            index.count.toLocaleString() +
-            " paths on " +
-            new Date(index.createdAt).toLocaleString() +
-            "."
-          : "Try a different pattern or rebuild the index to include new files.";
+            ? "Indexed " +
+              index.count.toLocaleString() +
+              " paths on " +
+              new Date(index.createdAt).toLocaleString() +
+              "."
+            : "Try a different pattern or rebuild the index to include new files.";
 
   return (
     <List
