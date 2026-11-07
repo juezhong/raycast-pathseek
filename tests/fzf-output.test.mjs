@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { appendFzfOutputChunk, createFzfOutputState, MAX_FZF_RESULTS } from "../src/lib/fzf-output.ts";
+import {
+  appendFzfOutputChunk,
+  createFzfOutputState,
+  MAX_FZF_PATH_BYTES,
+  MAX_FZF_RESULTS,
+} from "../src/lib/fzf-output.ts";
 
 test("fzf output is strictly capped when a single stdout chunk has too many entries", () => {
   const state = createFzfOutputState();
@@ -44,4 +49,32 @@ test("empty records do not appear as results", () => {
   const state = createFzfOutputState();
   appendFzfOutputChunk(state, Buffer.from("\0foo\0\0bar\0"));
   assert.deepEqual(state.results, ["foo", "bar"]);
+});
+
+test("fzf output limits an unterminated record across many chunks", () => {
+  const state = createFzfOutputState();
+  const part = Buffer.alloc(64 * 1024, 65);
+  for (let i = 0; i < MAX_FZF_PATH_BYTES / part.length; i++) {
+    appendFzfOutputChunk(state, part);
+  }
+  assert.equal(state.pending.length, MAX_FZF_PATH_BYTES);
+  assert.throws(() => appendFzfOutputChunk(state, Buffer.from("X")), /size limit/);
+});
+
+test("fzf output rejects oversized NUL-delimited records without retaining them", () => {
+  const state = createFzfOutputState();
+  const path = Buffer.alloc(MAX_FZF_PATH_BYTES + 2, 65);
+  path[path.length - 1] = 0;
+  assert.throws(() => appendFzfOutputChunk(state, path), /size limit/);
+  assert.equal(state.results.length, 0);
+});
+
+test("fzf output accepts a path exactly at the supported size boundary", () => {
+  const state = createFzfOutputState();
+  const record = Buffer.alloc(MAX_FZF_PATH_BYTES + 1, 65);
+  record[record.length - 1] = 0;
+  appendFzfOutputChunk(state, record);
+  assert.equal(state.results.length, 1);
+  assert.equal(Buffer.byteLength(state.results[0]), MAX_FZF_PATH_BYTES);
+  assert.equal(state.pending.length, 0);
 });
