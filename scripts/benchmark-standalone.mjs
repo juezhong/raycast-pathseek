@@ -36,6 +36,33 @@ function summarizeTimes(values) {
   };
 }
 
+function pipelineSummary(samples) {
+  const range = (field) => {
+    const values = samples.map((item) => item[field]);
+    return {
+      min: Math.min(...values),
+      max: Math.max(...values),
+    };
+  };
+  const median = (field) => {
+    const values = samples
+      .map((item) => item[field])
+      .filter((value) => typeof value === "number" && Number.isFinite(value));
+    return values.length ? summarizeTimes(values).p50Ms : null;
+  };
+
+  return {
+    recordsDecoded: range("inputRecords"),
+    recordsSentToFzf: range("outputRecords"),
+    bytesSentToFzf: range("outputBytes"),
+    batchesSentToFzf: range("outputChunks"),
+    transformCpuLikeMsP50: median("transformMs"),
+    decoderEndMsP50: median("decoderEndMs"),
+    stdinFinishMsP50: median("stdinFinishMs"),
+    childCloseMsP50: median("childCloseMs"),
+  };
+}
+
 function usageDelta(cpu) {
   return {
     userMs: Math.round(cpu.user / 1000),
@@ -421,9 +448,26 @@ async function run() {
       for (const entry of tests) {
         if (controller.signal.aborted) throw new Error("Benchmark cancelled");
         const startedQuery = performance.now();
-        const result = await runFzfFilter("fzf", index, entry.query, controller.signal);
+        const profile = {
+          inputRecords: 0,
+          outputRecords: 0,
+          outputBytes: 0,
+          outputChunks: 0,
+          transformMs: 0,
+        };
+        const result = await runFzfFilter(
+          "fzf",
+          index,
+          entry.query,
+          controller.signal,
+          60_000,
+          profile,
+        );
         const elapsed = performance.now() - startedQuery;
-        if (round > 0) entry.timings.push(elapsed);
+        if (round > 0) {
+          entry.timings.push(elapsed);
+          (entry.profiles ??= []).push(profile);
+        }
         entry.count = result.paths.length;
         entry.limited = result.limited;
         if (result.cancelled) throw new Error("Search cancelled");
@@ -435,6 +479,7 @@ async function run() {
       ...summarizeTimes(entry.timings),
       resultCount: entry.count,
       limitReached: entry.limited,
+      pipeline: pipelineSummary(entry.profiles),
     }));
     if (tests[2].count !== 0) throw new Error("No-match control unexpectedly matched");
 
@@ -485,7 +530,7 @@ async function run() {
       warmupRounds: 1,
       measuredRounds: args.runs,
       queries: measurements,
-      note: "CPU times are Node-only; RSS also includes periodically sampled fd/fzf descendants in processTreeRss. No path or query text is emitted.",
+      note: "CPU times are Node-only; RSS also includes periodically sampled fd/fzf descendants in processTreeRss. Pipeline stage times can overlap, are not additive, and include optional measurement overhead. No path or query text is emitted.",
     };
   } finally {
     clearInterval(rssSampler);
