@@ -78,6 +78,26 @@ PathSeek 统一使用 Raycast 提供的 `environment.supportPath` 作为索引�
 
 可在 Raycast 的扩展偏好设置里配置 `Include Hidden Files`、排除规则、Brotli 等级及 `fd`/`fzf` 可执行文件路径。修改扫描配置后需要**主动重建**，已有索引不会自动刷新。
 
+### 配置保存在哪里？
+
+PathSeek **没有单独的 `config.json` 配置文件**，所以不能从 `index.nul` 旁边找到完整配置。Raycast 管理以下两类持久化数据：
+
+| 配置 | 读取与保存方式 | 用户从哪里修改 |
+| --- | --- | --- |
+| 要扫描的根目录 | Raycast `LocalStorage`，键为 `configured-index-roots-v1` | `Build Index → Change Indexed Folders` |
+| 软链接快捷目录 | Raycast `LocalStorage`，键为 `configured-selective-symlink-folder-v1` | 同一个文件夹选择界面 |
+| 是否包含隐藏文件、排除规则、压缩等级、fd/fzf 路径及调试开关 | `getPreferenceValues()`，其配置项定义在 `package.json` | `Raycast Settings → Extensions → PathSeek` |
+
+以上由 Raycast 管理的配置**不等于**磁盘上的压缩索引。Raycast 的 `LocalStorage` 在本地加密数据库中，不是放在插件支持目录下的普通文本文件。索引 `index.nul` 的头部会另存**上一次成功构建时**的根目录快照，但不是设置的唯一来源。
+
+**取消/失败与清理规则：**
+
+- 主动取消或普通构建错误：关闭 `fd` 与压缩管道，删除本次 `index-UUID.nul.tmp`；不会发布半成品，已发布的 `index.nul` 保持原样。
+- 允许正常执行退出钩子的进程退出：额外尝试同步清理尚未完成的暂存文件。
+- `SIGKILL`、Raycast 强制终止执行线程或系统断电：无法保证立即清理；**下一次主动执行 Build Index、获得独占构建锁后**，会回收遗留的 UUID 暂存文件及进度临时文件。不会在平时搜索时自动启动清理任务。
+- `build-progress.json` 是扫描数值和 `cancelled` / `failed` 结果的诊断记录，**不是路径缓存索引**；它可以保留以方便排查。
+- 删除不涉及 Raycast `LocalStorage`、Preferences、已发布的 `index.nul` 或其它用户文件。主动保存的新目录配置即使随后取消构建，也会保持已保存状态。
+
 ## 4. 日常使用
 
 - **Find in Open/Save**：在其他应用中打开文件选择对话框，通过你设置的 Raycast 热键调用 PathSeek，搜索并执行 **Select File or Go to Folder (Paste Full Path)**。若目标应用不接受直接粘贴，先回到原对话框按 `⌘⇧G`（前往文件夹）再尝试。扩展只辅助输入路径，不自动点击“打开”或“保存”。
