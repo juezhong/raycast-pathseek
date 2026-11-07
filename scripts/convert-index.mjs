@@ -72,7 +72,6 @@ if (!sourceIndex || !destinationDirectory) {
       compressedBytes: compressedSize,
       sizeReductionPercent: Number((100 * (1 - compressedSize / originalSize)).toFixed(2)),
     }, null, 2));
-    console.log("Conversion completed; the existing Raycast index was not modified.");
   } catch (error) {
     console.error("Conversion failed:", error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
