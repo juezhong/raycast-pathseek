@@ -61,12 +61,12 @@ test("aborting an in-flight fzf kills child, reaps it, and returns no stale path
       binary,
       "#!/usr/bin/env node\n" +
         "const fs = require('node:fs');\n" +
-        "fs.writeFileSync(process.argv.at(-1), String(process.pid));\n" +
+        `fs.writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));\n` +
         "process.stdin.resume(); setInterval(() => {}, 1000);\n",
     );
     await chmod(binary, 0o755);
     const controller = new AbortController();
-    const task = runFzfFilter(binary, index, pidFile, controller.signal, 10000);
+    const task = runFzfFilter(binary, index, "driver", controller.signal, 10000);
     const pid = await waitForPid(pidFile);
     controller.abort();
     const result = await task;
@@ -84,7 +84,7 @@ test("timeout escalates to SIGKILL when fzf ignores SIGTERM", async () => {
       binary,
       "#!/usr/bin/env node\n" +
         "const fs = require('node:fs');\n" +
-        "fs.writeFileSync(process.argv.at(-1), String(process.pid));\n" +
+        `fs.writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));\n` +
         "process.on('SIGTERM', () => {});\n" +
         "process.stdin.resume(); setInterval(() => {}, 1000);\n",
     );
@@ -92,7 +92,7 @@ test("timeout escalates to SIGKILL when fzf ignores SIGTERM", async () => {
     // CI 或繁忙的 macOS 上 Node shebang 冷启动可能超过 250ms。
     // 等待真实超时/升级 SIGKILL，但不要用过短超时误判尚未启动。
     await assert.rejects(
-      runFzfFilter(binary, index, pidFile, undefined, 3000),
+      runFzfFilter(binary, index, "driver", undefined, 3000),
       /time limit/,
     );
     const pid = await waitForPid(pidFile);
@@ -108,13 +108,13 @@ test("malformed fzf stdout is bounded and the child is reaped", async () => {
       binary,
       "#!/usr/bin/env node\n" +
         "const fs = require('node:fs');\n" +
-        "fs.writeFileSync(process.argv.at(-1), String(process.pid));\n" +
+        `fs.writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));\n` +
         "process.stdout.write(Buffer.alloc(2 * 1024 * 1024, 65));\n" +
         "process.stdin.resume(); setInterval(() => {}, 1000);\n",
     );
     await chmod(binary, 0o755);
     const rejection = assert.rejects(
-      runFzfFilter(binary, index, pidFile, undefined, 10_000),
+      runFzfFilter(binary, index, "driver", undefined, 10_000),
       /fzf output path exceeds size limit/,
     );
     const pid = await waitForPid(pidFile);
@@ -368,5 +368,87 @@ test("pinyin search still surfaces Chinese among 300 shorter prefix matches", as
       result.paths.includes(target),
       "Chinese matches must be visible even when 300 short ASCII prefixes rank higher",
     );
+  });
+});
+
+
+test("slash-delimited fuzzy path search matches directory levels before the real fzf filename term", async () => {
+  await fixture(async (dir) => {
+    const entries = [
+      "/sample/first",
+      "/sample/first/second",
+      "/sample/first/second/third",
+      "/sample/first/second/third/fourth",
+      "/sample/first/second/third/fourth.txt",
+      "/sample/first/second/third/fourth/log.txt",
+      "/sample/first/second/third/archive",
+      "/sample/first/second/third/archive/fourth",
+      "/sample/first/second/sibling/fourth",
+      "/sample/第二次/第一次.txt",
+      "/sample/第一次",
+      "/sample/第一次/第二次",
+      "/sample/第一次/第二次.txt",
+      "/sample/第一次/第二次/报告.txt",
+    ];
+    const raw = path.join(dir, "path-level-input");
+    const staged = path.join(dir, "path-level-staged.nul.tmp");
+    await writeFile(raw, entries.join("\0") + "\0");
+    await prepareIndex(raw, staged, {
+      version: 3,
+      count: entries.length,
+      createdAt: new Date().toISOString(),
+      roots: ["/sample"],
+    });
+    await publishIndex(staged, dir);
+    const index = path.join(dir, "index.nul");
+    const targets = [
+      "/sample/first/second/third/fourth",
+      "/sample/first/second/third/fourth.txt",
+    ];
+    for (const query of [
+      "th/for",
+      "third/fou",
+      "fir/seco/th/four",
+      "/fir/seco/th/four",
+    ]) {
+      const result = await runFzfFilter("fzf", index, query);
+      assert.deepEqual(new Set(result.paths), new Set(targets), query);
+      assert.equal(result.cancelled, false);
+    }
+
+    const directories = await runFzfFilter("fzf", index, "th/");
+    assert.deepEqual(
+      new Set(directories.paths),
+      new Set([...targets, "/sample/first/second/third/archive"]),
+    );
+    const nonAdjacent = await runFzfFilter("fzf", index, "fir/th/four");
+    assert.deepEqual(nonAdjacent.paths, []);
+
+    const mixedPinyin = await runFzfFilter("fzf", index, "dyc/dec");
+    assert.deepEqual(
+      new Set(mixedPinyin.paths),
+      new Set(["/sample/第一次/第二次", "/sample/第一次/第二次.txt"]),
+    );
+    const reversed = await runFzfFilter("fzf", index, "dec/dyc");
+    assert.deepEqual(reversed.paths, ["/sample/第二次/第一次.txt"]);
+    const pinyinDirectories = await runFzfFilter("fzf", index, "dyc/");
+    assert.deepEqual(
+      new Set(pinyinDirectories.paths),
+      new Set([
+        "/sample/第一次/第二次",
+        "/sample/第一次/第二次.txt",
+      ]),
+    );
+
+    const plain = await runFzfFilter("fzf", index, "four");
+    assert.ok(plain.paths.includes(targets[0]));
+    assert.ok(plain.paths.includes("/sample/first/second/third/archive/fourth"));
+    const advanced = await runFzfFilter("fzf", index, "th/.txt$");
+    assert.deepEqual(advanced.paths, [targets[1]]);
+    const malformed = await assert.rejects(
+      runFzfFilter("fzf", index, "third//fourth"),
+      /empty directory levels/,
+    );
+    void malformed;
   });
 });
