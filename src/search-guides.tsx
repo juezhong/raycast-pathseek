@@ -28,11 +28,12 @@ PathSeek searches **only each indexed file or directory name** with \`fzf --exte
 
 ## Chinese Pinyin
 
-For simple Latin-letter/digit queries (including spaces), PathSeek also supplies temporary pinyin initials and full readings of Chinese names to fzf. Examples for \`第一次\`:
+For simple Latin-letter/digit queries (including spaces), PathSeek also supplies temporary pinyin initials and full readings of Chinese names to fzf. Examples for Chinese file/folder names:
 
 - \`dyc\`, \`d y c\` — ordered or separate initials
 - \`yc d\`, \`y c d\` — the independent terms can appear in any order
-- \`diyici\` — full pinyin
+- \`diyici\` — full pinyin of \`第一次\`
+- \`dec\`, \`derc\`, \`d erc\`, \`d er c\` — common matching forms of \`第二次\`
 - \`2026 dyc\` — both year and initials must appear in **the same name**, not its parent folders
 
 Pinyin aliases are generated **only while searching**, not stored in a second index. They support the same \`fzf\` matcher, but no transliteration library can guarantee every polyphonic proper name. Complex \`fzf\` operators (\`!\`, \`^\`, \`$\`, \`'\`, \`|\`) still use native fzf syntax, restricted to the **original file/directory name**.
@@ -41,7 +42,8 @@ Pinyin aliases are generated **only while searching**, not stored in a second in
 
 - Prefix and suffix anchors apply to the **file/directory name**, never the parent path.
 - Multiple terms separated by spaces mean AND; a standalone \`|\` means OR.
-- Results are capped at 150. Opening the guide or expression editor never starts \`fd\`.
+- Results are capped at 150. For Latin/pinyin queries, a bounded selection reserves slots for Chinese names beyond the top-ranked ASCII results. The retained output scan is also bounded.
+- If an exact Chinese filename cannot be found, manually rebuild the index; searches never scan new files automatically.
 - Use **Compose Expression & Preview** to see real matching files before pressing Enter.
 
 
