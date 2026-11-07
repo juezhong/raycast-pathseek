@@ -37,6 +37,12 @@ npm run benchmark:standalone -- "$HOME" \
 | `processTreeRss.peakCombinedRssBytes` | Node + 其子进程同一采样时点的合计 RSS 峰值 |
 | `processTreeRss.peakFdRssBytes / peakFzfRssBytes` | 观测到的 fd/fzf 单类进程合计峰值 |
 | `processTreeRss.sampled / failures` | 采样次数与采样错误次数；若采样失败不能据此推断内存安全 |
+| `queries[].pipeline.recordsDecoded / recordsSentToFzf` | 预热轮次处理的索引记录数及真正交给 fzf 的候选数 |
+| `queries[].pipeline.bytesSentToFzf / batchesSentToFzf` | 预热轮次写给 fzf 的字节总量及输出批次数 |
+| `queries[].pipeline.transformSyncWallMs` | 输入转换器同步处理所有解码块的累计墙钟耗时（不是独立的进程 CPU 时间） |
+| `queries[].pipeline.decoderEndMs / stdinFinishMs / childCloseMs` | 从搜索启动算起到解码结束、输入管道结束、fzf 进程退出的累计时间点；它们相互重叠，不能相加 |
+
+**搜索阶段诊断只在预热轮次启用，正式 5 轮 P50/P95 不增加逐条计数开销。** 当搜索因输出上限提前中断时，阶段统计可能不完整；只显示统计数字，不输出真实文件名和查询字符串。
 
 **注意：** RSS 进程树采样间隔 250ms，并不能保证捕捉短暂峰值；同时取到的 fd/fzf 峰值属于各自时间点，不能直接相加作为总内存峰值。对于上次的约 8GiB 问题，应优先检查 `processTreeRss.peakCombinedRssBytes`，必要时结合 macOS 活动监视器。
 
