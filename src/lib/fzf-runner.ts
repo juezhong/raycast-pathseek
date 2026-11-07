@@ -3,6 +3,11 @@ import type { Readable } from "node:stream";
 import { openIndexDataStream } from "./index-files.ts";
 import { appendFzfOutputChunk, createFzfOutputState } from "./fzf-output.ts";
 import {
+  appendPinyinPriorityChunk,
+  createPinyinPriorityOutput,
+  finishPinyinPriorityOutput,
+} from "./fzf-pinyin-priority.ts";
+import {
   createPinyinFilterInput,
   originalPathFromPinyinResult,
   shouldUsePinyinAliases,
@@ -42,6 +47,7 @@ export async function runFzfFilter(
 
   return new Promise<FilterResult>((resolve, reject) => {
     const output = createFzfOutputState();
+    const pinyinOutput = pinyinMode ? createPinyinPriorityOutput() : undefined;
     let limited = false;
     let cancelled = false;
     let fatal: Error | undefined;
@@ -128,8 +134,9 @@ export async function runFzfFilter(
     child.stdout.on("data", (chunk: Buffer) => {
       if (limited || cancelled) return;
       try {
-        appendFzfOutputChunk(output, chunk);
-        if (output.limitReached) {
+        if (pinyinOutput) appendPinyinPriorityChunk(pinyinOutput, chunk);
+        else appendFzfOutputChunk(output, chunk);
+        if (pinyinOutput?.limitReached || output.limitReached) {
           limited = true;
           stop();
         }
@@ -167,7 +174,10 @@ export async function runFzfFilter(
           reject(fatal);
         } else if (limited || code === 0 || (code === 1 && !stderr)) {
           try {
-            const paths = output.results.map(originalPathFromPinyinResult);
+            const rawResults = pinyinOutput
+              ? finishPinyinPriorityOutput(pinyinOutput)
+              : output.results;
+            const paths = rawResults.map(originalPathFromPinyinResult);
             resolve({ paths, exitCode: code, limited, cancelled: false });
           } catch (error) {
             reject(error);
