@@ -29,6 +29,8 @@ test("standalone benchmark builds, searches and removes only its temporary index
     }
     await writeFile(path.join(source, "nested", "中文文件.txt"), "source");
     await symlink(source, path.join(shortcuts, "project"));
+    // 普通扫描和显式快捷目标扫描都不能递归跟随这个循环链接。
+    await symlink(root, path.join(source, "loop"));
     await symlink(path.join(root, "not-a-directory"), path.join(shortcuts, "broken"));
     const before = await temporaryBenchmarkFiles();
 
@@ -49,9 +51,15 @@ test("standalone benchmark builds, searches and removes only its temporary index
     );
 
     const output = JSON.parse(stdout);
-    assert.equal(output.benchmarkVersion, 2);
+    assert.equal(output.benchmarkVersion, 3);
     assert.equal(output.formatVersion, 3);
     assert.equal(output.nodeRss.sampleIntervalMs, 50);
+    assert.equal(output.processTreeRss.sampleIntervalMs, 250);
+    assert.ok(output.processTreeRss.sampled >= 1);
+    assert.ok(output.processTreeRss.peakCombinedRssBytes > 0);
+    assert.ok(output.processTreeRss.peakFdRssBytes >= 0);
+    assert.ok(output.processTreeRss.peakFzfRssBytes >= 0);
+    assert.match(output.processTreeRss.scope, /short bursts can be missed/);
     assert.ok(output.nodeRss.atStartBytes > 0);
     assert.ok(output.nodeRss.afterBenchmarkBytes > 0);
     assert.ok(output.nodeRss.sampledPeakBytes >= output.nodeRss.atStartBytes);
@@ -74,6 +82,7 @@ test("standalone benchmark builds, searches and removes only its temporary index
     assert.equal(output.decodeMs, output.decodeStats.p50Ms);
     assert.ok(output.decodeStats.p95Ms >= output.decodeStats.p50Ms);
     assert.ok(output.indexedPaths >= 200);
+    assert.ok(output.indexedPaths < 500, "Nested symlink traversal would expand the index unexpectedly");
     assert.ok(output.uncompressedBytes > 0);
     assert.ok(output.compressedBytes > 0);
     assert.equal(output.queries.length, 5);

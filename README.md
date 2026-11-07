@@ -135,6 +135,8 @@ PathSeek 继续使用原生 `fzf --extended --read0 --print0 --filter` 和 `--nt
 
 ### 含软链接目录的真实冷启动与搜索对比
 
+完整固定命令及字段说明见 [性能基准模板](docs/PERFORMANCE_BENCHMARK.md)。
+
 保留成熟的 `benchmark:standalone` 测试路径：每次在临时目录从零构建索引；`--shortcuts` 仅展开指定目录的直接目录软链接，不使用 `fd --follow`。扫描 HOME 及显式目标，使用流式索引压缩，且只删除本次创建的临时索引：
 
 ```bash
@@ -143,17 +145,7 @@ npm run benchmark:standalone -- "$HOME" \
   --hidden --quality 7 --runs 5 --compare
 ```
 
-`--compare` 额外加入同一条索引记录的普通名称模糊查询和连续父目录路径模糊查询对照（并非自动比较不同 Git 版本）；`symlinkTargets` 与 `symlinkLinksSkipped` 记录识别情况。**`nodeRss` 只包括 Node 进程，不包括 `fd` 和 `fzf` 子进程的峰值 RSS，不能仅凭该项断言全进程内存安全。** 建议在真实扫描时同时监控系统内存。
-
-### 无索引冷启动基准
-
-从空的独立临时目录开始创建测试文件、运行 `fd` 建立压缩索引，并完成首次中英文与拼音路径搜索；不需要已有 `index.nul`，也不会清理或覆盖用户的 Raycast 插件目录与缓存：
-
-```bash
-npm run benchmark:cold -- 256
-```
-
-结束后自动删除本次生成的临时样本及索引，输出建索引耗时、首次查询耗时、Node CPU 与 RSS。进程外的 `fd` / `fzf` 资源不包含在 Node 指标内，建议新旧版本在相同设备和测试样本下对比。
+`--compare` 额外加入同一条索引记录的普通名称模糊查询和连续父目录路径模糊查询对照（并非自动比较不同 Git 版本）；`symlinkTargets` 与 `symlinkLinksSkipped` 记录识别情况。**`nodeRss` 是 Node 的 50ms 采样峰值，`processTreeRss` 是 Node 与本次启动的 `fd`/`fzf` 后代进程 RSS 的 250ms 采样峰值。** 后者不包括其他程序、系统文件缓存，也可能遗漏极短的峰值；若过去出现过 8GB 占用，仍建议同时观察活动监视器。
 
 ### 搜索性能基准（只读）
 

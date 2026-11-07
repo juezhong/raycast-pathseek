@@ -109,24 +109,3 @@ test("real index path benchmark is read-only and reports reliable baseline metri
     await rm(directory, { recursive: true, force: true });
   }
 });
-
-test("cold benchmark starts with no index and builds an isolated fd fixture", async () => {
-  const { stdout } = await execFileAsync(
-    process.execPath,
-    ["--experimental-strip-types", "scripts/benchmark-cold-search.mjs", "32"],
-    { cwd: path.resolve("."), timeout: 30_000, maxBuffer: 1024 * 1024 },
-  );
-  const parsed = JSON.parse(stdout);
-  assert.equal(parsed.benchmark, "fresh-fd-index-and-first-fzf-search");
-  assert.equal(parsed.fixtureFiles, 33);
-  assert.ok(parsed.indexedPaths >= 33);
-  assert.ok(parsed.buildMs > 0);
-  assert.ok(parsed.buildNodeCpuMs >= 0);
-  assert.deepEqual(
-    parsed.firstSearches.map((item) => item.resultCount),
-    [32, 32, 1],
-  );
-  assert.ok(parsed.firstSearches.every((item) => item.elapsedMs > 0));
-  assert.ok(parsed.firstSearches.every((item) => item.nodeRssBytes > 0));
-  assert.doesNotMatch(stdout, /pathseek-cold-\/|four-file-0|\/第一次\/第二次/);
-});

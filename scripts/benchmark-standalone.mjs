@@ -1,4 +1,5 @@
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
 import { createWriteStream } from "node:fs";
 import { mkdtemp, rm, stat } from "node:fs/promises";
@@ -39,6 +40,105 @@ function usageDelta(cpu) {
   return {
     userMs: Math.round(cpu.user / 1000),
     systemMs: Math.round(cpu.system / 1000),
+  };
+}
+
+
+const execFileAsync = promisify(execFile);
+
+/**
+ * 仅基准测试期间采样同一 Node 进程树的 RSS。
+ * ps 本身和它的子进程不纳入统计；短生命周期进程可能落在采样间隔之间。
+ */
+function createProcessTreeMemorySampler(sampleIntervalMs = 250) {
+  const state = {
+    sampled: 0,
+    failures: 0,
+    peakCombinedRssBytes: 0,
+    peakFdRssBytes: 0,
+    peakFzfRssBytes: 0,
+    peakOtherChildRssBytes: 0,
+    observedFd: false,
+    observedFzf: false,
+  };
+  let inFlight = null;
+  let stopped = false;
+
+  function capture() {
+    if (inFlight || stopped) return inFlight;
+    inFlight = execFileAsync("ps", ["-axo", "pid=,ppid=,rss=,comm="], {
+      timeout: 3000,
+      maxBuffer: 8 * 1024 * 1024,
+    }).then(({ stdout }) => {
+      const entries = new Map();
+      for (const line of stdout.split("\n")) {
+        const match = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(.+?)\s*$/.exec(line);
+        if (!match) continue;
+        entries.set(Number(match[1]), {
+          parent: Number(match[2]),
+          rssBytes: Number(match[3]) * 1024,
+          name: path.basename(match[4]),
+        });
+      }
+      const descendants = new Set([process.pid]);
+      // 只追踪基准进程的后代，其他程序即使也叫 fd/fzf 也不计入。
+      for (let changed = true; changed;) {
+        changed = false;
+        for (const [pid, entry] of entries) {
+          if (descendants.has(pid) || !descendants.has(entry.parent) || entry.name === "ps")
+            continue;
+          descendants.add(pid);
+          changed = true;
+        }
+      }
+
+      let combinedBytes = 0;
+      let fdBytes = 0;
+      let fzfBytes = 0;
+      let otherBytes = 0;
+      for (const pid of descendants) {
+        const item = entries.get(pid);
+        if (!item) continue;
+        combinedBytes += item.rssBytes;
+        if (pid === process.pid) continue;
+        if (item.name === "fd" || item.name === "fdfind") fdBytes += item.rssBytes;
+        else if (item.name === "fzf") fzfBytes += item.rssBytes;
+        else otherBytes += item.rssBytes;
+      }
+      state.sampled++;
+      state.peakCombinedRssBytes = Math.max(state.peakCombinedRssBytes, combinedBytes);
+      state.peakFdRssBytes = Math.max(state.peakFdRssBytes, fdBytes);
+      state.peakFzfRssBytes = Math.max(state.peakFzfRssBytes, fzfBytes);
+      state.peakOtherChildRssBytes = Math.max(state.peakOtherChildRssBytes, otherBytes);
+      state.observedFd ||= fdBytes > 0;
+      state.observedFzf ||= fzfBytes > 0;
+    }).catch(() => {
+      state.failures++;
+    }).finally(() => {
+      inFlight = null;
+    });
+    return inFlight;
+  }
+
+  const timer = setInterval(() => { void capture(); }, sampleIntervalMs);
+  timer.unref();
+  void capture();
+
+  return {
+    async finish() {
+      stopped = true;
+      clearInterval(timer);
+      await inFlight;
+      return {
+        ...state,
+        sampleIntervalMs,
+        scope: "Periodic RSS sample of this Node process and its fd/fzf descendants; short bursts can be missed. Does not include file cache, Raycast, or unrelated processes.",
+      };
+    },
+    stop() {
+      stopped = true;
+      clearInterval(timer);
+    },
   };
 }
 
@@ -201,6 +301,7 @@ async function run() {
     sampledPeakRss = Math.max(sampledPeakRss, process.memoryUsage.rss());
   }, 50);
   rssSampler.unref();
+  const processTreeSampler = createProcessTreeMemorySampler();
   const controller = new AbortController();
   const abort = () => controller.abort();
   process.once("SIGINT", abort);
@@ -314,8 +415,9 @@ async function run() {
     }));
     if (tests[2].count !== 0) throw new Error("No-match control unexpectedly matched");
 
+    const processTreeRss = await processTreeSampler.finish();
     return {
-      benchmarkVersion: 2,
+      benchmarkVersion: 3,
       formatVersion: 3,
       host: {
         platform: process.platform,
@@ -344,6 +446,7 @@ async function run() {
       ),
       buildMs,
       buildCpu,
+      processTreeRss,
       nodeRss: {
         atStartBytes: rssAtStart,
         afterBenchmarkBytes: process.memoryUsage.rss(),
@@ -359,10 +462,11 @@ async function run() {
       warmupRounds: 1,
       measuredRounds: args.runs,
       queries: measurements,
-      note: "Build/decode/search CPU times only include the Node process, not fd/fzf. No path or query text is emitted.",
+      note: "CPU times are Node-only; RSS also includes periodically sampled fd/fzf descendants in processTreeRss. No path or query text is emitted.",
     };
   } finally {
     clearInterval(rssSampler);
+    processTreeSampler.stop();
     process.off("SIGINT", abort);
     process.off("SIGTERM", abort);
     // 仅删除 mkdtemp 本次创建的临时目录；绝不操作 Raycast 正式索引。
