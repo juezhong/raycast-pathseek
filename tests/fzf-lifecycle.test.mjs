@@ -578,3 +578,19 @@ test("anchored fzf expressions preserve native filename suffixes and match pinyi
     assert.deepEqual((await runFzfFilter("fzf", index, ".txt$")).paths, [entries[0]]);
   });
 });
+
+test("native fzf path query matches a top-level directory under hyphenated parent", async () => {
+  await fixture(async (dir) => {
+    const target = "/private/var/tmp/pathseek-standalone-fixture-abc/Shortcuts";
+    const raw = path.join(dir, "hyphen-root.paths");
+    const stage = path.join(dir, "hyphen-root.stage");
+    await writeFile(raw, target + "\0");
+    await prepareIndex(raw, stage, {
+      version: 3, count: 1, createdAt: new Date().toISOString(),
+      roots: ["/private/var/tmp/pathseek-standalone-fixture-abc"],
+    });
+    await publishIndex(stage, dir);
+    const file = path.join(dir, "index.nul");
+    assert.deepEqual((await runFzfFilter("fzf", file, "pat/sho")).paths, [target]);
+  });
+});
