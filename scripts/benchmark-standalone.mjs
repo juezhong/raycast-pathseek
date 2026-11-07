@@ -205,8 +205,6 @@ async function run() {
     } finally {
       controller.signal.removeEventListener("abort", onAbort);
     }
-    const buildMs = Number((performance.now() - started).toFixed(1));
-    const buildCpu = usageDelta(process.cpuUsage(buildCpuStart));
     await finalizeStreamingIndexStage(stage, {
       version: 3,
       count: counters.paths,
@@ -215,13 +213,23 @@ async function run() {
     });
     await publishIndex(stage, temporary);
     const indexBytes = (await stat(index)).size;
+    const buildMs = Number((performance.now() - started).toFixed(1));
+    const buildCpu = usageDelta(process.cpuUsage(buildCpuStart));
 
+    // 同一份索引先预热，再重复完整解压，避免单次缓存波动影响判断。
     const decodeCpuStart = process.cpuUsage();
-    const decoded = await measureDecode(index);
-    const decodeCpu = usageDelta(process.cpuUsage(decodeCpuStart));
-    if (decoded.paths !== counters.paths || decoded.rawBytes !== counters.rawBytes) {
-      throw new Error("Compressed index round-trip verification failed");
+    const decodeTimings = [];
+    let decoded;
+    for (let round = 0; round <= args.runs; round++) {
+      if (controller.signal.aborted) throw new Error("Benchmark cancelled");
+      decoded = await measureDecode(index);
+      if (decoded.paths !== counters.paths || decoded.rawBytes !== counters.rawBytes) {
+        throw new Error("Compressed index round-trip verification failed");
+      }
+      if (round > 0) decodeTimings.push(decoded.elapsedMs);
     }
+    const decodeStats = summarizeTimes(decodeTimings);
+    const decodeCpu = usageDelta(process.cpuUsage(decodeCpuStart));
 
     const tests = [
       { kind: "frequent-early-limit", query: "a", timings: [], count: 0, limited: false },
@@ -274,7 +282,8 @@ async function run() {
       buildMs,
       buildCpu,
       decodedPaths: decoded.paths,
-      decodeMs: decoded.elapsedMs,
+      decodeMs: decodeStats.p50Ms,
+      decodeStats,
       decodeCpu,
       searchCpu,
       warmupRounds: 1,
