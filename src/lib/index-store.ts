@@ -2,7 +2,7 @@ import { environment, getPreferenceValues } from "@raycast/api";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { createWriteStream, constants } from "node:fs";
-import { access, mkdir, readFile, rm, stat } from "node:fs/promises";
+import { access, mkdir, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
@@ -36,17 +36,18 @@ import {
   createStreamingIndexStage,
   finalizeStreamingIndexStage,
   publishIndex,
-  readIndexHeader,
-  type SavedIndexMetadata,
 } from "./index-files";
 
-export type IndexMetadata = SavedIndexMetadata;
+import {
+  indexPathAt,
+  readStoredIndex,
+  type ActiveIndexMetadata,
+} from "./index-location";
 
-// 开发版索引与正式安装版隔离，避免测试重建覆盖用户原有数据。
-export const indexDirectory = environment.isDevelopment
-  ? path.join(environment.supportPath, "index-development-v3")
-  : environment.supportPath;
-const metadataPath = path.join(indexDirectory, "index.json");
+export type IndexMetadata = ActiveIndexMetadata;
+
+// Raycast 本身隔离扩展数据，不再额外区分开发版和本地安装索引。
+export const indexDirectory = environment.supportPath;
 
 export function getPreferences(): Preferences {
   return getPreferenceValues<Preferences>();
@@ -111,57 +112,11 @@ export async function findBinary(
 }
 
 export function indexFilePath(metadata: IndexMetadata): string {
-  // 元数据只允许指向当前扩展的数据文件，避免读取任意外部路径。
-  if (
-    metadata.filename !== ACTIVE_INDEX_FILENAME &&
-    !/^index-[a-f0-9-]+\.nul$/.test(metadata.filename)
-  ) {
-    throw new Error("Invalid index filename");
-  }
-  return path.join(indexDirectory, metadata.filename);
+  return indexPathAt(indexDirectory, metadata);
 }
 
 export async function readIndex(): Promise<IndexMetadata | null> {
-  // Version 2 is a single self-describing, atomically replaced file.
-  // It is always authoritative when present, even if a legacy index.json
-  // remains from a previous plugin version.
-  try {
-    return await readIndexHeader(
-      path.join(indexDirectory, ACTIVE_INDEX_FILENAME),
-    );
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-  }
-
-  // Backward compatibility with pre-v2 UUID + index.json format. Old
-  // generations are left alone until a successful v2 rebuild/migration.
-  let text: string;
-  try {
-    text = await readFile(metadataPath, "utf8");
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
-    throw error;
-  }
-  const data: unknown = JSON.parse(text);
-  if (
-    !data ||
-    typeof data !== "object" ||
-    !("version" in data) ||
-    data.version !== 1 ||
-    !("filename" in data) ||
-    typeof data.filename !== "string" ||
-    !("count" in data) ||
-    typeof data.count !== "number" ||
-    !("roots" in data) ||
-    !Array.isArray(data.roots) ||
-    !("createdAt" in data) ||
-    typeof data.createdAt !== "string"
-  ) {
-    throw new Error("Invalid legacy index metadata; rebuild the index");
-  }
-  const metadata = data as IndexMetadata;
-  await access(indexFilePath(metadata));
-  return { ...metadata, dataOffset: 0 };
+  return readStoredIndex(indexDirectory);
 }
 
 async function runFd(
