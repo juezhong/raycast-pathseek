@@ -8,6 +8,7 @@ import {
   isPathInsideDirectory,
   matchesSelectedDirectory,
   parseSubtreeQuery,
+  selectedFolderSearchQuery,
 } from "../src/lib/subtree-search.ts";
 import { prepareIndex, publishIndex } from "../src/lib/index-files.ts";
 import { parseFuzzyPathQuery } from "../src/lib/fuzzy-path-query.ts";
@@ -134,5 +135,66 @@ test("aborted directory lookup never continues searching the index", async () =>
     await assert.rejects(
       findIndexedDirectoryChoices(index, ["dir"], controller.signal),
     );
+  });
+});
+
+
+test("Tab and Action construct an unambiguous full-path scope without preserving prior terms", () => {
+  const first = "/projects/first/src";
+  const second = "/archive/first/src";
+  assert.equal(selectedFolderSearchQuery(first), first + "/ ");
+  assert.equal(selectedFolderSearchQuery(second), second + "/ ");
+  assert.notEqual(selectedFolderSearchQuery(first), selectedFolderSearchQuery(second));
+
+  const input = selectedFolderSearchQuery(first);
+  const parsed = parseSubtreeQuery(input);
+  assert.deepEqual(parsed, {
+    directoryPatterns: ["projects", "first", "src"],
+    directoryExpression: first,
+    absoluteDirectory: first,
+    nameQuery: "",
+    marker: "/ ",
+  });
+  assert.equal(parseSubtreeQuery(input + ".ts$").nameQuery, ".ts$");
+  assert.equal(parseSubtreeQuery(input + "dyc").nameQuery, "dyc");
+  assert.equal(
+    parseSubtreeQuery(selectedFolderSearchQuery("/projects/中文 目录") + "so file")
+      .absoluteDirectory,
+    "/projects/中文 目录",
+  );
+  assert.equal(selectedFolderSearchQuery("/projects/first/src/"), input);
+  assert.equal(selectedFolderSearchQuery("/"), "/ ");
+  assert.equal(parseSubtreeQuery("/ ").absoluteDirectory, "/");
+  assert.throws(() => selectedFolderSearchQuery("relative/path"), /absolute/);
+});
+
+test("typed absolute subtree scope selects the exact indexed folder, never another matching suffix", async () => {
+  await withIndex([
+    "/projects/first/src/main.ts",
+    "/archive/first/src/main.ts",
+    "/projects/first/src-other/other.ts",
+    "/projects/中文 目录/一次.ts",
+  ], async (index) => {
+    const a = "/projects/first/src";
+    const b = "/archive/first/src";
+    const params = parseSubtreeQuery(selectedFolderSearchQuery(a) + ".ts$");
+    const exact = await findIndexedDirectoryChoices(
+      index, params.directoryPatterns, undefined, 50, params.absoluteDirectory,
+    );
+    assert.deepEqual(exact, { paths: [a], truncated: false });
+    const other = await findIndexedDirectoryChoices(
+      index, params.directoryPatterns, undefined, 50, b,
+    );
+    assert.deepEqual(other, { paths: [b], truncated: false });
+    const missing = await findIndexedDirectoryChoices(
+      index, params.directoryPatterns, undefined, 50, "/projects/first/src-not-here",
+    );
+    assert.deepEqual(missing, { paths: [], truncated: false });
+    const withSpaces = parseSubtreeQuery("/projects/中文 目录/ .ts$");
+    const chinese = await findIndexedDirectoryChoices(
+      index, withSpaces.directoryPatterns, undefined, 50,
+      withSpaces.absoluteDirectory,
+    );
+    assert.deepEqual(chinese.paths, ["/projects/中文 目录"]);
   });
 });
