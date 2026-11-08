@@ -31,19 +31,26 @@ export function parseSubtreeQuery(input: string): SubtreeQuery | null {
 
   // 选定目录后的绝对路径就是搜索作用域，不能再用 fuzzy 名称猜测同名目录。
   // 保留目录名中的前后空格，不对真实路径做 trim。
-  const absoluteDirectory = path.isAbsolute(match[1])
-    ? match[1]
-    : undefined;
+  const absoluteDirectory =
+    match[1] === "" && input.startsWith("/ ")
+      ? "/"
+      : path.isAbsolute(match[1])
+        ? match[1]
+        : undefined;
   const directoryExpression = absoluteDirectory ?? match[1].trim();
   if (!directoryExpression) {
     throw new Error("Subtree search needs a directory before /  or //");
   }
-  const directoryPatterns = directoryExpression
-    .split("/")
-    .slice(absoluteDirectory ? 1 : 0)
-    .map((segment) => (absoluteDirectory ? segment : segment.trim()));
+  const directoryPatterns =
+    directoryExpression === "/"
+      ? []
+      : directoryExpression
+          .split("/")
+          .slice(absoluteDirectory ? 1 : 0)
+          .map((segment) => (absoluteDirectory ? segment : segment.trim()));
   if (
     directoryPatterns.length > (absoluteDirectory ? 128 : 16) ||
+    (!absoluteDirectory && directoryPatterns.length === 0) ||
     directoryPatterns.some((segment) => !segment || segment.length > 128)
   ) {
     throw new Error(
@@ -65,6 +72,15 @@ export function parseSubtreeQuery(input: string): SubtreeQuery | null {
     marker: match[2] === "/" ? "//" : "/ ",
     ...(absoluteDirectory ? { absoluteDirectory } : {}),
   };
+}
+
+/** 选定目录后搜索框显示真实绝对路径，而不是可能重名的 basename。 */
+export function selectedFolderSearchQuery(folder: string): string {
+  if (!path.isAbsolute(folder)) {
+    throw new Error("Selected folder must have an absolute path");
+  }
+  const normalized = folder === "/" ? "/" : folder.replace(/\/+$/u, "");
+  return normalized === "/" ? "/ " : normalized + "/ ";
 }
 
 /** 前缀边界必须完整：/foo 不能命中 /foobar。 */
