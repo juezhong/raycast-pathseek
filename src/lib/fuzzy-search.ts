@@ -12,8 +12,9 @@ export async function fuzzySearch(
   index: IndexMetadata,
   query: string,
   signal?: AbortSignal,
+  scopeDirectory?: string,
 ): Promise<string[]> {
-  if (!query.trim() || signal?.aborted) return [];
+  if ((!query.trim() && !scopeDirectory) || signal?.aborted) return [];
 
   const binary = await findBinary("fzf", getPreferences().fzfBinary);
   if (signal?.aborted) return [];
@@ -30,6 +31,9 @@ export async function fuzzySearch(
       indexFilePath(index),
       query,
       signal,
+      60_000,
+      undefined,
+      scopeDirectory,
     );
     await trace?.finish(
       result.cancelled

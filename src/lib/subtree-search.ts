@@ -1,0 +1,193 @@
+import path from "node:path";
+import { MAX_FZF_PATH_BYTES } from "./fzf-output.ts";
+import { compileFuzzyParentPathMatcher } from "./fuzzy-path-query.ts";
+import { openIndexDataStream } from "./index-files.ts";
+import { throwIfAborted } from "./managed-child.ts";
+import { pinyinAlias } from "./pinyin-filter.ts";
+
+const MAX_DIRECTORY_CHOICES = 50;
+const MAX_CHECKED_DIRECTORIES = 8192;
+
+export type SubtreeQuery = {
+  directoryPatterns: string[];
+  directoryExpression: string;
+  nameQuery: string;
+  marker: "/ " | "//";
+  absoluteDirectory?: string;
+};
+
+export type DirectoryChoices = {
+  paths: string[];
+  truncated: boolean;
+};
+
+/**
+ * 只有 "/ " 或 "//" 才进入子树模式。保留原有单斜杠连续层级查询。
+ * 解析时不依赖输入末尾的 trim()，否则会丢失用于切换模式的空格。
+ */
+export function parseSubtreeQuery(input: string): SubtreeQuery | null {
+  const match = /^(.*?)\/(\/| )([\s\S]*)$/u.exec(input);
+  if (!match) return null;
+
+  // 选定目录后的绝对路径就是搜索作用域，不能再用 fuzzy 名称猜测同名目录。
+  // 保留目录名中的前后空格，不对真实路径做 trim。
+  const absoluteDirectory =
+    match[1] === "" && input.startsWith("/ ")
+      ? "/"
+      : path.isAbsolute(match[1])
+        ? match[1]
+        : undefined;
+  const directoryExpression = absoluteDirectory ?? match[1].trim();
+  if (!directoryExpression) {
+    throw new Error("Subtree search needs a directory before /  or //");
+  }
+  const directoryPatterns =
+    directoryExpression === "/"
+      ? []
+      : directoryExpression
+          .split("/")
+          .slice(absoluteDirectory ? 1 : 0)
+          .map((segment) => (absoluteDirectory ? segment : segment.trim()));
+  if (
+    directoryPatterns.length > (absoluteDirectory ? 128 : 16) ||
+    (!absoluteDirectory && directoryPatterns.length === 0) ||
+    directoryPatterns.some((segment) => !segment || segment.length > 128)
+  ) {
+    throw new Error(
+      "Subtree directory query needs non-empty levels (max 128 characters each)",
+    );
+  }
+  const nameQuery = match[3].trimStart();
+  if (nameQuery.startsWith("/"))
+    throw new Error(
+      "Subtree search cannot start with an empty directory level (///)",
+    );
+  if (nameQuery.length > 512)
+    throw new Error("Subtree filename query is too long");
+
+  return {
+    directoryPatterns,
+    directoryExpression,
+    nameQuery,
+    marker: match[2] === "/" ? "//" : "/ ",
+    ...(absoluteDirectory ? { absoluteDirectory } : {}),
+  };
+}
+
+/** 选定目录后搜索框显示真实绝对路径，而不是可能重名的 basename。 */
+export function selectedFolderSearchQuery(folder: string): string {
+  if (!path.isAbsolute(folder)) {
+    throw new Error("Selected folder must have an absolute path");
+  }
+  const normalized = folder === "/" ? "/" : folder.replace(/\/+$/u, "");
+  return normalized === "/" ? "/ " : normalized + "/ ";
+}
+
+/** 前缀边界必须完整：/foo 不能命中 /foobar。 */
+export function isPathInsideDirectory(
+  filepath: string,
+  directory: string,
+): boolean {
+  const normalized = directory === "/" ? "/" : directory.replace(/\/+$/u, "");
+  const prefix = normalized === "/" ? "/" : normalized + "/";
+  return filepath.startsWith(prefix) && filepath.length > prefix.length;
+}
+
+/**
+ * 支持一个目录被高亮后才输入分隔符。
+ * 高亮目录可以是表达式本身匹配的目录，也可以是它的直接子目录。
+ */
+export function matchesSelectedDirectory(
+  filepath: string,
+  directoryPatterns: readonly string[],
+): boolean {
+  const normalized = filepath.replace(/\/+$/u, "");
+  if (!normalized.startsWith("/")) return false;
+  const matches = compileFuzzyParentPathMatcher(directoryPatterns, pinyinAlias);
+  return matches(normalized + "/__pathseek_probe__") || matches(normalized);
+}
+
+/**
+ * 只读取既有索引，目录由实际索引记录的父路径推断；
+ * 不调用 fd，不在内存中构建整个目录树，不跟随磁盘软链接。
+ * 即使展示超过 50 个目录，也不会凭列表上限误判为唯一。
+ */
+export async function findIndexedDirectoryChoices(
+  indexPath: string,
+  directoryPatterns: readonly string[],
+  signal?: AbortSignal,
+  maxChoices = MAX_DIRECTORY_CHOICES,
+  exactDirectory?: string,
+): Promise<DirectoryChoices> {
+  if (maxChoices < 1)
+    throw new Error("Directory choice limit must be positive");
+  throwIfAborted(signal);
+  const match = exactDirectory
+    ? (candidate: string) => candidate === exactDirectory
+    : compileFuzzyParentPathMatcher(directoryPatterns, pinyinAlias);
+  const found = new Set<string>();
+  const checked = new Set<string>();
+  let pending = Buffer.alloc(0);
+  const stream = await openIndexDataStream(indexPath);
+  try {
+    for await (const chunk of stream) {
+      throwIfAborted(signal);
+      let offset = 0;
+      while (offset < chunk.length) {
+        const end = chunk.indexOf(0, offset);
+        if (end < 0) {
+          const tail = chunk.subarray(offset);
+          if (pending.length + tail.length > MAX_FZF_PATH_BYTES)
+            throw new Error("Index path exceeds size limit");
+          pending = pending.length
+            ? Buffer.concat([pending, tail])
+            : Buffer.from(tail);
+          break;
+        }
+        const part = chunk.subarray(offset, end);
+        if (pending.length + part.length > MAX_FZF_PATH_BYTES)
+          throw new Error("Index path exceeds size limit");
+        const record = pending.length
+          ? Buffer.concat([pending, part]).toString("utf8")
+          : part.toString("utf8");
+        pending = Buffer.alloc(0);
+        offset = end + 1;
+
+        const normalized = record.endsWith("/")
+          ? record.replace(/\/+$/u, "")
+          : record;
+        let directory = record.endsWith("/")
+          ? normalized
+          : path.dirname(normalized);
+        while (directory && directory !== "/" && directory !== ".") {
+          if (checked.has(directory)) break;
+          checked.add(directory);
+          if (checked.size > MAX_CHECKED_DIRECTORIES) {
+            const oldest = checked.values().next().value;
+            if (oldest) checked.delete(oldest);
+          }
+          if (
+            match(
+              exactDirectory ? directory : directory + "/__pathseek_probe__",
+            )
+          ) {
+            found.add(directory);
+            if (found.size > maxChoices) {
+              return {
+                paths: [...found].slice(0, maxChoices),
+                truncated: true,
+              };
+            }
+          }
+          const parent = path.dirname(directory);
+          if (parent === directory) break;
+          directory = parent;
+        }
+      }
+    }
+    if (pending.length) throw new Error("Incomplete NUL-delimited index input");
+    return { paths: [...found].sort(), truncated: false };
+  } finally {
+    stream.destroy();
+  }
+}

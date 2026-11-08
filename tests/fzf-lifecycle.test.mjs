@@ -594,3 +594,55 @@ test("native fzf path query matches a top-level directory under hyphenated paren
     assert.deepEqual((await runFzfFilter("fzf", file, "pat/sho")).paths, [target]);
   });
 });
+
+
+test("scoped fzf search matches all descendant levels without leaking sibling paths", async () => {
+  await fixture(async (dir) => {
+    const entries = [
+      "/projects/raypath/",
+      "/projects/raypath/main.ts",
+      "/projects/raypath/sub/source-file.ts",
+      "/projects/raypath/sub/第一次.ts",
+      "/projects/raypath/sub/deep/driver.js",
+      "/projects/raypath-other/main.ts",
+      "/projects/unrelated/sub/第一次.ts",
+      "/projects/Symlinks/raypath/linked.ts",
+    ];
+    const raw = path.join(dir, "subtree.raw");
+    const stage = path.join(dir, "subtree.stage");
+    await writeFile(raw, entries.join("\0") + "\0");
+    await prepareIndex(raw, stage, {
+      version: 3,
+      createdAt: new Date().toISOString(),
+      count: entries.length,
+      roots: ["/projects"],
+    });
+    await publishIndex(stage, dir);
+    const index = path.join(dir, "index.nul");
+    const run = async (query, root) =>
+      (await runFzfFilter("fzf", index, query, undefined, 60_000, undefined, root)).paths;
+
+    assert.deepEqual(
+      new Set(await run(".ts$", "/projects/raypath")),
+      new Set(entries.slice(1, 4)),
+    );
+    assert.deepEqual(await run("dyc", "/projects/raypath"), [entries[3]]);
+    assert.deepEqual(await run("so file", "/projects/raypath"), [entries[2]]);
+    assert.deepEqual(
+      new Set(await run("", "/projects/raypath")),
+      new Set(entries.slice(1, 5)),
+    );
+    assert.deepEqual(await run("main", "/projects/raypath-other"), [entries[5]]);
+    assert.deepEqual(await run(".ts$", "/projects/Symlinks/raypath"), [entries[7]]);
+    assert.deepEqual(await run("sub/deep/driv", "/projects/raypath"), [entries[4]]);
+
+    // 不带子树限定时，原先的名称和连续层级规则不变。
+    const ordinary = (await runFzfFilter("fzf", index, ".ts$")).paths;
+    assert.ok(ordinary.includes(entries[1]));
+    assert.ok(ordinary.includes(entries[5]));
+    assert.deepEqual(
+      new Set((await runFzfFilter("fzf", index, "raypath/.ts$")).paths),
+      new Set([entries[1], entries[5], entries[7]]),
+    );
+  });
+});

@@ -9,7 +9,11 @@ import {
 import { useEffect, useState } from "react";
 import path from "node:path";
 import { fuzzySearch } from "./lib/fuzzy-search";
-import type { IndexMetadata } from "./lib/index-store";
+import { indexFilePath, type IndexMetadata } from "./lib/index-store";
+import {
+  findIndexedDirectoryChoices,
+  parseSubtreeQuery,
+} from "./lib/subtree-search";
 
 const HELP = `# Search Syntax Guide
 
@@ -41,6 +45,16 @@ Use / to separate **directory levels** from the final file or directory name. Ev
 - \`fzf\` extended syntax is **not** full regex: patterns such as \`a.*b\` are not treated as regular expressions.
 
 All checks read the existing local index; no on-demand filesystem traversal, second index, or background service is added.
+
+## Recursive Search Within a Folder
+
+- \`raypath/ .ts$\` and \`raypath//.ts$\` enter subtree mode: choose the indexed folder matching \`raypath\`, then search all descendants for names ending in \`.ts\`.
+- \`first/second/ so file\` uses existing consecutive fuzzy directory matching to locate \`second\`, then recursively searches descendant names with fzf AND terms.
+- \`raypath/.ts$\` (without space or double slash) keeps its old behavior, matching only direct children of fuzzy-matching parent folders.
+- When several folders match, choose the intended one in the directory picker. Highlight a compatible directory before typing \`/ \` or \`//\` to use that selected folder instead.
+- On an indexed folder result, use Search Within This Folder from the Action Panel. Tab is configured but must be checked in Raycast; the menu action works independently.
+- Only indexed paths are searched. \`/first/\` does not include \`/first-other/\`. No fd scans, extra indexes, or automatic symlink following are added.
+- \`.ts$\` is the fzf suffix operator; \`*.ts\` and \`.*ts\` are not supported glob/regex expressions.
 
 ## Chinese Pinyin
 
@@ -97,7 +111,27 @@ function SearchExpressionBuilder({
 
     setLoading(true);
     const timer = setTimeout(() => {
-      fuzzySearch(index, expression, controller.signal)
+      const preview = async () => {
+        const subtree = parseSubtreeQuery(expression);
+        if (!subtree) return fuzzySearch(index, expression, controller.signal);
+        const choices = await findIndexedDirectoryChoices(
+          indexFilePath(index),
+          subtree.directoryPatterns,
+          controller.signal,
+        );
+        if (choices.paths.length !== 1 || choices.truncated) {
+          throw new Error(
+            "Subtree preview needs one matching directory. Apply the expression in the main list to choose a folder.",
+          );
+        }
+        return fuzzySearch(
+          index,
+          subtree.nameQuery,
+          controller.signal,
+          choices.paths[0],
+        );
+      };
+      void preview()
         .then((paths) => {
           if (!controller.signal.aborted) setPreview(paths);
         })
