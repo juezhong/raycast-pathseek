@@ -13,6 +13,7 @@ export type SubtreeQuery = {
   directoryExpression: string;
   nameQuery: string;
   marker: "/ " | "//";
+  absoluteDirectory?: string;
 };
 
 export type DirectoryChoices = {
@@ -28,17 +29,25 @@ export function parseSubtreeQuery(input: string): SubtreeQuery | null {
   const match = /^(.*?)\/(\/| )([\s\S]*)$/u.exec(input);
   if (!match) return null;
 
-  const directoryExpression = match[1].trim();
+  // 选定目录后的绝对路径就是搜索作用域，不能再用 fuzzy 名称猜测同名目录。
+  // 保留目录名中的前后空格，不对真实路径做 trim。
+  const absoluteDirectory = path.isAbsolute(match[1])
+    ? match[1]
+    : undefined;
+  const directoryExpression = absoluteDirectory ?? match[1].trim();
   if (!directoryExpression) {
     throw new Error("Subtree search needs a directory before /  or //");
   }
-  const directoryPatterns = directoryExpression.split("/").map((s) => s.trim());
+  const directoryPatterns = directoryExpression
+    .split("/")
+    .slice(absoluteDirectory ? 1 : 0)
+    .map((segment) => (absoluteDirectory ? segment : segment.trim()));
   if (
-    directoryPatterns.length > 16 ||
-    directoryPatterns.some((s) => !s || s.length > 128)
+    directoryPatterns.length > (absoluteDirectory ? 128 : 16) ||
+    directoryPatterns.some((segment) => !segment || segment.length > 128)
   ) {
     throw new Error(
-      "Subtree directory query needs 1 to 16 non-empty levels (max 128 characters each)",
+      "Subtree directory query needs non-empty levels (max 128 characters each)",
     );
   }
   const nameQuery = match[3].trimStart();
@@ -54,6 +63,7 @@ export function parseSubtreeQuery(input: string): SubtreeQuery | null {
     directoryExpression,
     nameQuery,
     marker: match[2] === "/" ? "//" : "/ ",
+    ...(absoluteDirectory ? { absoluteDirectory } : {}),
   };
 }
 
@@ -91,11 +101,14 @@ export async function findIndexedDirectoryChoices(
   directoryPatterns: readonly string[],
   signal?: AbortSignal,
   maxChoices = MAX_DIRECTORY_CHOICES,
+  exactDirectory?: string,
 ): Promise<DirectoryChoices> {
   if (maxChoices < 1)
     throw new Error("Directory choice limit must be positive");
   throwIfAborted(signal);
-  const match = compileFuzzyParentPathMatcher(directoryPatterns, pinyinAlias);
+  const match = exactDirectory
+    ? (candidate: string) => candidate === exactDirectory
+    : compileFuzzyParentPathMatcher(directoryPatterns, pinyinAlias);
   const found = new Set<string>();
   const checked = new Set<string>();
   let pending = Buffer.alloc(0);
