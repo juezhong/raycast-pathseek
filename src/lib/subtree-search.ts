@@ -166,7 +166,11 @@ export async function findIndexedDirectoryChoices(
             const oldest = checked.values().next().value;
             if (oldest) checked.delete(oldest);
           }
-          if (match(exactDirectory ? directory : directory + "/__pathseek_probe__")) {
+          if (
+            match(
+              exactDirectory ? directory : directory + "/__pathseek_probe__",
+            )
+          ) {
             found.add(directory);
             if (found.size > maxChoices) {
               return {
