@@ -23,6 +23,7 @@ import {
   findIndexedDirectoryChoices,
   matchesSelectedDirectory,
   parseSubtreeQuery,
+  selectedFolderSearchQuery,
 } from "./lib/subtree-search";
 import { getDialogNavigationPaths } from "./lib/dialog-navigation";
 import {
@@ -109,17 +110,11 @@ export function SearchFilesView({
         });
         return;
       }
-      let request: ReturnType<typeof parseSubtreeQuery> = null;
-      try {
-        request = parseSubtreeQuery(queryRef.current);
-      } catch {
-        // 当前表达式无效时，从真实的选中目录名称重新开始。
-      }
-      const expression =
-        request?.directoryExpression ?? path.basename(filepath);
-      const nextQuery = request ? queryRef.current : expression + "/ ";
+      // Action Panel 与 Tab 共用同一个入口：始终清除旧搜索词，
+      // 在搜索框内显示选定目录完整路径，以免重名目录无法区分。
       const folder = filepath === "/" ? "/" : filepath.replace(/\/+$/u, "");
-      setActiveScope({ expression, folder });
+      const nextQuery = selectedFolderSearchQuery(folder);
+      setActiveScope({ expression: folder, folder });
       setDirectoryChoices([]);
       setScopeHint(null);
       queryRef.current = nextQuery;
@@ -177,7 +172,12 @@ export function SearchFilesView({
 
     const resolve = async () => {
       // 用户先高亮某个目录、再输入 "/ " 或 "//"：优先锁定高亮目录。
-      if (hint && matchesSelectedDirectory(hint, patterns)) {
+      if (
+        hint &&
+        (subtreeQuery.absoluteDirectory
+          ? hint === subtreeQuery.absoluteDirectory
+          : matchesSelectedDirectory(hint, patterns))
+      ) {
         const selected = await stat(hint).catch(() => null);
         if (selected?.isDirectory()) {
           if (!controller.signal.aborted) {
@@ -194,6 +194,8 @@ export function SearchFilesView({
         indexFilePath(index),
         patterns,
         controller.signal,
+        50,
+        subtreeQuery.absoluteDirectory,
       );
       if (controller.signal.aborted) return;
       if (choices.paths.length === 1 && !choices.truncated) {
